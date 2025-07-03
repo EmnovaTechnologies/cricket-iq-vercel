@@ -1,0 +1,143 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    //----------------------------------------------------------------------
+    // Helper Functions
+    //----------------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isSuperAdmin() {
+      // Check if user is signed in, their user document exists, and the roles array contains 'admin'.
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+    }
+
+    function isAssignedToOrg(orgId) {
+      // Check if user is signed in, their user document exists, and they are assigned to the specified organization.
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedOrganizationIds.hasAny([orgId]);
+    }
+
+    //----------------------------------------------------------------------
+    // Collection-Specific Rules
+    //----------------------------------------------------------------------
+
+    match /users/{userId} {
+      // Any user can create their own document.
+      allow create: if request.auth.uid == userId;
+      // Any signed-in user can read any profile or list users.
+      allow read, list: if isSignedIn();
+      // Who can update?
+      // 1. The owner of the profile.
+      // 2. A super admin.
+      // 3. An Organization Admin, with specific restrictions.
+      allow update: if isOwner(userId) || isSuperAdmin() ||
+        (
+          // Org admin check
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['Organization Admin']) &&
+          // Cannot edit an existing admin's profile
+          !resource.data.roles.hasAny(['admin']) &&
+          // Cannot grant admin role
+          !request.resource.data.roles.hasAny(['admin']) &&
+          // Can only affect specific assignment/role fields
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'roles',
+            'activeOrganizationId',
+            'assignedOrganizationIds',
+            'assignedSeriesIds',
+            'assignedTeamIds',
+            'assignedGameIds',
+            'lastLogin'
+          ])
+        );
+    }
+
+    match /organizations/{orgId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /role_permissions_config/{roleName} {
+        allow read: if isSignedIn();
+        allow write: if isSuperAdmin();
+    }
+
+    match /genkit-traces/{traceId} {
+      allow write: if isSignedIn();
+    }
+
+    match /genkit-flows/{flowId} {
+      allow write: if isSignedIn();
+    }
+
+    match /players/{playerId} {
+      allow get, list: if isSignedIn();
+      allow write: if
+        // Super Admins can do anything.
+        isSuperAdmin() ||
+        // Org Admins can manage players in their organization.
+        (isSignedIn() && isAssignedToOrg(request.resource.data.organizationId)) ||
+        // Allow public player registration (anonymous create with token).
+        (
+          request.method == 'create'
+          && request.resource.data.registrationToken is string
+          && request.resource.data.registrationTokenExpires is timestamp
+        ) ||
+        // Allow a new user to claim their profile after signing up.
+        (
+          request.method == 'update'
+          && isSignedIn()
+          && resource.data.userId == null // Profile is unclaimed.
+          && request.resource.data.userId == request.auth.uid // Claiming with own UID.
+          && request.resource.data.registrationTokenExpires > request.time // Token is not expired.
+          && resource.data.registrationToken == request.resource.data.registrationToken // Token from DB matches request.
+          // Only allow specific fields to change during the claim process.
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'registrationToken', 'registrationTokenExpires'])
+        );
+    }
+
+    match /teams/{docId} {
+      allow get, list: if isSignedIn();
+      allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
+    }
+    match /series/{docId} {
+      allow get, list: if isSignedIn();
+      allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
+    }
+    match /venues/{docId} {
+      allow get, list: if isSignedIn();
+      allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
+    }
+    match /games/{docId} {
+      allow get, list: if isSignedIn();
+      allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
+    }
+    match /playerRatings/{docId} {
+      allow get, list: if isSignedIn();
+      allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
+    }
+    match /fitnessTests/{docId} {
+      allow get, list: if isSignedIn();
+      allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
+    }
+    match /fitnessTestResults/{docId} {
+      allow get, list: if isSignedIn();
+      allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
+    }
+
+    // Default deny all access to other paths.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,100 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    //----------------------------------------------------------------------
+    // Helper Functions
+    //----------------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isSuperAdmin() {
+      // Check if user is signed in, their user document exists, and the roles array contains 'admin'.
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+    }
+
+    function isAssignedToOrg(orgId) {
+      // Check if user is signed in, their user document exists, and they are assigned to the specified organization.
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedOrganizationIds.hasAny([orgId]);
+    }
+
+    //----------------------------------------------------------------------
+    // Collection-Specific Rules
+    //----------------------------------------------------------------------
+
+    match /users/{userId} {
+      // Any user can create their own document.
+      allow create: if request.auth.uid == userId;
+      // Any signed-in user can read any profile (to prevent recursive lookup errors).
+      allow read: if isSignedIn();
+      // Only the owner or a super admin can update a profile.
+      allow update: if isOwner(userId) || isSuperAdmin();
+    }
+
+    match /organizations/{orgId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /role_permissions_config/{roleName} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /players/{playerId} {
+      // GET: Allow reading a single player document if the user is a super admin or assigned to the player's organization.
+      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
+      // LIST: Allow any signed-in user to query the players collection. Security is enforced by client-side queries.
+      allow list: if isSignedIn();
+      // WRITE: Complex write rules for creating, claiming, or admin updates.
+      allow write: if
+        // Super Admins can do anything.
+        isSuperAdmin() ||
+        // Org Admins can manage players in their organization.
+        (isSignedIn() && isAssignedToOrg(request.resource.data.organizationId)) ||
+        // Allow public player registration (anonymous create with token).
+        (
+          request.method == 'create'
+          && request.resource.data.registrationToken is string
+          && request.resource.data.registrationTokenExpires is timestamp
+        ) ||
+        // Allow a new user to claim their profile after signing up.
+        (
+          request.method == 'update'
+          && isSignedIn()
+          && resource.data.userId == null // Profile is unclaimed.
+          && request.resource.data.userId == request.auth.uid // Claiming with own UID.
+          && request.resource.data.registrationTokenExpires > request.time // Token is not expired.
+          && resource.data.registrationToken == request.resource.data.registrationToken // Token from DB matches request.
+          // Only allow specific fields to change during the claim process.
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'registrationToken', 'registrationTokenExpires'])
+        );
+    }
+    
+    // Consolidated rule for most data collections.
+    match /{collection}/{docId}
+      where collection in ['teams', 'series', 'venues', 'games', 'playerRatings', 'fitnessTests', 'fitnessTestResults'] {
+        // GET: Allow reading a single document if the user is a super admin or assigned to the document's organization.
+        allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
+        // LIST: Allow any signed-in user to query the collection. Security is enforced by client-side queries.
+        allow list: if isSignedIn();
+        // WRITE: Allow writing if the user is a super admin or assigned to the document's organization.
+        allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
+    }
+
+    // Default deny all access to other paths.
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

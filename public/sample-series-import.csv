@@ -1,0 +1,4 @@
+SeriesName,AgeCategory,Year,MaleCutoffDate,FemaleCutoffDate,SeriesAdminEmails
+SoCal U13 Championship 2024,Under 13 (U13),2024,09/01/2011,09/01/2009,admin@example.com,selector1@example.com
+SoCal U15 League 2025,Under 15 (U15),2025,09/01/2010,09/01/2008,
+NCA Hub Games U11 2024,Under 11 (U11),2024,09/01/2013,09/01/2011,testuser@example.com

@@ -1,0 +1,4 @@
+FirstName,LastName,CricClubsID,DateOfBirth,Gender,PrimarySkill,DominantHandBatting,BattingOrder,DominantHandBowling,BowlingStyle,PrimaryClubName,PrimaryTeamName
+John,Doe,JD123,05/15/2008,Male,Batting,"Right Hand","Top Order",,,Warriors Club,"U15 Heat"
+Jane,Smith,JS456,10/20/2009,Female,Bowling,"Right Hand","Low Order","Right Hand","Off Spin",Lions Club,"U15 Heat"
+Peter,Jones,PJ789,02/01/2008,Male,"Wicket Keeping","Left Hand","Middle Order",,,Warriors Club,"U15 Heat"
