@@ -4,9 +4,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  turbopack: {},
   async headers() {
     return [
       {
@@ -23,14 +21,6 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'placehold.co', port: '', pathname: '/**' },
       { protocol: 'https', hostname: 'firebasestorage.googleapis.com', port: '', pathname: '/**' },
     ],
-  },
-  webpack: (config, { isServer }) => {
-    // Suppress missing optional peer dependency warnings from opentelemetry/genkit
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      '@opentelemetry/exporter-jaeger': false,
-    };
-    return config;
   },
 };
 
