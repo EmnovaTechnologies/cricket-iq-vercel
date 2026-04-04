@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RatingFormEnhanced } from '@/components/rating-form-enhanced';
@@ -19,7 +18,7 @@ import { finalizeGameRatingsAction, certifyRatingsAction, adminForceFinalizeGame
 import { useToast } from '@/hooks/use-toast';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 
-export default function RateGameEnhancedPage() {
+function RateGameEnhancedContent() {
   const params = useParams<{ id: string }>();
   const searchParamsHook = useSearchParams();
   const router = useRouter();
@@ -51,15 +50,15 @@ export default function RateGameEnhancedPage() {
         setGame(fetchedGame);
         if (fetchedGame) {
           try {
-              const gameDateObj = parseISO(fetchedGame.date);
-              setFormattedGameDate(format(gameDateObj, 'PPP'));
-              setIsFutureGame(startOfDay(gameDateObj) > startOfDay(new Date()));
+            const gameDateObj = parseISO(fetchedGame.date);
+            setFormattedGameDate(format(gameDateObj, 'PPP'));
+            setIsFutureGame(startOfDay(gameDateObj) > startOfDay(new Date()));
           } catch (e) {
-              console.error("Error formatting game date:", e);
-              setFormattedGameDate("Invalid date");
-              setIsFutureGame(false);
+            console.error("Error formatting game date:", e);
+            setFormattedGameDate("Invalid date");
+            setIsFutureGame(false);
           }
-          
+
           setInitialRatings(await getRatingsForGameFromDB(gameId));
 
           const loadedPlayers: PlayerInGameDetails[] = [];
@@ -68,17 +67,13 @@ export default function RateGameEnhancedPage() {
 
           for (const playerId of team1PlayerIds) {
             const player = await getPlayerByIdFromDB(playerId);
-            if (player) {
-              loadedPlayers.push({ ...player, teamName: fetchedGame.team1 });
-            }
+            if (player) loadedPlayers.push({ ...player, teamName: fetchedGame.team1 });
           }
           for (const playerId of team2PlayerIds) {
             const player = await getPlayerByIdFromDB(playerId);
-            if (player) {
-              loadedPlayers.push({ ...player, teamName: fetchedGame.team2 });
-            }
+            if (player) loadedPlayers.push({ ...player, teamName: fetchedGame.team2 });
           }
-          
+
           loadedPlayers.sort((a, b) => {
             if (a.teamName < b.teamName) return -1;
             if (a.teamName > b.teamName) return 1;
@@ -88,7 +83,7 @@ export default function RateGameEnhancedPage() {
 
           if (fetchedGame.selectorUserIds && fetchedGame.selectorUserIds.length > 0) {
             const selectorProfiles = (await Promise.all(
-               fetchedGame.selectorUserIds.map(uid => getUserProfile(uid))
+              fetchedGame.selectorUserIds.map(uid => getUserProfile(uid))
             )).filter(Boolean) as UserProfile[];
             setGameSelectorsFullProfiles(selectorProfiles);
           } else {
@@ -96,7 +91,6 @@ export default function RateGameEnhancedPage() {
           }
 
           setCanAdminForceFinalizeThisGame(!!effectivePermissions[PERMISSIONS.GAMES_ADMIN_FORCE_FINALIZE_ANY]);
-
         } else {
           setFormattedGameDate(null);
           setIsFutureGame(false);
@@ -109,9 +103,7 @@ export default function RateGameEnhancedPage() {
       setIsLoadingPageData(false);
 
       if (fetchedGame && !fetchedGame.ratingsFinalized && currentUserProfile?.uid && !(startOfDay(parseISO(fetchedGame.date)) > startOfDay(new Date()))) {
-        if (isAttemptingAutoFinalize) {
-          return;
-        }
+        if (isAttemptingAutoFinalize) return;
         const assignedSelectors = fetchedGame.selectorUserIds || [];
         const certifications = fetchedGame.selectorCertifications || {};
         const lastModified = fetchedGame.ratingsLastModifiedAt ? new Date(fetchedGame.ratingsLastModifiedAt) : null;
@@ -125,15 +117,10 @@ export default function RateGameEnhancedPage() {
             const isCertified = certData?.status === 'certified';
             const certifiedAt = certData?.certifiedAt ? new Date(certData.certifiedAt) : null;
             const isCurrent = certifiedAt && (!lastModified || certifiedAt >= lastModified);
-
-
-            if (!isCertified || !isCurrent) {
-              allCertifiedAndCurrent = false;
-              break;
-            }
+            if (!isCertified || !isCurrent) { allCertifiedAndCurrent = false; break; }
           }
         }
-        
+
         if (allCertifiedAndCurrent) {
           setIsAttemptingAutoFinalize(true);
           toast({ title: "Auto-Finalizing Ratings", description: "All selectors have certified. Finalizing ratings..." });
@@ -141,7 +128,7 @@ export default function RateGameEnhancedPage() {
             .then(result => {
               if (result.success) {
                 toast({ title: "Ratings Auto-Finalized", description: result.message });
-                triggerPageRefresh(); 
+                triggerPageRefresh();
               } else {
                 toast({ title: "Auto-Finalization Failed", description: result.error, variant: "destructive" });
               }
@@ -150,16 +137,12 @@ export default function RateGameEnhancedPage() {
               console.error("Error during auto-finalization call:", err);
               toast({ title: "Auto-Finalization Error", description: "An unexpected error occurred.", variant: "destructive" });
             })
-            .finally(() => {
-              setIsAttemptingAutoFinalize(false);
-            });
+            .finally(() => setIsAttemptingAutoFinalize(false));
         }
       }
-    }; 
-    
-    if (!isAuthLoading) { 
-        fetchData();
-    }
+    };
+
+    if (!isAuthLoading) fetchData();
   }, [gameId, isAuthLoading, refreshTrigger, currentUserProfile, toast, effectivePermissions]);
 
   if (isAuthLoading || isLoadingPageData) {
@@ -171,46 +154,30 @@ export default function RateGameEnhancedPage() {
     );
   }
 
-  if (!game) {
-    return <p className="text-center text-muted-foreground py-10">Game not found.</p>;
-  }
-  
+  if (!game) return <p className="text-center text-muted-foreground py-10">Game not found.</p>;
+
   const canRateThisGame = effectivePermissions[PERMISSIONS.GAMES_RATE_ANY] || (effectivePermissions[PERMISSIONS.GAMES_RATE_ASSIGNED] && game.selectorUserIds?.includes(currentUserProfile?.uid || ''));
 
   const getCertificationProgress = () => {
-    if (!game) {
-        return { text: "Game data not loaded.", certifiedCount: 0, totalSelectors: 0, readyToFinalize: false };
-    }
-    
-    if (game.ratingsFinalized) {
-      return { text: "Ratings for this game are finalized.", certifiedCount: game.selectorUserIds?.length || 0, totalSelectors: game.selectorUserIds?.length || 0, readyToFinalize: false };
-    }
+    if (!game) return { text: "Game data not loaded.", certifiedCount: 0, totalSelectors: 0, readyToFinalize: false };
+    if (game.ratingsFinalized) return { text: "Ratings for this game are finalized.", certifiedCount: game.selectorUserIds?.length || 0, totalSelectors: game.selectorUserIds?.length || 0, readyToFinalize: false };
+    if (!game.selectorUserIds || game.selectorUserIds.length === 0) return { text: "No selectors assigned to this game.", certifiedCount: 0, totalSelectors: 0, readyToFinalize: false };
 
-    if (!game.selectorUserIds || game.selectorUserIds.length === 0) {
-      return { text: "No selectors assigned to this game.", certifiedCount: 0, totalSelectors: 0, readyToFinalize: false };
-    }
     const totalSelectors = game.selectorUserIds.length;
     let certifiedCount = 0;
     for (const selectorId of game.selectorUserIds) {
       const certData = game.selectorCertifications?.[selectorId];
       if (certData?.status === 'certified') {
         const isCurrent = !game.ratingsLastModifiedAt || !certData.certifiedAt || new Date(certData.certifiedAt) >= new Date(game.ratingsLastModifiedAt);
-        if (isCurrent) {
-          certifiedCount++;
-        }
+        if (isCurrent) certifiedCount++;
       }
     }
     const readyToFinalize = certifiedCount === totalSelectors;
     let text = "";
-    if (readyToFinalize && certifiedCount > 0) { 
-      text = `All ${totalSelectors} selectors have certified the current ratings. Ready to finalize.`;
-    } else if (totalSelectors > 0 && certifiedCount === 0) {
-      text = "No selectors have certified the current ratings yet."
-    } else if (totalSelectors > 0) {
-      text = `Certification Progress: ${certifiedCount} of ${totalSelectors} selectors have certified the current ratings.`;
-    } else {
-      text = "Certification status unknown.";
-    }
+    if (readyToFinalize && certifiedCount > 0) text = `All ${totalSelectors} selectors have certified the current ratings. Ready to finalize.`;
+    else if (totalSelectors > 0 && certifiedCount === 0) text = "No selectors have certified the current ratings yet.";
+    else if (totalSelectors > 0) text = `Certification Progress: ${certifiedCount} of ${totalSelectors} selectors have certified the current ratings.`;
+    else text = "Certification status unknown.";
     return { text, certifiedCount, totalSelectors, readyToFinalize };
   };
 
@@ -231,17 +198,11 @@ export default function RateGameEnhancedPage() {
         <div className="mt-2 sm:mt-0 flex flex-col sm:flex-row gap-2">
           {showBackToListButton && (
             <Button asChild variant="outline" size="sm">
-              <Link href="/games">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to List
-              </Link>
+              <Link href="/games"><ArrowLeft className="mr-2 h-4 w-4" />Back to List</Link>
             </Button>
           )}
           <Button asChild variant="outline" size="sm">
-            <Link href={`/games/${gameId}/details`}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Game Details
-            </Link>
+            <Link href={`/games/${gameId}/details`}><ArrowLeft className="mr-2 h-4 w-4" />Game Details</Link>
           </Button>
         </div>
       </div>
@@ -256,44 +217,40 @@ export default function RateGameEnhancedPage() {
               const certification = game.selectorCertifications?.[s.uid];
               let displayStatus = certification?.status || 'pending';
               let isCertificationCurrent = false;
-              
               if (certification?.status === 'certified') {
-                  isCertificationCurrent = !game.ratingsLastModifiedAt || !certification.certifiedAt || new Date(certification.certifiedAt) >= new Date(game.ratingsLastModifiedAt);
-                  if (!isCertificationCurrent) {
-                      displayStatus = 'pending'; 
-                  }
+                isCertificationCurrent = !game.ratingsLastModifiedAt || !certification.certifiedAt || new Date(certification.certifiedAt) >= new Date(game.ratingsLastModifiedAt);
+                if (!isCertificationCurrent) displayStatus = 'pending';
               }
               const certifiedDate = certification?.certifiedAt ? format(parseISO(certification.certifiedAt), 'Pp') : null;
-              
               return (
                 <li key={s.uid} className="flex items-center gap-2">
-                   {s.displayName || s.email}
-                   <Badge variant={displayStatus === 'certified' ? 'default' : 'secondary'} className={displayStatus === 'certified' ? 'bg-green-600 hover:bg-green-700' : ''}>
-                     {displayStatus === 'certified' ? <CheckCircle className="h-3 w-3 mr-1"/> : <Clock className="h-3 w-3 mr-1"/>}
-                     {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
-                     {displayStatus === 'pending' && certification?.status === 'certified' && !isCertificationCurrent && <span className="ml-1 text-xs">(Needs Re-certify)</span>}
-                   </Badge>
-                   {displayStatus === 'certified' && certifiedDate && <span className="text-muted-foreground text-xs">({certifiedDate})</span>}
+                  {s.displayName || s.email}
+                  <Badge variant={displayStatus === 'certified' ? 'default' : 'secondary'} className={displayStatus === 'certified' ? 'bg-green-600 hover:bg-green-700' : ''}>
+                    {displayStatus === 'certified' ? <CheckCircle className="h-3 w-3 mr-1"/> : <Clock className="h-3 w-3 mr-1"/>}
+                    {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+                    {displayStatus === 'pending' && certification?.status === 'certified' && !isCertificationCurrent && <span className="ml-1 text-xs">(Needs Re-certify)</span>}
+                  </Badge>
+                  {displayStatus === 'certified' && certifiedDate && <span className="text-muted-foreground text-xs">({certifiedDate})</span>}
                 </li>
               );
             })}
           </ul>
         </div>
       )}
-      
+
       <div className="pt-3 mt-3 border-t">
         <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
-            <Users2 className="h-4 w-4" /> Overall Certification:
+          <Users2 className="h-4 w-4" /> Overall Certification:
         </h4>
         <p className={`text-sm ${certificationProgress.readyToFinalize && !game.ratingsFinalized && certificationProgress.totalSelectors > 0 ? 'text-green-600 font-semibold' : 'text-foreground'}`}>
-            {certificationProgress.text}
+          {certificationProgress.text}
         </p>
       </div>
 
-       {(game.ratingsLastModifiedAt) && (
+      {game.ratingsLastModifiedAt && (
         <div className="pt-2 mt-2 border-t">
           <p className="text-xs text-muted-foreground">
-            Ratings last saved: {format(parseISO(game.ratingsLastModifiedAt), 'Pp')} 
+            Ratings last saved: {format(parseISO(game.ratingsLastModifiedAt), 'Pp')}
             {game.ratingsLastModifiedBy && ` by ${gameSelectorsFullProfiles.find(s => s.uid === game.ratingsLastModifiedBy)?.displayName || game.ratingsLastModifiedBy.substring(0,6)}.`}
           </p>
         </div>
@@ -302,18 +259,14 @@ export default function RateGameEnhancedPage() {
         <Alert variant="default" className="mt-4 border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-300">
           <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
           <AlertTitle className="font-semibold">Ratings Finalized</AlertTitle>
-          <AlertDescription>
-            The ratings for this game have been finalized and are now read-only.
-          </AlertDescription>
+          <AlertDescription>The ratings for this game have been finalized and are now read-only.</AlertDescription>
         </Alert>
       )}
       {isFutureGame && !game.ratingsFinalized && (
         <Alert variant="default" className="mt-4 border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300">
           <CalendarX className="h-5 w-5 text-amber-600 dark:text-amber-400" />
           <AlertTitle className="font-semibold">Future Game</AlertTitle>
-          <AlertDescription>
-            This game is scheduled for a future date. Ratings cannot be submitted or modified until the game has been played. The form below is read-only.
-          </AlertDescription>
+          <AlertDescription>This game is scheduled for a future date. Ratings cannot be submitted or modified until the game has been played. The form below is read-only.</AlertDescription>
         </Alert>
       )}
     </>
@@ -322,18 +275,11 @@ export default function RateGameEnhancedPage() {
   if (playersInGame.length === 0 && game.team1Players?.length === 0 && game.team2Players?.length === 0) {
     return (
       <div className="space-y-8">
-        <Card>
-          <CardHeader>
-            {renderHeaderContent()}
-          </CardHeader>
-        </Card>
+        <Card><CardHeader>{renderHeaderContent()}</CardHeader></Card>
         <Alert>
           <Info className="h-4 w-4" />
           <AlertTitle>No Players to Rate</AlertTitle>
-          <AlertDescription>
-            There are no players assigned to this game (game.team1Players or game.team2Players are empty for game ID: {game.id}), 
-            or player data could not be loaded for the assigned IDs. Please ensure players are correctly assigned to games.
-          </AlertDescription>
+          <AlertDescription>There are no players assigned to this game, or player data could not be loaded. Please ensure players are correctly assigned.</AlertDescription>
         </Alert>
       </div>
     );
@@ -342,17 +288,11 @@ export default function RateGameEnhancedPage() {
   if (!canRateThisGame && !game.ratingsFinalized && !isFutureGame) {
     return (
       <div className="space-y-8">
-        <Card>
-          <CardHeader>
-            {renderHeaderContent()}
-          </CardHeader>
-        </Card>
+        <Card><CardHeader>{renderHeaderContent()}</CardHeader></Card>
         <Alert variant="destructive">
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Access Denied</AlertTitle>
-          <AlertDescription>
-            You do not have permission to rate players for this game. This requires the '{PERMISSIONS.GAMES_RATE_ANY}' or '{PERMISSIONS.GAMES_RATE_ASSIGNED}' permission.
-          </AlertDescription>
+          <AlertDescription>You do not have permission to rate players for this game.</AlertDescription>
         </Alert>
       </div>
     );
@@ -360,35 +300,41 @@ export default function RateGameEnhancedPage() {
 
   return (
     <div className="space-y-8">
-      <Card>
-        <CardHeader>
-          {renderHeaderContent()}
-        </CardHeader>
-      </Card>
-      
+      <Card><CardHeader>{renderHeaderContent()}</CardHeader></Card>
       {playersInGame.length > 0 ? (
         <RatingFormEnhanced
-          game={game} 
+          game={game}
           players={playersInGame}
           initialRatings={initialRatings}
           team1NameFromGame={game.team1}
           team2NameFromGame={game.team2}
-          currentUserProfile={currentUserProfile} 
-          gameSelectorsFullProfiles={gameSelectorsFullProfiles} 
+          currentUserProfile={currentUserProfile}
+          gameSelectorsFullProfiles={gameSelectorsFullProfiles}
           onRatingsUpdated={triggerPageRefresh}
           canAdminForceFinalize={canAdminForceFinalizeThisGame}
           isFutureGame={isFutureGame}
           effectivePermissions={effectivePermissions}
         />
       ) : (
-         <Alert>
-            <Users className="h-4 w-4" />
-            <AlertTitle>No Players Loaded</AlertTitle>
-            <AlertDescription>
-                No players were found for this game based on the game's roster (team1Players, team2Players).
-            </AlertDescription>
+        <Alert>
+          <Users className="h-4 w-4" />
+          <AlertTitle>No Players Loaded</AlertTitle>
+          <AlertDescription>No players were found for this game based on the game's roster.</AlertDescription>
         </Alert>
       )}
     </div>
+  );
+}
+
+export default function RateGameEnhancedPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Loading page data...</p>
+      </div>
+    }>
+      <RateGameEnhancedContent />
+    </Suspense>
   );
 }

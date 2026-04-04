@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { LogIn, Mail, Phone, Key, Loader2, ExternalLink, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { LogIn, Mail, Phone, Key, Loader2, ShieldAlert, AlertTriangle } from 'lucide-react';
 import type { ConfirmationResult } from 'firebase/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -25,16 +25,17 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { GoogleIcon } from '@/components/custom-icons';
 
 
-export default function LoginPage() {
+// ── Inner component that uses useSearchParams ──────────────────────────────
+function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
-  const { 
-    signInWithEmail, 
-    signInWithGoogle, 
-    signInWithPhoneNumberFlow, 
-    confirmPhoneNumberCode, 
+  const {
+    signInWithEmail,
+    signInWithGoogle,
+    signInWithPhoneNumberFlow,
+    confirmPhoneNumberCode,
     isAuthLoading,
     userProfile,
     sendPasswordReset
@@ -45,14 +46,13 @@ export default function LoginPage() {
   const [phoneFormSubmitting, setPhoneFormSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
 
-
   const [phoneNumber, setPhoneNumber] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [isCodeSent, setIsCodeSent] = useState(false);
 
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParams(); // ✅ safe here inside Suspense
 
   useEffect(() => {
     if (!isAuthLoading && userProfile) {
@@ -90,36 +90,33 @@ export default function LoginPage() {
     setGoogleSubmitting(true);
     try {
       await signInWithGoogle();
-      // onAuthStateChanged will handle navigation
     } catch (err: any) {
       let errorMessage = `An unexpected error occurred during Google Sign-In. Please try again.`;
       if (err.code === 'auth/popup-closed-by-user') {
-          errorMessage = "The sign-in popup was closed before completing. Please try again.";
+        errorMessage = "The sign-in popup was closed before completing. Please try again.";
       }
       setError(errorMessage);
     } finally {
-        setGoogleSubmitting(false);
+      setGoogleSubmitting(false);
     }
   };
 
   const handleSendVerificationCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null); 
-    setPhoneFormSubmitting(true); 
+    setError(null);
+    setPhoneFormSubmitting(true);
     try {
       const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber.replace(/\D/g, '')}`;
-      if (formattedPhoneNumber.length < 10) { 
+      if (formattedPhoneNumber.length < 10) {
         setError("Please enter a valid phone number with country code (e.g., +1XXXXXXXXXX).");
         setPhoneFormSubmitting(false);
         return;
       }
-
       const result = await signInWithPhoneNumberFlow(formattedPhoneNumber, 'recaptcha-container-login');
       setConfirmationResult(result);
       setIsCodeSent(true);
       toast({ title: 'Verification Code Sent', description: 'Please check your phone for the code.' });
-    } catch (err: any)
-       {
+    } catch (err: any) {
       let errorMessage = "Failed to send verification code. Please try again.";
       if (err.code === 'auth/invalid-phone-number') {
         errorMessage = "Invalid phone number format. Please include your country code (e.g., +1XXXXXXXXXX).";
@@ -128,7 +125,7 @@ export default function LoginPage() {
       } else if (err.message?.includes('reCAPTCHA')) {
         errorMessage = "reCAPTCHA verification failed. Please ensure it's set up correctly and try again.";
       }
-      setError(errorMessage); 
+      setError(errorMessage);
       toast({ title: 'Phone Sign-in Failed', description: errorMessage, variant: 'destructive' });
     }
     setPhoneFormSubmitting(false);
@@ -145,7 +142,7 @@ export default function LoginPage() {
     try {
       await confirmPhoneNumberCode(confirmationResult, verificationCode);
     } catch (err: any) {
-       let errorMessage = "Failed to verify code. Please try again.";
+      let errorMessage = "Failed to verify code. Please try again.";
       if (err.code === 'auth/invalid-verification-code') {
         errorMessage = "Invalid verification code.";
       } else if (err.code === 'auth/code-expired') {
@@ -164,13 +161,9 @@ export default function LoginPage() {
     }
     try {
       await sendPasswordReset(resetEmail);
-      toast({
-        title: 'Password Reset Email Sent',
-        description: 'If an account exists for this email, a reset link has been sent.',
-      });
-      setIsResetDialogOpen(false);
-      setResetEmail('');
     } catch (err: any) {
+      // swallow error — always show same message for security
+    } finally {
       toast({
         title: 'Password Reset Email Sent',
         description: 'If an account exists for this email, a reset link has been sent.',
@@ -185,14 +178,12 @@ export default function LoginPage() {
       <div className="flex items-center justify-center min-h-[calc(100vh-10rem)] py-12">
         <Card className="w-full max-w-md shadow-xl p-8 text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-          <p className="text-muted-foreground">
-            Initializing session...
-          </p>
+          <p className="text-muted-foreground">Initializing session...</p>
         </Card>
       </div>
     );
   }
-  
+
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-10rem)] py-12">
       <Card className="w-full max-w-md shadow-xl">
@@ -221,7 +212,7 @@ export default function LoginPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-               <div className="relative">
+              <div className="relative">
                 <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="password"
@@ -236,7 +227,7 @@ export default function LoginPage() {
               </div>
               <div className="text-right">
                 <Button type="button" variant="link" className="p-0 h-auto text-sm font-normal text-muted-foreground" onClick={() => setIsResetDialogOpen(true)}>
-                    Forgot Password?
+                  Forgot Password?
                 </Button>
               </div>
             </div>
@@ -247,23 +238,19 @@ export default function LoginPage() {
           </form>
 
           <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
             </div>
           </div>
 
           <Button variant="outline" onClick={handleGoogleSignIn} className="w-full" disabled={isAuthLoading || googleSubmitting}>
-             {googleSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon />}
-             <span className="ml-2">{googleSubmitting ? "Signing in..." : "Sign in with Google"}</span>
+            {googleSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon />}
+            <span className="ml-2">{googleSubmitting ? "Signing in..." : "Sign in with Google"}</span>
           </Button>
 
           <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
             </div>
@@ -273,7 +260,7 @@ export default function LoginPage() {
             <form onSubmit={handleSendVerificationCode} className="space-y-4 pt-2">
               <div className="space-y-1.5">
                 <Label htmlFor="phone">Phone Number</Label>
-                 <div className="relative">
+                <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="phone"
@@ -312,9 +299,9 @@ export default function LoginPage() {
                   {phoneFormSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   {phoneFormSubmitting ? 'Verifying...' : 'Verify Code'}
                 </Button>
-                 <Button variant="link" onClick={() => { setIsCodeSent(false); setError(null); setPhoneNumber(''); setVerificationCode(''); setConfirmationResult(null); }} disabled={phoneFormSubmitting || isAuthLoading}>
-                    Change Number
-                 </Button>
+                <Button variant="link" onClick={() => { setIsCodeSent(false); setError(null); setPhoneNumber(''); setVerificationCode(''); setConfirmationResult(null); }} disabled={phoneFormSubmitting || isAuthLoading}>
+                  Change Number
+                </Button>
               </div>
             </form>
           )}
@@ -330,7 +317,8 @@ export default function LoginPage() {
           </p>
         </CardFooter>
       </Card>
-       <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+
+      <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Reset Password</AlertDialogTitle>
@@ -356,5 +344,21 @@ export default function LoginPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+// ── Page export — wraps LoginForm in Suspense ──────────────────────────────
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[calc(100vh-10rem)] py-12">
+        <Card className="w-full max-w-md shadow-xl p-8 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+          <p className="text-muted-foreground">Loading...</p>
+        </Card>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

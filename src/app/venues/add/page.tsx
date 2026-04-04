@@ -1,16 +1,17 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { VenueForm } from '@/components/venue-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ShieldAlert, ArrowLeft } from 'lucide-react';
+import { ShieldAlert, ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
-export default function AddVenuePage() {
+function AddVenueForm() {
   const searchParams = useSearchParams();
   const seriesIdToLink = searchParams.get('seriesIdToLink');
 
@@ -22,9 +23,7 @@ export default function AddVenuePage() {
           <Alert variant="destructive" className="mt-8">
             <ShieldAlert className="h-5 w-5" />
             <AlertTitle>Access Denied</AlertTitle>
-            <AlertDescription>
-              You do not have permission to add new venues. This action requires the '{PERMISSIONS.PAGE_VIEW_VENUE_ADD}' permission.
-            </AlertDescription>
+            <AlertDescription>You do not have permission to add new venues. This action requires the '{PERMISSIONS.PAGE_VIEW_VENUE_ADD}' permission.</AlertDescription>
           </Alert>
         </div>
       }
@@ -32,9 +31,7 @@ export default function AddVenuePage() {
       <div className="max-w-2xl mx-auto">
         <div className="mb-4">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/venues">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Venues List
-            </Link>
+            <Link href="/venues"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Venues List</Link>
           </Button>
         </div>
         <Card>
@@ -51,5 +48,18 @@ export default function AddVenuePage() {
         </Card>
       </div>
     </AuthProviderClientComponent>
+  );
+}
+
+export default function AddVenuePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Loading...</p>
+      </div>
+    }>
+      <AddVenueForm />
+    </Suspense>
   );
 }

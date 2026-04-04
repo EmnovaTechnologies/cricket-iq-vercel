@@ -1,7 +1,5 @@
-
 'use client';
-
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { TeamForm } from '@/components/team-form';
@@ -13,12 +11,12 @@ import type { UserProfile, AgeCategory } from '@/types';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 
-export default function AddTeamPage() {
+// ── Inner component that uses useSearchParams ──────────────────────────────
+function AddTeamForm() {
   const { activeOrganizationId, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const [potentialTeamManagers, setPotentialTeamManagers] = useState<UserProfile[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
-
   const seriesIdToLink = searchParams.get('seriesIdToLink');
   const seriesAgeCategoryToEnforce = searchParams.get('seriesAgeCategoryToEnforce') as AgeCategory | null;
 
@@ -81,8 +79,8 @@ export default function AddTeamPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <TeamForm 
-                potentialTeamManagers={potentialTeamManagers} 
+              <TeamForm
+                potentialTeamManagers={potentialTeamManagers}
                 preselectedSeriesIdToLink={seriesIdToLink || undefined}
                 preselectedSeriesAgeCategoryToEnforce={seriesAgeCategoryToEnforce || undefined}
               />
@@ -91,5 +89,19 @@ export default function AddTeamPage() {
         )}
       </div>
     </AuthProviderClientComponent>
+  );
+}
+
+// ── Page export — wraps inner component in Suspense ────────────────────────
+export default function AddTeamPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Loading...</p>
+      </div>
+    }>
+      <AddTeamForm />
+    </Suspense>
   );
 }
