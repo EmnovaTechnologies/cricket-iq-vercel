@@ -24,6 +24,14 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'firebasestorage.googleapis.com', port: '', pathname: '/**' },
     ],
   },
+  webpack: (config, { isServer }) => {
+    // Suppress missing optional peer dependency warnings from opentelemetry/genkit
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      '@opentelemetry/exporter-jaeger': false,
+    };
+    return config;
+  },
 };
 
 export default nextConfig;
