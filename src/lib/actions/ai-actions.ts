@@ -1,21 +1,19 @@
-
-'use client';
+'use server';
 
 import {
-  getSeriesByIdFromDB,
-  getPlayersWithDetailsFromDB,
-  getTeamsForSeriesFromDB,
-  getGamesForSeriesFromDB,
-  isPlayerAgeEligibleForSeriesFromDB,
-  getFitnessTestsForSeriesFromDB,
+  adminGetSeriesById,
+  adminGetPlayersWithDetails,
+  adminGetTeamsForSeries,
+  adminGetGamesForSeries,
+  adminGetFitnessTestsForSeries,
+  adminGetFitnessTestResults,
+  isPlayerEligibleForSeries,
   ratingValueToNumber,
-} from '../db';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+} from '../admin-db';
 
 import { suggestTeamComposition as aiSuggestTeamComposition } from '@/ai/flows/suggest-team-composition';
 import type { TeamCompositionCriteria, SuggestedTeam } from '@/ai/flows/suggest-team-composition';
-import type { PlayerAIData, PlayerWithRatings, Series, FitnessTestResult, FitnessTestHeader, RatingValue } from '../../types';
+import type { PlayerWithRatings, RatingValue } from '../../types';
 
 interface SuggestTeamParams {
   seriesId: string;
@@ -44,23 +42,24 @@ export async function suggestTeam({
   criteria,
 }: SuggestTeamParams): Promise<SuggestTeamResult> {
   try {
-    const series = await getSeriesByIdFromDB(seriesId);
-    if (!series) {
-      return { success: false, error: "Selected series not found." };
-    }
-    
+    const series = await adminGetSeriesById(seriesId);
+    if (!series) return { success: false, error: "Selected series not found." };
     if (series.status === 'archived') return { success: false, error: "Cannot suggest team for an archived series." };
-    if (!series.organizationId) return { success: false, error: "Series is not associated with an organization."};
+    if (!series.organizationId) return { success: false, error: "Series is not associated with an organization." };
 
-    const allPlayersWithFullDetails: PlayerWithRatings[] = await getPlayersWithDetailsFromDB(series.organizationId);
-    const teamsInSeries = await getTeamsForSeriesFromDB(seriesId);
+    const allPlayersWithFullDetails: PlayerWithRatings[] = await adminGetPlayersWithDetails(series.organizationId);
+    const teamsInSeries = await adminGetTeamsForSeries(seriesId);
     const playerIdsInSeriesTeams = new Set<string>();
-    teamsInSeries.forEach(team => team.playerIds.forEach(pid => playerIdsInSeriesTeams.add(pid)));
+    teamsInSeries.forEach(team => team.playerIds?.forEach(pid => playerIdsInSeriesTeams.add(pid)));
+
+    const gamesForSeries = await adminGetGamesForSeries(seriesId);
+    const gameDataMap = new Map(gamesForSeries.map(g => [g.id, g]));
 
     let eligiblePlayers = allPlayersWithFullDetails.filter(p => {
       if (!playerIdsInSeriesTeams.has(p.id)) return false;
-      if (!isPlayerAgeEligibleForSeriesFromDB(p, series)) return false;
-      if (minPrimarySkillScore !== undefined && minPrimarySkillScore > 0 && (p.calculatedAverageScore === 0 || (typeof p.calculatedAverageScore === 'number' && p.calculatedAverageScore < minPrimarySkillScore))) return false;
+      if (!isPlayerEligibleForSeries(p, series)) return false;
+      if (minPrimarySkillScore !== undefined && minPrimarySkillScore > 0 &&
+        (p.calculatedAverageScore === 0 || (typeof p.calculatedAverageScore === 'number' && p.calculatedAverageScore < minPrimarySkillScore))) return false;
       if (minFieldingScore !== undefined && minFieldingScore > 0) {
         const fieldingScoreNum = typeof p.averageFieldingScore === 'number' ? p.averageFieldingScore : -1;
         if (fieldingScoreNum < minFieldingScore) return false;
@@ -68,115 +67,86 @@ export async function suggestTeam({
       return true;
     });
 
-    const gamesForSeries = await getGamesForSeriesFromDB(seriesId);
-    const gameDataMap = new Map(gamesForSeries.map(g => [g.id, g]));
-    
     eligiblePlayers = eligiblePlayers.filter(p => {
-        if (minGamesPlayed !== undefined && minGamesPlayed > 0) {
-            const gamesPlayerParticipatedInSeries = new Set(p.ratings.filter(r => gameDataMap.has(r.gameId) && gameDataMap.get(r.gameId)?.seriesId === seriesId).map(r => r.gameId)).size;
-            if (gamesPlayerParticipatedInSeries < minGamesPlayed) return false;
-        }
-        return true;
+      if (minGamesPlayed !== undefined && minGamesPlayed > 0) {
+        const gamesInSeries = new Set(p.ratings.filter(r => gameDataMap.has(r.gameId) && gameDataMap.get(r.gameId)?.seriesId === seriesId).map(r => r.gameId)).size;
+        if (gamesInSeries < minGamesPlayed) return false;
+      }
+      return true;
     });
-    
+
     if (fitnessFilterOption && fitnessFilterOption !== 'none' && eligiblePlayers.length > 0) {
       if (!series.fitnessTestType || !series.fitnessTestPassingScore) {
-        const errorMsg = `The selected fitness filter ('${fitnessFilterOption}') cannot be applied because the series "${series.name}" does not have a fitness test type and/or passing score defined.`;
-        return { success: false, error: errorMsg };
+        return { success: false, error: `The selected fitness filter cannot be applied because the series "${series.name}" does not have a fitness test type and/or passing score defined.` };
       }
-      const certifiedHeaders = (await getFitnessTestsForSeriesFromDB(seriesId)).filter(h => h.isCertified && h.testType === series.fitnessTestType);
-      if (certifiedHeaders.length > 0) {
-        const certifiedHeaderIds = certifiedHeaders.map(h => h.id);
-        const playerIdsForFitnessCheck = eligiblePlayers.map(p => p.id);
-        const allRelevantFitnessResults: FitnessTestResult[] = [];
-        for (let i = 0; i < playerIdsForFitnessCheck.length; i += 30) {
-          const playerChunk = playerIdsForFitnessCheck.slice(i, i + 30);
-          if (playerChunk.length > 0) {
-            const resultsQuery = query(collection(db, 'fitnessTestResults'), where('playerId', 'in', playerChunk), where('fitnessTestHeaderId', 'in', certifiedHeaderIds));
-            const resultsSnapshot = await getDocs(resultsQuery);
-            resultsSnapshot.forEach(docSnap => allRelevantFitnessResults.push({ id: docSnap.id, ...docSnap.data() } as FitnessTestResult));
-          }
-        }
-        const playerResultsMap = new Map<string, FitnessTestResult[]>();
-        allRelevantFitnessResults.forEach(res => { const current = playerResultsMap.get(res.playerId) || []; current.push(res); playerResultsMap.set(res.playerId, current); });
+      const certifiedHeaders = await adminGetFitnessTestsForSeries(seriesId);
+      const filteredHeaders = certifiedHeaders.filter(h => h.testType === series.fitnessTestType);
+
+      if (filteredHeaders.length > 0) {
+        const certifiedHeaderIds = filteredHeaders.map(h => h.id);
+        const playerIdsForCheck = eligiblePlayers.map(p => p.id);
+        const allFitnessResults = await adminGetFitnessTestResults(playerIdsForCheck, certifiedHeaderIds);
+
+        const playerResultsMap = new Map<string, typeof allFitnessResults>();
+        allFitnessResults.forEach(res => {
+          const curr = playerResultsMap.get(res.playerId) || [];
+          curr.push(res);
+          playerResultsMap.set(res.playerId, curr);
+        });
+
         eligiblePlayers = eligiblePlayers.filter(player => {
-          const playerFitnessResults = playerResultsMap.get(player.id) || [];
-          if (playerFitnessResults.length === 0) return false;
-          if (fitnessFilterOption === 'passedCertified') return playerFitnessResults.some(res => res.result === 'Pass');
-          if (fitnessFilterOption === 'minScoreCertified' && minFitnessTestScore !== undefined) return playerFitnessResults.some(res => { const scoreNum = parseFloat(res.score); return !isNaN(scoreNum) && scoreNum >= minFitnessTestScore; });
+          const results = playerResultsMap.get(player.id) || [];
+          if (!results.length) return false;
+          if (fitnessFilterOption === 'passedCertified') return results.some(r => r.result === 'Pass');
+          if (fitnessFilterOption === 'minScoreCertified' && minFitnessTestScore !== undefined)
+            return results.some(r => { const s = parseFloat(r.score); return !isNaN(s) && s >= minFitnessTestScore; });
           return true;
         });
       }
     }
 
     if (eligiblePlayers.length === 0) {
-      let message = "No players found matching all selected criteria (including series, performance, and fitness filters).";
-      if (fitnessFilterOption !== 'none' && (!series.fitnessTestType || !series.fitnessTestPassingScore)) {
-        message = `No players could be evaluated for fitness as the series "${series.name}" is missing defined fitness criteria (type/passing score).`;
-      } else if (fitnessFilterOption !== 'none') {
-        message = `No players met the specified fitness criteria ('${fitnessFilterOption}'${fitnessFilterOption === 'minScoreCertified' ? ` with score >= ${minFitnessTestScore}` : ''}) after other filters were applied.`;
-      }
-      return { success: true, team: [], message };
+      return { success: true, team: [], message: "No players found matching all selected criteria." };
     }
 
     const playerDataString = eligiblePlayers.map(p => {
-        const ratingsInSeries = p.ratings.filter(r => gameDataMap.has(r.gameId));
-        const gamesPlayedInThisSeries = new Set(ratingsInSeries.map(r => r.gameId)).size;
-        
-        const primarySkillNumericScores = ratingsInSeries.map(r => {
-            let skillValue: RatingValue | undefined;
-            switch (p.primarySkill) {
-                case 'Batting': skillValue = r.batting; break;
-                case 'Bowling': skillValue = r.bowling; break;
-                case 'Wicket Keeping': skillValue = r.wicketKeeping; break;
-                default: skillValue = 'Not Rated';
-            }
-            return ratingValueToNumber(skillValue);
-        }).filter(score => score !== null) as number[];
+      const ratingsInSeries = p.ratings.filter(r => gameDataMap.has(r.gameId));
+      const gamesPlayedInSeries = new Set(ratingsInSeries.map(r => r.gameId)).size;
 
-        let seriesSpecificAverageScore = 0;
-        if (primarySkillNumericScores.length > 0) {
-            const sum = primarySkillNumericScores.reduce((acc, curr) => acc + curr, 0);
-            seriesSpecificAverageScore = parseFloat((sum / primarySkillNumericScores.length).toFixed(1));
-        }
+      const primaryScores = ratingsInSeries.map(r => {
+        let val: RatingValue | undefined;
+        if (p.primarySkill === 'Batting') val = r.batting;
+        else if (p.primarySkill === 'Bowling') val = r.bowling;
+        else if (p.primarySkill === 'Wicket Keeping') val = r.wicketKeeping;
+        return ratingValueToNumber(val);
+      }).filter(s => s !== null) as number[];
 
-        const aiPlayerData: PlayerAIData = { 
-            playerName: p.name, 
-            primarySkill: p.primarySkill, 
-            battingOrder: p.battingOrder, 
-            bowlingStyle: p.bowlingStyle, 
-            dominantHandBatting: p.dominantHandBatting, 
-            dominantHandBowling: p.dominantHandBowling, 
-            averageScore: seriesSpecificAverageScore, 
-            gamesPlayed: gamesPlayedInThisSeries 
-        };
+      const avgScore = primaryScores.length
+        ? parseFloat((primaryScores.reduce((a, b) => a + b, 0) / primaryScores.length).toFixed(1))
+        : 0;
 
-        let playerStr = `${aiPlayerData.playerName}: PrimarySkill=${aiPlayerData.primarySkill}`;
-        if (aiPlayerData.battingOrder) playerStr += `, BattingOrder=${aiPlayerData.battingOrder}`;
-        if (aiPlayerData.bowlingStyle) playerStr += `, BowlingStyle=${aiPlayerData.bowlingStyle}`;
-        playerStr += `, DominantHandBat=${aiPlayerData.dominantHandBatting}`;
-        if (aiPlayerData.dominantHandBowling) playerStr += `, DominantHandBowl=${aiPlayerData.dominantHandBowling}`;
-        playerStr += `, AverageScore=${aiPlayerData.averageScore.toFixed(1)}`;
-        playerStr += `, GamesPlayed=${aiPlayerData.gamesPlayed}`;
-        return playerStr;
+      let str = `${p.name}: PrimarySkill=${p.primarySkill}`;
+      if (p.battingOrder) str += `, BattingOrder=${p.battingOrder}`;
+      if (p.bowlingStyle) str += `, BowlingStyle=${p.bowlingStyle}`;
+      str += `, DominantHandBat=${p.dominantHandBatting}`;
+      if (p.dominantHandBowling) str += `, DominantHandBowl=${p.dominantHandBowling}`;
+      str += `, AverageScore=${avgScore.toFixed(1)}`;
+      str += `, GamesPlayed=${gamesPlayedInSeries}`;
+      return str;
     }).join('; \n');
 
-    const fullCriteriaForAI: TeamCompositionCriteria = { ...criteria, playerData: playerDataString };
-    const suggestedTeam = await aiSuggestTeamComposition(fullCriteriaForAI);
-    return { success: true, team: suggestedTeam, message: "AI team suggestion generated successfully based on all criteria." };
+    const fullCriteria: TeamCompositionCriteria = { ...criteria, playerData: playerDataString };
+    const suggestedTeam = await aiSuggestTeamComposition(fullCriteria);
+    return { success: true, team: suggestedTeam, message: "AI team suggestion generated successfully." };
+
   } catch (error) {
     console.error("Error in suggestTeam action:", error);
     let errorMessage = "An unexpected error occurred while generating the team suggestion.";
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    } else if (typeof error === 'string') {
-      errorMessage = error;
-    }
-    
+    if (error instanceof Error) errorMessage = error.message;
+    else if (typeof error === 'string') errorMessage = error;
     if (errorMessage.toLowerCase().includes("permission-denied") || errorMessage.toLowerCase().includes("missing or insufficient permissions")) {
       return { success: false, error: "Missing or insufficient permissions." };
     }
-
     return { success: false, error: errorMessage };
   }
 }
