@@ -10,13 +10,15 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { format, parseISO, startOfDay } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info, Users, UserCog, ArrowLeft, Edit, CheckCircle, Clock, ShieldAlert, Users2, Loader2, CalendarX } from 'lucide-react';
+import { Info, Users, UserCog, ArrowLeft, Edit, CheckCircle, Clock, ShieldAlert, Users2, Loader2, CalendarX, QrCode } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { getUserProfile } from '@/lib/user-actions';
 import { Badge } from '@/components/ui/badge';
 import { finalizeGameRatingsAction, certifyRatingsAction, adminForceFinalizeGameRatingsAction } from '@/lib/actions/game-actions';
 import { useToast } from '@/hooks/use-toast';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { QRCodeSVG } from 'qrcode.react';
 
 function RateGameEnhancedContent() {
   const params = useParams<{ id: string }>();
@@ -36,6 +38,7 @@ function RateGameEnhancedContent() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [canAdminForceFinalizeThisGame, setCanAdminForceFinalizeThisGame] = useState(false);
   const [isAttemptingAutoFinalize, setIsAttemptingAutoFinalize] = useState(false);
+  const [showQrDialog, setShowQrDialog] = useState(false);
 
   const navigationSource = searchParamsHook.get('from');
 
@@ -204,7 +207,48 @@ function RateGameEnhancedContent() {
           <Button asChild variant="outline" size="sm">
             <Link href={`/games/${gameId}/details`}><ArrowLeft className="mr-2 h-4 w-4" />Game Details</Link>
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowQrDialog(true)}>
+            <QrCode className="mr-2 h-4 w-4" />Mobile QR
+          </Button>
         </div>
+
+        {/* QR Code Dialog */}
+        <Dialog open={showQrDialog} onOpenChange={setShowQrDialog}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <QrCode className="h-5 w-5 text-primary" /> Mobile Rating Link
+              </DialogTitle>
+              <DialogDescription>
+                Scan this QR code on a mobile phone to open the mobile-friendly rating page for this game.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col items-center gap-4 py-4">
+              <div className="p-4 bg-white rounded-xl border shadow-sm">
+                <QRCodeSVG
+                  value={`${typeof window !== 'undefined' ? window.location.origin : 'https://cricket-iq-vercel.vercel.app'}/rate/${gameId}`}
+                  size={220}
+                  level="M"
+                  includeMargin={false}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground text-center break-all">
+                {typeof window !== 'undefined' ? window.location.origin : 'https://cricket-iq-vercel.vercel.app'}/rate/{gameId}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  const url = `${window.location.origin}/rate/${gameId}`;
+                  navigator.clipboard.writeText(url);
+                }}
+              >
+                Copy Link
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {gameSelectorsFullProfiles.length > 0 && (
