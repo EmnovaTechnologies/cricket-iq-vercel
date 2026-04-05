@@ -18,9 +18,12 @@ import { collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { CricketBatIcon, CricketBallIcon, WicketKeeperGloves } from '@/components/custom-icons';
 
-// Rating options displayed as big tap buttons
-const QUICK_RATINGS: RatingValue[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
-const NA_RATINGS: RatingValue[] = ['Not Rated', 'Not Applicable'];
+// Exact rating values matching web app
+const NUMERIC_RATINGS: RatingValue[] = ['0.5', '1.0', '1.5', '2.0', '2.5', '3.0', '3.5', '4.0', '4.5', '5.0'];
+const SPECIAL_RATINGS: RatingValue[] = ['Not Rated', 'Not Applicable'];
+
+// All 4 skills always shown for every player
+const ALL_SKILLS: SkillKey[] = ['batting', 'bowling', 'fielding', 'wicketKeeping'];
 
 type SkillKey = 'batting' | 'bowling' | 'fielding' | 'wicketKeeping';
 
@@ -45,10 +48,11 @@ function getDefaultRatings(player: Player): PlayerRatings {
   }
 }
 
-function getSkillsForPlayer(player: Player): SkillKey[] {
-  if (player.primarySkill === 'Batting') return ['batting', 'fielding'];
-  if (player.primarySkill === 'Bowling') return ['batting', 'bowling', 'fielding'];
-  return ['batting', 'wicketKeeping'];
+function isPrimarySkill(player: Player, skill: SkillKey): boolean {
+  if (player.primarySkill === 'Batting' && skill === 'batting') return true;
+  if (player.primarySkill === 'Bowling' && skill === 'bowling') return true;
+  if (player.primarySkill === 'Wicket Keeping' && skill === 'wicketKeeping') return true;
+  return false;
 }
 
 function SkillIcon({ skill }: { skill: string }) {
@@ -378,7 +382,6 @@ function MobileRatePage() {
 
   const player = players[currentPlayerIndex];
   const playerRatings = ratings[player?.id] || getDefaultRatings(player);
-  const skillsToRate = getSkillsForPlayer(player);
   const isSaved = savedPlayers.has(player?.id);
   const isFinalized = game.ratingsFinalized;
 
@@ -454,28 +457,33 @@ function MobileRatePage() {
           </div>
         )}
 
-        {/* Rating sections */}
-        {skillsToRate.map(skill => (
+        {/* Rating sections — all 4 skills */}
+        {ALL_SKILLS.map(skill => (
           <div key={skill} className="bg-card border rounded-xl p-4 space-y-3">
-            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-              {skillLabels[skill]}
-              {(skill === player.primarySkill.toLowerCase().replace(' ', '') ||
-                (player.primarySkill === 'Wicket Keeping' && skill === 'wicketKeeping')) && (
-                <span className="ml-1 text-primary">★ Primary</span>
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <span className="text-muted-foreground uppercase tracking-wide">{skillLabels[skill]}</span>
+              {isPrimarySkill(player, skill) && (
+                <Badge variant="default" className="text-xs py-0 px-1.5">★ Primary</Badge>
               )}
+              <span className="ml-auto text-sm font-bold text-primary">
+                {playerRatings[skill] !== 'Not Rated' && playerRatings[skill] !== 'Not Applicable'
+                  ? playerRatings[skill]
+                  : <span className="text-muted-foreground font-normal text-xs">{playerRatings[skill]}</span>
+                }
+              </span>
             </h3>
-            {/* Numeric ratings */}
-            <div className="grid grid-cols-5 gap-2">
-              {QUICK_RATINGS.map(val => (
+            {/* Numeric ratings — 0.5 to 5.0 in a 5-column grid */}
+            <div className="grid grid-cols-5 gap-1.5">
+              {NUMERIC_RATINGS.map(val => (
                 <button
                   key={val}
                   type="button"
                   disabled={isFinalized}
                   onClick={() => handleRatingChange(player.id, skill, val)}
                   className={cn(
-                    "h-12 rounded-lg text-base font-bold border-2 transition-all",
+                    "h-11 rounded-lg text-sm font-bold border-2 transition-all",
                     playerRatings[skill] === val
-                      ? "bg-primary text-primary-foreground border-primary scale-105"
+                      ? "bg-primary text-primary-foreground border-primary scale-105 shadow-sm"
                       : "bg-background border-border hover:border-primary hover:text-primary"
                   )}
                 >
@@ -483,18 +491,18 @@ function MobileRatePage() {
                 </button>
               ))}
             </div>
-            {/* N/A options */}
+            {/* Not Rated / Not Applicable */}
             <div className="grid grid-cols-2 gap-2">
-              {NA_RATINGS.map(val => (
+              {SPECIAL_RATINGS.map(val => (
                 <button
                   key={val}
                   type="button"
                   disabled={isFinalized}
                   onClick={() => handleRatingChange(player.id, skill, val)}
                   className={cn(
-                    "h-10 rounded-lg text-sm font-medium border-2 transition-all",
+                    "h-9 rounded-lg text-xs font-medium border-2 transition-all",
                     playerRatings[skill] === val
-                      ? "bg-muted-foreground text-background border-muted-foreground"
+                      ? "bg-muted text-foreground border-muted-foreground"
                       : "bg-background border-border hover:border-muted-foreground text-muted-foreground"
                   )}
                 >
