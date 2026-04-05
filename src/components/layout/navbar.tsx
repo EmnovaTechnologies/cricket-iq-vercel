@@ -292,11 +292,18 @@ const Navbar = () => {
                         ))}
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild disabled={!userProfile.playerId}>
-                      <Link href={userProfile.playerId ? `/players/${userProfile.playerId}` : '#'}>
-                          <User className="mr-2 h-4 w-4" />Profile
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile">
+                          <User className="mr-2 h-4 w-4" />My Profile
                       </Link>
                     </DropdownMenuItem>
+                    {userProfile.playerId && (
+                      <DropdownMenuItem asChild>
+                        <Link href={`/players/${userProfile.playerId}`}>
+                            <User className="mr-2 h-4 w-4" />Player Profile
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={handleLogout} className="text-destructive">
                         <LogOut className="mr-2 h-4 w-4" />
