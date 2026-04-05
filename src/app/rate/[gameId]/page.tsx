@@ -397,7 +397,7 @@ function MobileRatePage() {
                     <Input
                       id="phone"
                       type="tel"
-                      placeholder="714 829 0716"
+                      placeholder="310 555 1234"
                       value={phone}
                       onChange={e => setPhone(e.target.value)}
                       className="h-12 text-base"
