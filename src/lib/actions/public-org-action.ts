@@ -64,6 +64,8 @@ export async function getAllPublicActiveOrganizations(): Promise<PublicOrgDetail
     return [];
   }
 }
+
+export async function getPublicOrgTeams(orgId: string): Promise<PublicTeam[]> {
   if (!orgId) return [];
   try {
     const snap = await adminDb.collection('teams')
