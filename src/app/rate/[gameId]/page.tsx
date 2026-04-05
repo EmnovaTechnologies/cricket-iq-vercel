@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { getGameByIdFromDB, getPlayerByIdFromDB, getRatingsForGameFromDB, saveGameRatingsToDB } from '@/lib/db';
 import type { Game, Player, PlayerRating, RatingValue } from '@/types';
@@ -65,7 +65,9 @@ function SkillIcon({ skill }: { skill: string }) {
 
 function MobileRatePage() {
   const params = useParams<{ gameId: string }>();
+  const searchParams = useSearchParams();
   const gameId = params.gameId;
+  const selectorUidFromUrl = searchParams.get('uid');
   const { signInWithPhoneNumberFlow, confirmPhoneNumberCode, isAuthLoading, currentUser, userProfile } = useAuth();
   const { toast } = useToast();
 
@@ -160,50 +162,71 @@ function MobileRatePage() {
         if (!g) { setIsLoadingGame(false); return; }
         setGame(g);
 
-        // Check authorization — match by UID first, then by phone number
-        // This handles the case where selector was assigned by email UID
-        // but is logging in via phone OTP (different UID)
+        // ── Authorization ────────────────────────────────────────────────
+        // If URL has ?uid=, validate that the logged-in phone matches that user's profile
         let authorizedUid: string | null = null;
 
-        // Step 1: Direct UID match
-        if (g.selectorUserIds?.includes(currentUser.uid)) {
-          authorizedUid = currentUser.uid;
-        }
-
-        // Step 2: Phone number match — look up user by phone number in Firestore
-        if (!authorizedUid && currentUser.phoneNumber) {
-          const usersQuery = query(
-            collection(db, 'users'),
-            where('phoneNumber', '==', currentUser.phoneNumber),
-            limit(5)
+        if (selectorUidFromUrl) {
+          // Look up the expected selector's profile to get their phone number
+          const expectedUserDoc = await getDocs(
+            query(collection(db, 'users'), where('uid', '==', selectorUidFromUrl), limit(1))
           );
-          const usersSnap = await getDocs(usersQuery);
-          for (const userDoc of usersSnap.docs) {
-            if (g.selectorUserIds?.includes(userDoc.id)) {
-              authorizedUid = userDoc.id;
-              break;
+
+          if (!expectedUserDoc.empty) {
+            const expectedProfile = expectedUserDoc.docs[0].data();
+            const expectedPhone = expectedProfile.phoneNumber;
+
+            // Check phone match
+            if (currentUser.phoneNumber && expectedPhone && currentUser.phoneNumber === expectedPhone) {
+              // Phone matches — check this uid is actually a selector for this game
+              if (g.selectorUserIds?.includes(selectorUidFromUrl)) {
+                authorizedUid = selectorUidFromUrl;
+              } else {
+                // Phone matched but uid not a selector
+                setAuthChecked(true);
+                setIsAuthorized(false);
+                setIsLoadingGame(false);
+                return;
+              }
+            } else {
+              // Phone doesn't match — wrong person scanned the QR
+              setAuthChecked(true);
+              setIsAuthorized(false);
+              setIsLoadingGame(false);
+              return;
             }
           }
         }
 
-        // Step 3: If still not found, store phone number on current user profile
-        // so future matches work, and check if any selector has no phone set
+        // Fallback: no uid in URL — use direct UID or phone lookup
         if (!authorizedUid) {
-          // Save phone number to current user's Firestore profile for future use
-          if (currentUser.phoneNumber) {
-            try {
-              const userDocRef = collection(db, 'users');
-              const existingQuery = query(userDocRef, where('uid', '==', currentUser.uid), limit(1));
-              const existingSnap = await getDocs(existingQuery);
-              if (!existingSnap.empty) {
-                const { doc: firestoreDoc, updateDoc } = await import('firebase/firestore');
-                await updateDoc(firestoreDoc(db, 'users', currentUser.uid), {
-                  phoneNumber: currentUser.phoneNumber
-                });
+          if (g.selectorUserIds?.includes(currentUser.uid)) {
+            authorizedUid = currentUser.uid;
+          } else if (currentUser.phoneNumber) {
+            const usersQuery = query(
+              collection(db, 'users'),
+              where('phoneNumber', '==', currentUser.phoneNumber),
+              limit(5)
+            );
+            const usersSnap = await getDocs(usersQuery);
+            for (const userDoc of usersSnap.docs) {
+              if (g.selectorUserIds?.includes(userDoc.id)) {
+                authorizedUid = userDoc.id;
+                break;
               }
-            } catch (e) {
-              console.warn('Could not save phone number to profile:', e);
             }
+          }
+        }
+
+        // Save phone to profile for future use
+        if (!authorizedUid && currentUser.phoneNumber) {
+          try {
+            const { doc: firestoreDoc, updateDoc } = await import('firebase/firestore');
+            await updateDoc(firestoreDoc(db, 'users', currentUser.uid), {
+              phoneNumber: currentUser.phoneNumber
+            });
+          } catch (e) {
+            console.warn('Could not save phone number to profile:', e);
           }
         }
 
@@ -422,14 +445,21 @@ function MobileRatePage() {
   // ── Not authorized ──────────────────────────────────────────────────────────
 
   if (!isAuthorized) {
+    const isPhoneMismatch = selectorUidFromUrl && currentUser?.phoneNumber;
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
-        <h2 className="text-xl font-bold mb-2">Not Authorized</h2>
-        <p className="text-muted-foreground max-w-xs">
-          You are not assigned as a selector for this game. Please contact your series administrator.
-        </p>
-        <p className="text-xs text-muted-foreground mt-4">Logged in as: {currentUser.phoneNumber || currentUser.email}</p>
+        <h2 className="text-xl font-bold mb-2">Access Denied</h2>
+        {isPhoneMismatch ? (
+          <p className="text-muted-foreground max-w-xs">
+            This QR code was generated for a different selector. The phone number you used (<span className="font-medium">{currentUser.phoneNumber}</span>) does not match the selector this link was created for.
+          </p>
+        ) : (
+          <p className="text-muted-foreground max-w-xs">
+            You are not assigned as a selector for this game. Please contact your series administrator.
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground mt-4">Logged in as: {currentUser?.phoneNumber || currentUser?.email}</p>
       </div>
     );
   }

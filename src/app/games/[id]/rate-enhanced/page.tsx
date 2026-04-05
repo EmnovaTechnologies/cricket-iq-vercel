@@ -217,36 +217,56 @@ function RateGameEnhancedContent() {
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <QrCode className="h-5 w-5 text-primary" /> Mobile Rating Link
+                <QrCode className="h-5 w-5 text-primary" /> Your Mobile Rating Link
               </DialogTitle>
               <DialogDescription>
-                Scan this QR code on a mobile phone to open the mobile-friendly rating page for this game.
+                This QR code is tied to your account. Only your phone number can unlock it.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex flex-col items-center gap-4 py-4">
-              <div className="p-4 bg-white rounded-xl border shadow-sm">
-                <QRCodeSVG
-                  value={`${typeof window !== 'undefined' ? window.location.origin : 'https://cricket-iq-vercel.vercel.app'}/rate/${gameId}`}
-                  size={220}
-                  level="M"
-                  includeMargin={false}
-                />
+
+            {!currentUserProfile?.phoneNumber ? (
+              <div className="py-4 space-y-3 text-center">
+                <div className="text-4xl">📵</div>
+                <p className="font-semibold text-sm">No phone number on your profile</p>
+                <p className="text-xs text-muted-foreground">
+                  You need to add your phone number to your profile before you can use the mobile rating page. This ensures only you can access your rating link.
+                </p>
+                <Button asChild variant="default" size="sm" className="w-full" onClick={() => setShowQrDialog(false)}>
+                  <Link href="/profile">Go to Profile → Add Phone Number</Link>
+                </Button>
               </div>
-              <p className="text-xs text-muted-foreground text-center break-all">
-                {typeof window !== 'undefined' ? window.location.origin : 'https://cricket-iq-vercel.vercel.app'}/rate/{gameId}
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => {
-                  const url = `${window.location.origin}/rate/${gameId}`;
-                  navigator.clipboard.writeText(url);
-                }}
-              >
-                Copy Link
-              </Button>
-            </div>
+            ) : (
+              <div className="flex flex-col items-center gap-4 py-4">
+                <div className="p-4 bg-white rounded-xl border shadow-sm">
+                  <QRCodeSVG
+                    value={`${typeof window !== 'undefined' ? window.location.origin : 'https://cricket-iq-vercel.vercel.app'}/rate/${gameId}?uid=${currentUserProfile.uid}`}
+                    size={220}
+                    level="M"
+                    includeMargin={false}
+                  />
+                </div>
+                <div className="w-full space-y-1">
+                  <p className="text-xs text-muted-foreground text-center break-all">
+                    Linked to: <span className="font-medium text-foreground">{currentUserProfile.phoneNumber}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Only this phone number can access this link
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    const url = `${window.location.origin}/rate/${gameId}?uid=${currentUserProfile.uid}`;
+                    navigator.clipboard.writeText(url);
+                    toast({ title: 'Link copied!', description: 'Share this link only with the assigned selector.' });
+                  }}
+                >
+                  Copy Link
+                </Button>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
