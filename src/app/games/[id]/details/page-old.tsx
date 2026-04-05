@@ -6,7 +6,7 @@ import type { Game, Player, PlayerRating, Series, UserProfile, RatingValue, Perm
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { CalendarDays, MapPin, Users, ArrowLeft, Layers, UserSquare2, UserPlus, CheckSquare, Square, Edit3, UserCog, Save, Check, ChevronsUpDown, Loader2, Copy, Share2, CheckCheck } from 'lucide-react';
+import { CalendarDays, MapPin, Users, ArrowLeft, Layers, UserSquare2, UserPlus, CheckSquare, Square, Edit3, UserCog, Save, Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { format, parseISO, startOfDay } from 'date-fns';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -72,19 +72,6 @@ export default function GameDetailsPage() {
   const [selectedSelectorUidsForUpdate, setSelectedSelectorUidsForUpdate] = useState<string[]>([]);
   const [isLoadingGameSelectors, setIsLoadingGameSelectors] = useState(false);
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
-  const [linkCopied, setLinkCopied] = useState(false);
-
-  const handleShareLink = () => {
-    const url = `${window.location.origin}/rate/${gameId}`;
-    if (navigator.share) {
-      navigator.share({ title: `Rate players: ${game?.team1} vs ${game?.team2}`, url });
-    } else {
-      navigator.clipboard.writeText(url);
-      setLinkCopied(true);
-      toast({ title: 'Link copied!', description: 'Share this link with your selectors.' });
-      setTimeout(() => setLinkCopied(false), 3000);
-    }
-  };
 
 
   const allPlayersOnPage = useMemo(() => {
@@ -317,18 +304,7 @@ export default function GameDetailsPage() {
             : (<p className="text-sm text-muted-foreground">No selectors assigned.</p>)}
           </div>
         </CardContent>
-        {canManageSelectors && !isEditingSelectors && (<CardFooter className="border-t pt-4 flex gap-2 justify-between items-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleShareLink}
-            className="gap-2"
-          >
-            {linkCopied ? <CheckCheck className="h-4 w-4 text-green-500" /> : <Share2 className="h-4 w-4" />}
-            {linkCopied ? 'Link Copied!' : 'Share Rating Link'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setIsEditingSelectors(true)}><UserCog className="h-4 w-4 mr-2" /> Manage Selectors</Button>
-        </CardFooter>)}
+        {canManageSelectors && !isEditingSelectors && (<CardFooter className="border-t pt-4"><Button variant="outline" size="sm" onClick={() => setIsEditingSelectors(true)} className="ml-auto"><UserCog className="h-4 w-4 mr-2" /> Manage Selectors</Button></CardFooter>)}
       </Card>
 
       {isEditingSelectors && canManageSelectors && (<Card><CardHeader>
