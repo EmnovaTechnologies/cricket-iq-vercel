@@ -43,7 +43,27 @@ export async function getPublicOrganizationDetails(orgId: string): Promise<Publi
   }
 }
 
-export async function getPublicOrgTeams(orgId: string): Promise<PublicTeam[]> {
+export async function getAllPublicActiveOrganizations(): Promise<PublicOrgDetails[]> {
+  try {
+    const snap = await adminDb.collection('organizations')
+      .where('status', '==', 'active')
+      .orderBy('name')
+      .get();
+    return snap.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.name?.trim() || '',
+        status: data.status || 'active',
+        branding: data.branding || {},
+        clubs: data.clubs || [],
+      };
+    });
+  } catch (error) {
+    console.error('[getAllPublicActiveOrganizations] Error:', error);
+    return [];
+  }
+}
   if (!orgId) return [];
   try {
     const snap = await adminDb.collection('teams')

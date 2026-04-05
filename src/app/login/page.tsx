@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { LogIn, Mail, Key, Loader2 } from 'lucide-react';
+import { LogIn, Mail, Key, Loader2, Users, ChevronRight, Building } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertDialog,
@@ -20,8 +20,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { GoogleIcon } from '@/components/custom-icons';
+import { getAllPublicActiveOrganizations } from '@/lib/actions/public-org-action';
 
 
 // ── Inner component that uses useSearchParams ──────────────────────────────
@@ -41,6 +49,24 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [emailFormSubmitting, setEmailFormSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+
+  // Player signup dialog state
+  const [showPlayerDialog, setShowPlayerDialog] = useState(false);
+  const [orgs, setOrgs] = useState<{ id: string; name: string; branding?: any }[]>([]);
+  const [orgsLoading, setOrgsLoading] = useState(false);
+
+  const handleOpenPlayerDialog = async () => {
+    setShowPlayerDialog(true);
+    setOrgsLoading(true);
+    try {
+      const activeOrgs = await getAllPublicActiveOrganizations();
+      setOrgs(activeOrgs);
+    } catch (e) {
+      setOrgs([]);
+    } finally {
+      setOrgsLoading(false);
+    }
+  };
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -194,8 +220,64 @@ function LoginForm() {
               <Link href="/signup">Sign Up</Link>
             </Button>
           </p>
+          <div className="relative w-full">
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-dashed" /></div>
+            <div className="relative flex justify-center">
+              <span className="bg-card px-2 text-xs text-muted-foreground">or</span>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            className="w-full gap-2 border-primary/40 text-primary hover:bg-primary/5"
+            onClick={handleOpenPlayerDialog}
+          >
+            <Users className="h-4 w-4" />
+            Register as a Player
+          </Button>
         </CardFooter>
       </Card>
+
+      {/* Organisation picker dialog for player registration */}
+      <Dialog open={showPlayerDialog} onOpenChange={setShowPlayerDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" /> Register as a Player
+            </DialogTitle>
+            <DialogDescription>
+              Select your organization to begin the player registration process.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2 max-h-72 overflow-y-auto">
+            {orgsLoading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : orgs.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No active organizations found.</p>
+            ) : (
+              orgs.map(org => (
+                <Link
+                  key={org.id}
+                  href={`/register-player/${org.id}`}
+                  onClick={() => setShowPlayerDialog(false)}
+                  className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted hover:border-primary/50 transition-colors group"
+                >
+                  <div className="h-9 w-9 rounded-md border bg-muted flex items-center justify-center shrink-0">
+                    {org.branding?.logoUrl ? (
+                      <img src={org.branding.logoUrl} alt={org.name} className="h-8 w-8 object-contain rounded" />
+                    ) : (
+                      <Building className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <span className="flex-1 text-sm font-medium">{org.name}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                </Link>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
         <AlertDialogContent>
