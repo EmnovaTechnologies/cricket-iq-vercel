@@ -1,7 +1,7 @@
-
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Users, Gamepad2, Target, BarChart3, PlusCircle, Layers, Shield, MapPinned, Loader2, LogOut, Hourglass, Edit, Link2 } from 'lucide-react';
@@ -12,6 +12,7 @@ import { PERMISSIONS } from '@/lib/permissions-master-list';
 import React, { useState, useEffect } from 'react';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const {
     activeOrganizationDetails,
     isAuthLoading,
@@ -21,7 +22,7 @@ export default function DashboardPage() {
     effectivePermissions,
     isLoggingOut,
   } = useAuth();
-  
+
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -80,16 +81,11 @@ export default function DashboardPage() {
   }
 
   if (!currentUser && !isAuthLoading) {
-     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] text-center">
-        <Alert variant="destructive" className="max-w-lg">
-          <Shield className="h-5 w-5" />
-          <AlertTitle>Access Denied</AlertTitle>
-          <AlertDescription>
-            You need to be logged in to view the dashboard. Please{' '}
-            <Link href="/login" className="underline hover:text-primary">login</Link> to continue.
-          </AlertDescription>
-        </Alert>
+    router.push('/login');
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Redirecting to login...</p>
       </div>
     );
   }
@@ -191,7 +187,7 @@ export default function DashboardPage() {
           </div>
         </section>
       )}
-       {(visibleQuickLinks.length === 0 && visibleInfoCards.length === 0 && currentUser && !isAuthLoading) && (
+      {(visibleQuickLinks.length === 0 && visibleInfoCards.length === 0 && currentUser && !isAuthLoading) && (
         <Alert variant="default" className="border-primary/50">
           <Hourglass className="h-5 w-5 text-primary" />
           <AlertTitle>Dashboard Content Limited</AlertTitle>
