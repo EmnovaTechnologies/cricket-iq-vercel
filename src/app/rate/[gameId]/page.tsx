@@ -518,10 +518,22 @@ function MobileRatePage() {
           {game.team1} vs {game.team2}
           {game.seriesName ? <span className="opacity-70"> · {game.seriesName}</span> : ''}
         </p>
-        <p className="text-xs opacity-75 leading-snug truncate">
-          {game.date ? (() => { try { return new Date(game.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); } catch { return ''; } })() : ''}
-          {game.venue ? <span> · {game.venue}</span> : ''}
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs opacity-75 leading-snug truncate">
+            {game.date ? (() => { try { return new Date(game.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); } catch { return ''; } })() : ''}
+            {game.venue ? <span> · {game.venue}</span> : ''}
+          </p>
+          {(game as any).externalScoreUrl && (
+            <a
+              href={(game as any).externalScoreUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs opacity-90 hover:opacity-100 underline whitespace-nowrap shrink-0 flex items-center gap-1"
+            >
+              📋 Scorecard
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Progress bar */}

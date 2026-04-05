@@ -10,7 +10,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { format, parseISO, startOfDay } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info, Users, UserCog, ArrowLeft, Edit, CheckCircle, Clock, ShieldAlert, Users2, Loader2, CalendarX, QrCode } from 'lucide-react';
+import { Info, Users, UserCog, ArrowLeft, Edit, CheckCircle, Clock, ShieldAlert, Users2, Loader2, CalendarX, QrCode, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { getUserProfile } from '@/lib/user-actions';
 import { Badge } from '@/components/ui/badge';
@@ -197,6 +197,17 @@ function RateGameEnhancedContent() {
           <CardDescription>
             Game: {game.team1} vs {game.team2} on {formattedGameDate || 'Loading date...'} at {game.venue}.
           </CardDescription>
+          {(game as any).externalScoreUrl && (
+            <a
+              href={(game as any).externalScoreUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm text-primary hover:underline mt-1"
+            >
+              <ExternalLink className="h-4 w-4 shrink-0" />
+              View Scorecard
+            </a>
+          )}
         </div>
         <div className="mt-2 sm:mt-0 flex flex-col sm:flex-row gap-2">
           {showBackToListButton && (
