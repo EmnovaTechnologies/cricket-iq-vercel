@@ -6,7 +6,7 @@ import type { Game, Player, PlayerRating, Series, UserProfile, RatingValue, Perm
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { CalendarDays, MapPin, Users, ArrowLeft, Layers, UserSquare2, UserPlus, CheckSquare, Square, Edit3, UserCog, Save, Check, ChevronsUpDown, Loader2, Copy, Share2, CheckCheck } from 'lucide-react';
+import { CalendarDays, MapPin, Users, ArrowLeft, Layers, UserSquare2, UserPlus, CheckSquare, Square, Edit3, UserCog, Save, Check, ChevronsUpDown, Loader2, ExternalLink, Link2, Share2, CheckCheck } from 'lucide-react';
 import { format, parseISO, startOfDay } from 'date-fns';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,8 @@ import { useAuth } from '@/contexts/auth-context';
 import { getUsersByRole } from '@/lib/actions/user-actions';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; // Added Popover
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'; // Added Command
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { CricketBatIcon, LayersIcon, CricketBallIcon, WicketKeeperGloves } from '@/components/custom-icons';
@@ -73,6 +74,8 @@ export default function GameDetailsPage() {
   const [isLoadingGameSelectors, setIsLoadingGameSelectors] = useState(false);
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [gameUrl, setGameUrl] = useState('');
+  const [isSavingGameUrl, setIsSavingGameUrl] = useState(false);
 
   const handleShareLink = () => {
     const url = `${window.location.origin}/rate/${gameId}`;
@@ -83,6 +86,21 @@ export default function GameDetailsPage() {
       setLinkCopied(true);
       toast({ title: 'Link copied!', description: 'Share this link with your selectors.' });
       setTimeout(() => setLinkCopied(false), 3000);
+    }
+  };
+
+  const handleSaveGameUrl = async () => {
+    if (!gameId) return;
+    setIsSavingGameUrl(true);
+    try {
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      await updateDoc(doc(db, 'games', gameId), { externalScoreUrl: gameUrl.trim() });
+      toast({ title: 'Scorecard URL saved!', description: 'The external scorecard link has been saved.' });
+    } catch (e) {
+      toast({ title: 'Error', description: 'Could not save URL.', variant: 'destructive' });
+    } finally {
+      setIsSavingGameUrl(false);
     }
   };
 
@@ -124,6 +142,7 @@ export default function GameDetailsPage() {
     try {
       const fetchedGame = await getGameByIdFromDB(gameId);
       setGame(fetchedGame);
+      if (fetchedGame) setGameUrl((fetchedGame as any).externalScoreUrl || '');
 
       if (fetchedGame) {
           try {
@@ -312,18 +331,49 @@ export default function GameDetailsPage() {
           <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-muted-foreground" /><span>{formattedGameDate ? format(parseISO(game.date), 'EEEE, MMMM do, yyyy') : "N/A"}</span></div>
           <div className="flex items-center gap-2"><MapPin className="h-5 w-5 text-muted-foreground" /><span>Venue: {game.venue}</span></div>
           {game.seriesId && series && (<div className="flex items-center gap-2"><LayersIcon className="h-5 w-5 text-muted-foreground" /><span>Series: <Link href={`/series/${game.seriesId}/details`} className="underline text-primary hover:text-primary/80">{series.name}</Link></span></div>)}
+
+          {/* Game URL / Scorecard Link */}
+          <div className="pt-2 space-y-1.5">
+            <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
+              <Link2 className="h-4 w-4" /> Scorecard URL
+            </h4>
+            {gameUrl && !canManageSelectors ? (
+              <a href={gameUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-sm text-primary underline hover:text-primary/80 break-all">
+                <ExternalLink className="h-4 w-4 shrink-0" />
+                {gameUrl}
+              </a>
+            ) : canManageSelectors ? (
+              <div className="flex gap-2 items-center">
+                <Input
+                  placeholder="https://cricclubs.com/..."
+                  value={gameUrl}
+                  onChange={e => setGameUrl(e.target.value)}
+                  className="text-sm h-9 flex-1"
+                />
+                {gameUrl && (
+                  <a href={gameUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="ghost" size="sm" type="button" title="Open scorecard">
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </a>
+                )}
+                <Button size="sm" onClick={handleSaveGameUrl} disabled={isSavingGameUrl} className="shrink-0">
+                  {isSavingGameUrl ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No scorecard URL added.</p>
+            )}
+          </div>
+
           <div className="pt-2"><h4 className="text-sm font-semibold text-muted-foreground mb-1">Selectors:</h4>
             {gameSelectors.length > 0 ? (<ul className="list-disc list-inside text-sm text-foreground space-y-0.5">{gameSelectors.map(s => <li key={s.uid}>{s.displayName || s.email}</li>)}</ul>)
             : (<p className="text-sm text-muted-foreground">No selectors assigned.</p>)}
           </div>
         </CardContent>
         {canManageSelectors && !isEditingSelectors && (<CardFooter className="border-t pt-4 flex gap-2 justify-between items-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleShareLink}
-            className="gap-2"
-          >
+          <Button variant="outline" size="sm" onClick={handleShareLink} className="gap-2">
             {linkCopied ? <CheckCheck className="h-4 w-4 text-green-500" /> : <Share2 className="h-4 w-4" />}
             {linkCopied ? 'Link Copied!' : 'Share Rating Link'}
           </Button>
