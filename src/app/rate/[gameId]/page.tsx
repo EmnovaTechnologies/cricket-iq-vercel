@@ -471,10 +471,16 @@ function MobileRatePage() {
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-lg mx-auto">
 
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground px-4 py-3 sticky top-0 z-10">
-        <p className="text-xs opacity-80">{game.team1} vs {game.team2}</p>
-        <p className="text-xs opacity-70">{game.venue}</p>
+      {/* Header — two lines fitting all key details */}
+      <div className="bg-primary text-primary-foreground px-4 py-2.5 sticky top-0 z-10">
+        <p className="text-xs font-medium leading-snug truncate">
+          {game.team1} vs {game.team2}
+          {game.seriesName ? <span className="opacity-70"> · {game.seriesName}</span> : ''}
+        </p>
+        <p className="text-xs opacity-75 leading-snug truncate">
+          {game.date ? (() => { try { return new Date(game.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); } catch { return ''; } })() : ''}
+          {game.venue ? <span> · {game.venue}</span> : ''}
+        </p>
       </div>
 
       {/* Progress bar */}
