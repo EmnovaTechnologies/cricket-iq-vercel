@@ -10,8 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Phone, ChevronLeft, ChevronRight, CheckCircle, ShieldAlert, Send, ChevronDown, MessageSquare } from 'lucide-react';
+import { Loader2, Phone, ChevronLeft, ChevronRight, CheckCircle, ShieldAlert, Send, ChevronDown, MessageSquare, Search, X } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { ConfirmationResult } from 'firebase/auth';
@@ -93,6 +94,28 @@ function MobileRatePage() {
   const [expandedNotes, setExpandedNotes] = useState<Record<string, Set<SkillKey>>>({});
   const [savedPlayers, setSavedPlayers] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+
+  // Swipe handling
+  const [swipeTouchStart, setSwipeTouchStart] = useState<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setSwipeTouchStart(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (swipeTouchStart === null) return;
+    const diff = swipeTouchStart - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) {
+      if (diff > 0 && currentPlayerIndex < players.length - 1) {
+        setCurrentPlayerIndex(prev => prev + 1);
+      } else if (diff < 0 && currentPlayerIndex > 0) {
+        setCurrentPlayerIndex(prev => prev - 1);
+      }
+    }
+    setSwipeTouchStart(null);
+  };
 
   const toggleSkillExpanded = (playerId: string, skill: SkillKey) => {
     setExpandedSkills(prev => {
@@ -487,22 +510,112 @@ function MobileRatePage() {
         </div>
       </div>
 
-      {/* Player card */}
+      {/* Player card with swipe + nav arrows */}
       <div className="flex-1 px-4 pb-4 space-y-4">
-        <div className="bg-card border rounded-xl p-4 flex items-center gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={player.avatarUrl || 'https://placehold.co/64x64.png'} alt={player.name} />
-            <AvatarFallback className="text-lg">{player.name.substring(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <div className="flex-1">
-            <h2 className="text-xl font-bold">{player.name}</h2>
-            <Badge variant="outline" className="flex items-center gap-1 w-fit mt-1">
-              <SkillIcon skill={player.primarySkill} />
-              {player.primarySkill}
-            </Badge>
-            <p className="text-xs text-muted-foreground mt-1">{player.teamName}</p>
+
+        {/* Search bar */}
+        {showSearch ? (
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              autoFocus
+              placeholder="Search player name..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9 pr-9 h-10"
+            />
+            <button
+              onClick={() => { setShowSearch(false); setSearchQuery(''); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            {searchQuery && (
+              <div className="absolute top-full left-0 right-0 bg-card border rounded-xl shadow-lg z-20 mt-1 max-h-48 overflow-y-auto">
+                {players
+                  .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map((p, i) => (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setCurrentPlayerIndex(players.indexOf(p));
+                        setShowSearch(false);
+                        setSearchQuery('');
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left border-b last:border-0"
+                    >
+                      <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarImage src={p.avatarUrl || 'https://placehold.co/32x32.png'} alt={p.name} />
+                        <AvatarFallback className="text-xs">{p.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="text-sm font-medium">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{p.teamName} · {p.primarySkill}</p>
+                      </div>
+                      {savedPlayers.has(p.id) && <CheckCircle className="h-4 w-4 text-green-500 ml-auto shrink-0" />}
+                    </button>
+                  ))}
+                {players.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">No players found</p>
+                )}
+              </div>
+            )}
           </div>
-          {isSaved && <CheckCircle className="h-6 w-6 text-green-500 shrink-0" />}
+        ) : null}
+
+        {/* Player card with swipe gestures and nav arrows */}
+        <div
+          className="bg-card border rounded-xl overflow-hidden"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Nav arrows + player info row */}
+          <div className="flex items-center gap-2 p-3">
+            <button
+              onClick={() => setCurrentPlayerIndex(prev => Math.max(0, prev - 1))}
+              disabled={currentPlayerIndex === 0}
+              className="h-10 w-10 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-30 hover:bg-muted transition-colors"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <Avatar className="h-14 w-14 shrink-0">
+                <AvatarImage src={player.avatarUrl || 'https://placehold.co/56x56.png'} alt={player.name} />
+                <AvatarFallback className="text-base">{player.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold truncate">{player.name}</h2>
+                <Badge variant="outline" className="flex items-center gap-1 w-fit mt-0.5 text-xs">
+                  <SkillIcon skill={player.primarySkill} />
+                  {player.primarySkill}
+                </Badge>
+                <p className="text-xs text-muted-foreground mt-0.5">{player.teamName}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-1 shrink-0">
+              <button
+                onClick={() => setCurrentPlayerIndex(prev => Math.min(players.length - 1, prev + 1))}
+                disabled={currentPlayerIndex === players.length - 1}
+                className="h-10 w-10 rounded-full border flex items-center justify-center disabled:opacity-30 hover:bg-muted transition-colors"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+              {isSaved && <CheckCircle className="h-5 w-5 text-green-500" />}
+            </div>
+          </div>
+
+          {/* Swipe hint + search button */}
+          <div className="flex items-center justify-between px-3 pb-2">
+            <p className="text-xs text-muted-foreground">← swipe to navigate →</p>
+            <button
+              onClick={() => setShowSearch(true)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <Search className="h-3.5 w-3.5" /> Find player
+            </button>
+          </div>
         </div>
 
         {isFinalized && (
@@ -606,33 +719,31 @@ function MobileRatePage() {
                     ))}
                   </div>
 
-                  {/* Notes toggle — only show if skill has a numeric rating */}
-                  {currentRating !== 'Not Rated' && currentRating !== 'Not Applicable' && (
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => toggleNoteExpanded(player.id, skill)}
-                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        disabled={isFinalized}
-                      >
-                        <MessageSquare className="h-3.5 w-3.5" />
-                        {isNoteExpanded ? 'Hide note' : noteValue ? `Note: "${noteValue.slice(0, 30)}${noteValue.length > 30 ? '...' : ''}"` : 'Add note'}
-                        <ChevronDown className={cn("h-3 w-3 transition-transform", isNoteExpanded && "rotate-180")} />
-                      </button>
+                  {/* Notes — always available when skill is not NA */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => toggleNoteExpanded(player.id, skill)}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      disabled={isFinalized}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      {isNoteExpanded ? 'Hide note' : noteValue ? `Note: "${noteValue.slice(0, 30)}${noteValue.length > 30 ? '...' : ''}"` : 'Add note'}
+                      <ChevronDown className={cn("h-3 w-3 transition-transform", isNoteExpanded && "rotate-180")} />
+                    </button>
 
-                      {isNoteExpanded && (
-                        <Textarea
-                          placeholder={`Notes on ${skillLabels[skill].toLowerCase()}...`}
-                          value={noteValue}
-                          onChange={e => handleNoteChange(player.id, skill, e.target.value)}
-                          rows={2}
-                          className="mt-2 text-sm resize-none"
-                          disabled={isFinalized}
-                          maxLength={200}
-                        />
-                      )}
-                    </div>
-                  )}
+                    {isNoteExpanded && (
+                      <Textarea
+                        placeholder={`Notes on ${skillLabels[skill].toLowerCase()}...`}
+                        value={noteValue}
+                        onChange={e => handleNoteChange(player.id, skill, e.target.value)}
+                        rows={2}
+                        className="mt-2 text-sm resize-none"
+                        disabled={isFinalized}
+                        maxLength={200}
+                      />
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -654,26 +765,6 @@ function MobileRatePage() {
             {isSaving ? 'Saving...' : isSaved ? 'Update & Next' : 'Save & Next →'}
           </Button>
         )}
-
-        {/* Prev / Next navigation */}
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPlayerIndex(prev => Math.max(0, prev - 1))}
-            disabled={currentPlayerIndex === 0}
-            className="flex-1 h-12"
-          >
-            <ChevronLeft className="mr-1 h-4 w-4" /> Previous
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPlayerIndex(prev => Math.min(players.length - 1, prev + 1))}
-            disabled={currentPlayerIndex === players.length - 1}
-            className="flex-1 h-12"
-          >
-            Next <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
-        </div>
 
         <p className="text-center text-xs text-muted-foreground pb-4">
           Logged in as {currentUser.phoneNumber || currentUser.email}
