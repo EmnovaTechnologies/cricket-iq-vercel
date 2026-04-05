@@ -684,7 +684,7 @@ export function RatingFormEnhanced({ game, players, initialRatings = [], team1Na
         </h2>
         <div className="rounded-md border overflow-x-auto">
           <Table>
-            <TableHeader className="sticky top-[57px] z-10 bg-background shadow-sm"><TableRow>
+            <TableHeader><TableRow>
                 <TableHead className="min-w-[150px]">Player</TableHead>
                 <TableHead className="min-w-[120px]">Primary Skill</TableHead>
                 <TableHead className="min-w-[230px]">Batting</TableHead>
