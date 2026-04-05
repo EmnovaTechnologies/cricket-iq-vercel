@@ -14,6 +14,8 @@ import { Loader2, Phone, ChevronLeft, ChevronRight, CheckCircle, ShieldAlert, Se
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { ConfirmationResult } from 'firebase/auth';
+import { collection, query, where, limit, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { CricketBatIcon, CricketBallIcon, WicketKeeperGloves } from '@/components/custom-icons';
 
 // Rating options displayed as big tap buttons
@@ -76,6 +78,7 @@ function MobileRatePage() {
   const [isLoadingGame, setIsLoadingGame] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [resolvedSelectorUid, setResolvedSelectorUid] = useState<string | null>(null);
 
   // Rating state
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
@@ -93,9 +96,56 @@ function MobileRatePage() {
         if (!g) { setIsLoadingGame(false); return; }
         setGame(g);
 
-        // Check authorization
-        const authorized = g.selectorUserIds?.includes(currentUser.uid) || false;
+        // Check authorization — match by UID first, then by phone number
+        // This handles the case where selector was assigned by email UID
+        // but is logging in via phone OTP (different UID)
+        let authorizedUid: string | null = null;
+
+        // Step 1: Direct UID match
+        if (g.selectorUserIds?.includes(currentUser.uid)) {
+          authorizedUid = currentUser.uid;
+        }
+
+        // Step 2: Phone number match — look up user by phone number in Firestore
+        if (!authorizedUid && currentUser.phoneNumber) {
+          const usersQuery = query(
+            collection(db, 'users'),
+            where('phoneNumber', '==', currentUser.phoneNumber),
+            limit(5)
+          );
+          const usersSnap = await getDocs(usersQuery);
+          for (const userDoc of usersSnap.docs) {
+            if (g.selectorUserIds?.includes(userDoc.id)) {
+              authorizedUid = userDoc.id;
+              break;
+            }
+          }
+        }
+
+        // Step 3: If still not found, store phone number on current user profile
+        // so future matches work, and check if any selector has no phone set
+        if (!authorizedUid) {
+          // Save phone number to current user's Firestore profile for future use
+          if (currentUser.phoneNumber) {
+            try {
+              const userDocRef = collection(db, 'users');
+              const existingQuery = query(userDocRef, where('uid', '==', currentUser.uid), limit(1));
+              const existingSnap = await getDocs(existingQuery);
+              if (!existingSnap.empty) {
+                const { doc: firestoreDoc, updateDoc } = await import('firebase/firestore');
+                await updateDoc(firestoreDoc(db, 'users', currentUser.uid), {
+                  phoneNumber: currentUser.phoneNumber
+                });
+              }
+            } catch (e) {
+              console.warn('Could not save phone number to profile:', e);
+            }
+          }
+        }
+
+        const authorized = !!authorizedUid;
         setIsAuthorized(authorized);
+        setResolvedSelectorUid(authorizedUid || currentUser.uid);
         setAuthChecked(true);
 
         if (authorized) {
@@ -143,11 +193,13 @@ function MobileRatePage() {
     if (!phone.trim()) return;
     setAuthInProgress(true);
     try {
-      const formatted = phone.startsWith('+') ? phone : `+${phone.replace(/\D/g, '')}`;
+      // Always prepend +1 for US numbers, strip any non-digits first
+      const digits = phone.replace(/\D/g, '');
+      const formatted = digits.startsWith('1') ? `+${digits}` : `+1${digits}`;
       const result = await signInWithPhoneNumberFlow(formatted, 'recaptcha-container-rate');
       setConfirmationResult(result);
       setIsCodeSent(true);
-      toast({ title: 'Code sent!', description: 'Check your phone for the verification code.' });
+      toast({ title: 'Code sent!', description: `Verification code sent to +1 ${phone}` });
     } catch (err: any) {
       toast({ title: 'Failed to send code', description: err.message || 'Please try again.', variant: 'destructive' });
     } finally {
@@ -177,6 +229,7 @@ function MobileRatePage() {
   const handleSaveAndNext = async () => {
     const player = players[currentPlayerIndex];
     if (!player || !currentUser) return;
+    const uidToUse = resolvedSelectorUid || currentUser.uid;
     setIsSaving(true);
     try {
       const playerRating = ratings[player.id];
@@ -187,7 +240,7 @@ function MobileRatePage() {
           fielding: playerRating.fielding,
           wicketKeeping: playerRating.wicketKeeping,
         }
-      }, currentUser.uid, false);
+      }, uidToUse, false);
       setSavedPlayers(prev => new Set([...prev, player.id]));
       toast({ title: `${player.name} rated ✓`, description: 'Rating saved successfully.' });
       if (currentPlayerIndex < players.length - 1) {
@@ -222,20 +275,22 @@ function MobileRatePage() {
             {!isCodeSent ? (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Your Phone Number</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="phone">Your US Phone Number</Label>
+                  <div className="flex gap-2 items-center">
+                    <div className="flex items-center justify-center h-12 px-3 rounded-md border bg-muted text-sm font-medium text-muted-foreground shrink-0">
+                      🇺🇸 +1
+                    </div>
                     <Input
                       id="phone"
                       type="tel"
-                      placeholder="+1 650 555 1234"
+                      placeholder="714 829 0716"
                       value={phone}
                       onChange={e => setPhone(e.target.value)}
-                      className="pl-10 h-12 text-base"
+                      className="h-12 text-base"
                       disabled={authInProgress}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">Include your country code (e.g. +1 for US)</p>
+                  <p className="text-xs text-muted-foreground">Enter your 10-digit US phone number</p>
                 </div>
                 <div id="recaptcha-container-rate" />
                 <Button onClick={handleSendOtp} disabled={authInProgress || !phone.trim()} className="w-full h-12 text-base">
@@ -257,7 +312,7 @@ function MobileRatePage() {
                     maxLength={6}
                     disabled={authInProgress}
                   />
-                  <p className="text-xs text-muted-foreground">Code sent to {phone}</p>
+                  <p className="text-xs text-muted-foreground">Code sent to +1 {phone}</p>
                 </div>
                 <Button onClick={handleVerifyOtp} disabled={authInProgress || otp.length < 6} className="w-full h-12 text-base">
                   {authInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
