@@ -19,7 +19,8 @@ import { certifyRatingsAction, finalizeGameRatingsAction, adminForceFinalizeGame
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, MessageSquare, Users, Loader2, Save, CheckCircle, UserCheck, Info, AlertTriangle, User } from 'lucide-react';
+import { ChevronDown, MessageSquare, Users, Loader2, Save, CheckCircle, UserCheck, Info, AlertTriangle, User, Search, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from '@/components/ui/table';
 import {
@@ -77,6 +78,8 @@ export function RatingFormEnhanced({ game, players, initialRatings = [], team1Na
 
   const [actionInProgress, setActionInProgress] = useState<'save' | 'certify' | 'finalize' | null>(null);
   const [showAdminFinalizeDialog, setShowAdminFinalizeDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [teamFilter, setTeamFilter] = useState<'all' | string>('all');
   
   const [showCertifyConfirmDialog, setShowCertifyConfirmDialog] = useState(false);
   const [certifyConfirmDialogMessage, setCertifyConfirmDialogMessage] = useState('');
@@ -491,6 +494,24 @@ export function RatingFormEnhanced({ game, players, initialRatings = [], team1Na
     return player?.teamName === team2NameFromGame;
   });
 
+  // Filter fields based on search query and team filter
+  const filterFields = (teamFields: typeof fields) => {
+    if (!searchQuery && teamFilter === 'all') return teamFields;
+    return teamFields.filter(field => {
+      const idx = fields.indexOf(field);
+      const player = getPlayerForField(form.getValues(`playerRatings.${idx}.playerId`));
+      if (!player) return false;
+      const matchesSearch = !searchQuery || player.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesTeam = teamFilter === 'all' || player.teamName === teamFilter;
+      return matchesSearch && matchesTeam;
+    });
+  };
+
+  const filteredTeam1Fields = filterFields(team1PlayersFields);
+  const filteredTeam2Fields = filterFields(team2PlayersFields);
+  const totalVisible = filteredTeam1Fields.length + filteredTeam2Fields.length;
+  const totalPlayers = team1PlayersFields.length + team2PlayersFields.length;
+
   const getSkillIcon = (skill: PrimarySkill) => {
     switch (skill) {
       case 'Batting': return <CricketBatIcon className="h-4 w-4" />;
@@ -504,8 +525,62 @@ export function RatingFormEnhanced({ game, players, initialRatings = [], team1Na
     <>
       <Form {...form}>
         <form className="space-y-6">
-          {renderPlayerTable(team1NameFromGame, team1PlayersFields)}
-          {renderPlayerTable(team2NameFromGame, team2PlayersFields)}
+
+          {/* Search & Filter Bar */}
+          <div className="sticky top-0 z-10 bg-background border rounded-lg p-3 shadow-sm flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search player by name..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-9 pr-8 h-9"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {['all', team1NameFromGame, team2NameFromGame].map(team => (
+                <button
+                  key={team}
+                  type="button"
+                  onClick={() => setTeamFilter(team)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md text-sm font-medium border transition-colors",
+                    teamFilter === team
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-border hover:bg-muted"
+                  )}
+                >
+                  {team === 'all' ? 'All Teams' : team}
+                </button>
+              ))}
+            </div>
+            <span className="text-sm text-muted-foreground whitespace-nowrap">
+              {totalVisible === totalPlayers ? `${totalPlayers} players` : `${totalVisible} of ${totalPlayers} players`}
+            </span>
+            {(searchQuery || teamFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={() => { setSearchQuery(''); setTeamFilter('all'); }}
+                className="text-sm text-primary hover:underline whitespace-nowrap"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          {totalVisible === 0 && (searchQuery || teamFilter !== 'all') && (
+            <div className="text-center py-8 text-muted-foreground">
+              No players found matching <strong>{searchQuery}</strong>. <button type="button" className="text-primary hover:underline" onClick={() => { setSearchQuery(''); setTeamFilter('all'); }}>Clear search</button>
+            </div>
+          )}
+
+          {(teamFilter === 'all' || teamFilter === team1NameFromGame) && renderPlayerTable(team1NameFromGame, filteredTeam1Fields)}
+          {(teamFilter === 'all' || teamFilter === team2NameFromGame) && renderPlayerTable(team2NameFromGame, filteredTeam2Fields)}
 
           {isGameGloballyFinalized && (
              <Alert variant="default" className="border-green-500 bg-green-50">
