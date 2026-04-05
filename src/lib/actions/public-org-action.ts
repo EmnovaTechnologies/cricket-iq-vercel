@@ -47,7 +47,6 @@ export async function getAllPublicActiveOrganizations(): Promise<PublicOrgDetail
   try {
     const snap = await adminDb.collection('organizations')
       .where('status', '==', 'active')
-      .orderBy('name')
       .get();
     return snap.docs.map(doc => {
       const data = doc.data();
@@ -58,7 +57,7 @@ export async function getAllPublicActiveOrganizations(): Promise<PublicOrgDetail
         branding: data.branding || {},
         clubs: data.clubs || [],
       };
-    });
+    }).sort((a, b) => a.name.localeCompare(b.name));
   } catch (error) {
     console.error('[getAllPublicActiveOrganizations] Error:', error);
     return [];
@@ -70,7 +69,6 @@ export async function getPublicOrgTeams(orgId: string): Promise<PublicTeam[]> {
   try {
     const snap = await adminDb.collection('teams')
       .where('organizationId', '==', orgId)
-      .orderBy('name')
       .get();
     return snap.docs.map(doc => {
       const data = doc.data();
@@ -83,7 +81,7 @@ export async function getPublicOrgTeams(orgId: string): Promise<PublicTeam[]> {
         clubName: data.clubName || '',
         teamManagerUids: data.teamManagerUids || [],
       };
-    });
+    }).sort((a, b) => a.name.localeCompare(b.name));
   } catch (error) {
     console.error('[getPublicOrgTeams] Error:', error);
     return [];
