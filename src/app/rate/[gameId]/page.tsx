@@ -96,7 +96,16 @@ function MobileRatePage() {
 
   const toggleSkillExpanded = (playerId: string, skill: SkillKey) => {
     setExpandedSkills(prev => {
-      const current = new Set(prev[playerId] || []);
+      // On first toggle for this player, initialize with all non-NA skills expanded
+      let current: Set<SkillKey>;
+      if (!prev[playerId]) {
+        const playerRatingsNow = ratings[playerId] || {};
+        current = new Set(
+          ALL_SKILLS.filter(s => (playerRatingsNow as any)[s] !== 'Not Applicable')
+        );
+      } else {
+        current = new Set(prev[playerId]);
+      }
       if (current.has(skill)) current.delete(skill);
       else current.add(skill);
       return { ...prev, [playerId]: current };
@@ -506,6 +515,9 @@ function MobileRatePage() {
         {ALL_SKILLS.map(skill => {
           const currentRating = playerRatings[skill];
           const isNA = currentRating === 'Not Applicable';
+          // NA skills start collapsed, all others start expanded
+          // expandedSkills overrides the default when user has toggled
+          const hasBeenToggled = player.id in expandedSkills && expandedSkills[player.id] !== undefined;
           const isSkillExpanded = expandedSkills[player.id]?.has(skill) ?? !isNA;
           const isNoteExpanded = expandedNotes[player.id]?.has(skill) ?? false;
           const noteValue = notes[player.id]?.[skill] || '';
@@ -516,11 +528,11 @@ function MobileRatePage() {
               "bg-card border rounded-xl overflow-hidden transition-all",
               isNA && !isSkillExpanded ? "opacity-60" : ""
             )}>
-              {/* Skill header — always visible, tap to expand/collapse if NA */}
+              {/* Skill header — always visible, tap to expand/collapse */}
               <button
                 type="button"
                 className="w-full flex items-center gap-2 px-4 py-3 text-left"
-                onClick={() => isNA ? toggleSkillExpanded(player.id, skill) : undefined}
+                onClick={() => toggleSkillExpanded(player.id, skill)}
                 disabled={isFinalized}
               >
                 <span className="font-semibold text-sm text-muted-foreground uppercase tracking-wide flex-1">
@@ -535,12 +547,10 @@ function MobileRatePage() {
                 )}>
                   {currentRating}
                 </span>
-                {isNA && (
-                  <ChevronDown className={cn(
-                    "h-4 w-4 text-muted-foreground transition-transform ml-1",
-                    isSkillExpanded && "rotate-180"
-                  )} />
-                )}
+                <ChevronDown className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform ml-1",
+                  isSkillExpanded && "rotate-180"
+                )} />
               </button>
 
               {/* Rating content — shown when not NA or when expanded */}
