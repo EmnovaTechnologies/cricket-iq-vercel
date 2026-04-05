@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Phone, User, Mail, ShieldCheck, CheckCircle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import type { ConfirmationResult } from 'firebase/auth';
@@ -23,6 +23,25 @@ export default function ProfilePage() {
 
   const [displayName, setDisplayName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [duplicatePhoneWarning, setDuplicatePhoneWarning] = useState<string | null>(null);
+
+  const checkPhoneDuplicate = async (formatted: string): Promise<boolean> => {
+    // Returns true if phone is already used by another user
+    const q = query(
+      collection(db, 'users'),
+      where('phoneNumber', '==', formatted),
+      limit(5)
+    );
+    const snap = await getDocs(q);
+    const otherUsers = snap.docs.filter(d => d.id !== currentUser?.uid);
+    if (otherUsers.length > 0) {
+      const names = otherUsers.map(d => d.data().displayName || d.data().email || 'Another user').join(', ');
+      setDuplicatePhoneWarning(`This phone number is already linked to: ${names}. Each selector must have a unique phone number for mobile rating to work correctly.`);
+      return true;
+    }
+    setDuplicatePhoneWarning(null);
+    return false;
+  };
   const [isSaving, setIsSaving] = useState(false);
 
   // Phone linking state
@@ -80,6 +99,12 @@ export default function ProfilePage() {
     try {
       const digits = newPhone.replace(/\D/g, '');
       const formatted = digits.startsWith('1') ? `+${digits}` : `+1${digits}`;
+      // Check for duplicate before sending OTP
+      const isDuplicate = await checkPhoneDuplicate(formatted);
+      if (isDuplicate) {
+        setIsLinkingPhone(false);
+        return; // Warning already set, don't proceed
+      }
       const result = await signInWithPhoneNumberFlow(formatted, 'recaptcha-container-profile');
       setConfirmationResult(result);
       setIsCodeSent(true);
@@ -124,11 +149,18 @@ export default function ProfilePage() {
     try {
       const digits = newPhone.replace(/\D/g, '');
       const formatted = digits.startsWith('1') ? `+${digits}` : `+1${digits}`;
+      // Check for duplicate first
+      const isDuplicate = await checkPhoneDuplicate(formatted);
+      if (isDuplicate) {
+        setIsSaving(false);
+        return;
+      }
       const userDocRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userDocRef, { phoneNumber: formatted });
       setPhoneNumber(formatted);
       setShowPhoneSection(false);
       setNewPhone('');
+      setDuplicatePhoneWarning(null);
       toast({ title: 'Phone number saved!', description: 'Your phone number has been linked to your profile.' });
     } catch (e) {
       toast({ title: 'Error', description: 'Could not save phone number.', variant: 'destructive' });
@@ -235,11 +267,17 @@ export default function ProfilePage() {
                     type="tel"
                     placeholder="310 555 1234"
                     value={newPhone}
-                    onChange={e => setNewPhone(e.target.value)}
+                    onChange={e => { setNewPhone(e.target.value); setDuplicatePhoneWarning(null); }}
                     disabled={isLinkingPhone || isCodeSent}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">Enter your 10-digit US phone number</p>
+                {duplicatePhoneWarning && (
+                  <Alert variant="destructive" className="mt-1">
+                    <AlertTitle className="text-sm">⚠️ Phone Number Already In Use</AlertTitle>
+                    <AlertDescription className="text-xs">{duplicatePhoneWarning}</AlertDescription>
+                  </Alert>
+                )}
               </div>
 
               {!isCodeSent ? (
