@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Phone, ChevronLeft, ChevronRight, CheckCircle, ShieldAlert, Send } from 'lucide-react';
+import { Loader2, Phone, ChevronLeft, ChevronRight, CheckCircle, ShieldAlert, Send, ChevronDown, MessageSquare } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { ConfirmationResult } from 'firebase/auth';
@@ -87,8 +88,36 @@ function MobileRatePage() {
   // Rating state
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const [ratings, setRatings] = useState<Record<string, PlayerRatings>>({});
+  const [notes, setNotes] = useState<Record<string, Record<SkillKey, string>>>({});
+  const [expandedSkills, setExpandedSkills] = useState<Record<string, Set<SkillKey>>>({});
+  const [expandedNotes, setExpandedNotes] = useState<Record<string, Set<SkillKey>>>({});
   const [savedPlayers, setSavedPlayers] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
+
+  const toggleSkillExpanded = (playerId: string, skill: SkillKey) => {
+    setExpandedSkills(prev => {
+      const current = new Set(prev[playerId] || []);
+      if (current.has(skill)) current.delete(skill);
+      else current.add(skill);
+      return { ...prev, [playerId]: current };
+    });
+  };
+
+  const toggleNoteExpanded = (playerId: string, skill: SkillKey) => {
+    setExpandedNotes(prev => {
+      const current = new Set(prev[playerId] || []);
+      if (current.has(skill)) current.delete(skill);
+      else current.add(skill);
+      return { ...prev, [playerId]: current };
+    });
+  };
+
+  const handleNoteChange = (playerId: string, skill: SkillKey, value: string) => {
+    setNotes(prev => ({
+      ...prev,
+      [playerId]: { ...(prev[playerId] || {}), [skill]: value },
+    }));
+  };
 
   // Load game data once user is authenticated
   useEffect(() => {
@@ -172,6 +201,7 @@ function MobileRatePage() {
 
           // Pre-populate ratings from existing data
           const initialRatings: Record<string, PlayerRatings> = {};
+          const initialNotes: Record<string, Record<SkillKey, string>> = {};
           loaded.forEach(player => {
             const er = existing.find(r => r.playerId === player.id);
             const defaults = getDefaultRatings(player);
@@ -181,8 +211,18 @@ function MobileRatePage() {
               fielding: (er?.fielding as RatingValue) || defaults.fielding,
               wicketKeeping: (er?.wicketKeeping as RatingValue) || defaults.wicketKeeping,
             };
+            if (er) {
+              const uid = currentUser.uid;
+              initialNotes[player.id] = {
+                batting: (er.battingComments as any)?.[uid] || '',
+                bowling: (er.bowlingComments as any)?.[uid] || '',
+                fielding: (er.fieldingComments as any)?.[uid] || '',
+                wicketKeeping: (er.wicketKeepingComments as any)?.[uid] || '',
+              };
+            }
           });
           setRatings(initialRatings);
+          setNotes(initialNotes);
         }
       } catch (e) {
         console.error('Error loading game:', e);
@@ -237,12 +277,17 @@ function MobileRatePage() {
     setIsSaving(true);
     try {
       const playerRating = ratings[player.id];
+      const playerNotes = notes[player.id] || {};
       await saveGameRatingsToDB(gameId, {
         [player.id]: {
           batting: playerRating.batting,
           bowling: playerRating.bowling,
           fielding: playerRating.fielding,
           wicketKeeping: playerRating.wicketKeeping,
+          battingComment: playerNotes.batting || '',
+          bowlingComment: playerNotes.bowling || '',
+          fieldingComment: playerNotes.fielding || '',
+          wicketKeepingComment: playerNotes.wicketKeeping || '',
         }
       }, uidToUse, false);
       setSavedPlayers(prev => new Set([...prev, player.id]));
@@ -458,60 +503,131 @@ function MobileRatePage() {
         )}
 
         {/* Rating sections — all 4 skills */}
-        {ALL_SKILLS.map(skill => (
-          <div key={skill} className="bg-card border rounded-xl p-4 space-y-3">
-            <h3 className="font-semibold text-sm flex items-center gap-2">
-              <span className="text-muted-foreground uppercase tracking-wide">{skillLabels[skill]}</span>
-              {isPrimarySkill(player, skill) && (
-                <Badge variant="default" className="text-xs py-0 px-1.5">★ Primary</Badge>
+        {ALL_SKILLS.map(skill => {
+          const currentRating = playerRatings[skill];
+          const isNA = currentRating === 'Not Applicable';
+          const isSkillExpanded = expandedSkills[player.id]?.has(skill) ?? !isNA;
+          const isNoteExpanded = expandedNotes[player.id]?.has(skill) ?? false;
+          const noteValue = notes[player.id]?.[skill] || '';
+          const isPrimary = isPrimarySkill(player, skill);
+
+          return (
+            <div key={skill} className={cn(
+              "bg-card border rounded-xl overflow-hidden transition-all",
+              isNA && !isSkillExpanded ? "opacity-60" : ""
+            )}>
+              {/* Skill header — always visible, tap to expand/collapse if NA */}
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-4 py-3 text-left"
+                onClick={() => isNA ? toggleSkillExpanded(player.id, skill) : undefined}
+                disabled={isFinalized}
+              >
+                <span className="font-semibold text-sm text-muted-foreground uppercase tracking-wide flex-1">
+                  {skillLabels[skill]}
+                  {isPrimary && <span className="ml-2 text-primary text-xs normal-case">★ Primary</span>}
+                </span>
+                <span className={cn(
+                  "text-sm font-bold",
+                  isNA ? "text-muted-foreground text-xs font-normal" :
+                  currentRating === 'Not Rated' ? "text-muted-foreground text-xs font-normal" :
+                  "text-primary"
+                )}>
+                  {currentRating}
+                </span>
+                {isNA && (
+                  <ChevronDown className={cn(
+                    "h-4 w-4 text-muted-foreground transition-transform ml-1",
+                    isSkillExpanded && "rotate-180"
+                  )} />
+                )}
+              </button>
+
+              {/* Rating content — shown when not NA or when expanded */}
+              {isSkillExpanded && (
+                <div className="px-4 pb-4 space-y-3 border-t pt-3">
+                  {/* Numeric ratings 0.5–5.0 */}
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {NUMERIC_RATINGS.map(val => (
+                      <button
+                        key={val}
+                        type="button"
+                        disabled={isFinalized}
+                        onClick={() => handleRatingChange(player.id, skill, val)}
+                        className={cn(
+                          "h-11 rounded-lg text-sm font-bold border-2 transition-all",
+                          currentRating === val
+                            ? "bg-primary text-primary-foreground border-primary scale-105 shadow-sm"
+                            : "bg-background border-border hover:border-primary hover:text-primary"
+                        )}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Not Rated / Not Applicable */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {SPECIAL_RATINGS.map(val => (
+                      <button
+                        key={val}
+                        type="button"
+                        disabled={isFinalized}
+                        onClick={() => {
+                          handleRatingChange(player.id, skill, val);
+                          if (val === 'Not Applicable') {
+                            // collapse when set to NA
+                            setExpandedSkills(prev => {
+                              const current = new Set(prev[player.id] || []);
+                              current.delete(skill);
+                              return { ...prev, [player.id]: current };
+                            });
+                          }
+                        }}
+                        className={cn(
+                          "h-9 rounded-lg text-xs font-medium border-2 transition-all",
+                          currentRating === val
+                            ? "bg-muted text-foreground border-muted-foreground"
+                            : "bg-background border-border hover:border-muted-foreground text-muted-foreground"
+                        )}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Notes toggle — only show if skill has a numeric rating */}
+                  {currentRating !== 'Not Rated' && currentRating !== 'Not Applicable' && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => toggleNoteExpanded(player.id, skill)}
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        disabled={isFinalized}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        {isNoteExpanded ? 'Hide note' : noteValue ? `Note: "${noteValue.slice(0, 30)}${noteValue.length > 30 ? '...' : ''}"` : 'Add note'}
+                        <ChevronDown className={cn("h-3 w-3 transition-transform", isNoteExpanded && "rotate-180")} />
+                      </button>
+
+                      {isNoteExpanded && (
+                        <Textarea
+                          placeholder={`Notes on ${skillLabels[skill].toLowerCase()}...`}
+                          value={noteValue}
+                          onChange={e => handleNoteChange(player.id, skill, e.target.value)}
+                          rows={2}
+                          className="mt-2 text-sm resize-none"
+                          disabled={isFinalized}
+                          maxLength={200}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
-              <span className="ml-auto text-sm font-bold text-primary">
-                {playerRatings[skill] !== 'Not Rated' && playerRatings[skill] !== 'Not Applicable'
-                  ? playerRatings[skill]
-                  : <span className="text-muted-foreground font-normal text-xs">{playerRatings[skill]}</span>
-                }
-              </span>
-            </h3>
-            {/* Numeric ratings — 0.5 to 5.0 in a 5-column grid */}
-            <div className="grid grid-cols-5 gap-1.5">
-              {NUMERIC_RATINGS.map(val => (
-                <button
-                  key={val}
-                  type="button"
-                  disabled={isFinalized}
-                  onClick={() => handleRatingChange(player.id, skill, val)}
-                  className={cn(
-                    "h-11 rounded-lg text-sm font-bold border-2 transition-all",
-                    playerRatings[skill] === val
-                      ? "bg-primary text-primary-foreground border-primary scale-105 shadow-sm"
-                      : "bg-background border-border hover:border-primary hover:text-primary"
-                  )}
-                >
-                  {val}
-                </button>
-              ))}
             </div>
-            {/* Not Rated / Not Applicable */}
-            <div className="grid grid-cols-2 gap-2">
-              {SPECIAL_RATINGS.map(val => (
-                <button
-                  key={val}
-                  type="button"
-                  disabled={isFinalized}
-                  onClick={() => handleRatingChange(player.id, skill, val)}
-                  className={cn(
-                    "h-9 rounded-lg text-xs font-medium border-2 transition-all",
-                    playerRatings[skill] === val
-                      ? "bg-muted text-foreground border-muted-foreground"
-                      : "bg-background border-border hover:border-muted-foreground text-muted-foreground"
-                  )}
-                >
-                  {val}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Save & navigation */}
         {!isFinalized && (
