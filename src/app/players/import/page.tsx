@@ -45,10 +45,16 @@ export default function ImportPlayersPage() {
                   Upload a CSV file to bulk import player data. First,{' '}
                   <Button variant="outline" size="sm" asChild className="text-xs -translate-y-px px-2 h-auto py-0.5">
                     <Link href="/sample-players-import.csv" download>
-                      <Download className="mr-1 h-3 w-3" /> Download Sample Template
+                      <Download className="mr-1 h-3 w-3" /> Download Sample CSV
                     </Link>
                   </Button>
-                  {' '}and ensure your CSV matches its format.
+                  {' '}or{' '}
+                  <Button variant="outline" size="sm" asChild className="text-xs -translate-y-px px-2 h-auto py-0.5 border-green-600 text-green-700 hover:bg-green-50">
+                    <Link href="/player_import_template.xlsx" download>
+                      <Download className="mr-1 h-3 w-3" /> Download Excel Template
+                    </Link>
+                  </Button>
+                  {' '}and ensure your file matches the required format.
                 </CardDescription>
               </div>
               <Button asChild variant="outline" size="sm">
