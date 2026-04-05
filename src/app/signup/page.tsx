@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { UserPlus, Loader2, Mail, Key, Building, User as UserIcon } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getOrganizationByIdFromDB } from '@/lib/db';
+import { getPublicOrganizationDetails } from '@/lib/actions/public-org-action';
 import type { Organization } from '@/types';
 import { GoogleIcon } from '@/components/custom-icons';
 
@@ -32,7 +32,7 @@ function SignupForm() {
   const searchParams = useSearchParams();
 
   const [targetOrgId, setTargetOrgId] = useState<string | null>(null);
-  const [targetOrgDetails, setTargetOrgDetails] = useState<Organization | null>(null);
+  const [targetOrgDetails, setTargetOrgDetails] = useState<{ id: string; name: string; status: string } | null>(null);
   const [isLoadingOrgDetails, setIsLoadingOrgDetails] = useState(false);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ function SignupForm() {
     if (orgIdFromQuery) {
       setTargetOrgId(orgIdFromQuery);
       setIsLoadingOrgDetails(true);
-      getOrganizationByIdFromDB(orgIdFromQuery)
+      getPublicOrganizationDetails(orgIdFromQuery)
         .then(org => {
           if (org && org.status === 'active') {
             setTargetOrgDetails(org);
