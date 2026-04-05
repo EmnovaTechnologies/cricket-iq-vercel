@@ -233,7 +233,7 @@ export default function ProfilePage() {
                   <Input
                     id="newPhone"
                     type="tel"
-                    placeholder="714 829 0716"
+                    placeholder="310 555 1234"
                     value={newPhone}
                     onChange={e => setNewPhone(e.target.value)}
                     disabled={isLinkingPhone || isCodeSent}
