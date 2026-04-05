@@ -7,8 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 import type { Organization, Team } from '@/types';
-import { getOrganizationByIdAction } from '@/lib/actions/organization-actions';
-import { getAllTeamsFromDB } from '@/lib/db';
+import { getPublicOrganizationDetails, getPublicOrgTeams } from '@/lib/actions/public-org-action';
 import { PlayerRegistrationForm } from '@/components/player/player-registration-form';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,14 +36,14 @@ export default function PlayerRegistrationPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const orgData = await getOrganizationByIdAction(orgId);
+        const orgData = await getPublicOrganizationDetails(orgId);
         if (!orgData || orgData.status !== 'active') {
           throw new Error("This organization is not active or does not exist.");
         }
-        setOrganization(orgData);
+        setOrganization(orgData as Organization);
 
-        const orgTeams = await getAllTeamsFromDB(orgId);
-        setTeams(orgTeams);
+        const orgTeams = await getPublicOrgTeams(orgId);
+        setTeams(orgTeams as Team[]);
 
       } catch (err: any) {
         setError(err.message || "Could not load organization details.");
