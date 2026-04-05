@@ -3,7 +3,8 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { getGameByIdFromDB, getPlayerByIdFromDB, getRatingsForGameFromDB, saveGameRatingsToDB } from '@/lib/db';
+import { getGameByIdFromDB, getPlayerByIdFromDB, getRatingsForGameFromDB } from '@/lib/db';
+import { saveMobileRatingAction } from '@/lib/actions/mobile-rating-action';
 import type { Game, Player, PlayerRating, RatingValue } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -332,8 +333,11 @@ function MobileRatePage() {
     try {
       const playerRating = ratings[player.id];
       const playerNotes = notes[player.id] || {};
-      await saveGameRatingsToDB(gameId, {
-        [player.id]: {
+
+      const result = await saveMobileRatingAction({
+        gameId,
+        playerId: player.id,
+        rating: {
           batting: playerRating.batting,
           bowling: playerRating.bowling,
           fielding: playerRating.fielding,
@@ -342,8 +346,15 @@ function MobileRatePage() {
           bowlingComment: playerNotes.bowling || '',
           fieldingComment: playerNotes.fielding || '',
           wicketKeepingComment: playerNotes.wicketKeeping || '',
-        }
-      }, uidToUse, false);
+        },
+        savingUid: uidToUse,
+      });
+
+      if (!result.success) {
+        toast({ title: 'Save failed', description: result.error || 'Please try again.', variant: 'destructive' });
+        return;
+      }
+
       setSavedPlayers(prev => new Set([...prev, player.id]));
       toast({ title: `${player.name} rated ✓`, description: 'Rating saved successfully.' });
       if (currentPlayerIndex < players.length - 1) {
