@@ -1,7 +1,3 @@
-import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/googleai';
-
-export const ai = genkit({
-  plugins: [googleAI()],
-  model: 'googleai/gemini-2.0-flash',
-});
+// AI is now handled directly via Anthropic Claude SDK
+// See src/ai/flows/suggest-team-composition.ts
+export {};
