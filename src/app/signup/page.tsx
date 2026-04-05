@@ -8,8 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { UserPlus, Loader2, Mail, Key, Phone as PhoneIcon, Building, User as UserIcon } from 'lucide-react';
-import type { ConfirmationResult } from 'firebase/auth';
+import { UserPlus, Loader2, Mail, Key, Building, User as UserIcon } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getOrganizationByIdFromDB } from '@/lib/db';
 import type { Organization } from '@/types';
@@ -21,21 +20,13 @@ const SESSION_STORAGE_DISPLAY_NAME_KEY = 'pendingSignupDisplayName';
 function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [emailFormDisplayName, setEmailFormDisplayName] = useState('');
-  const [phoneFormDisplayName, setPhoneFormDisplayName] = useState('');
+  const [displayName, setDisplayName] = useState('');
 
-  const { signUpWithEmail, signInWithGoogle, signInWithPhoneNumberFlow, confirmPhoneNumberCode, isAuthLoading, currentUser } = useAuth();
+  const { signUpWithEmail, signInWithGoogle, isAuthLoading, currentUser } = useAuth();
   const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
-
   const [emailFormSubmitting, setEmailFormSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
-  const [phoneFormSubmitting, setPhoneFormSubmitting] = useState(false);
-
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const [isCodeSent, setIsCodeSent] = useState(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -79,23 +70,23 @@ function SignupForm() {
     }
   }, [isAuthLoading, currentUser, router, searchParams]);
 
-  const prepareForAuth = (currentDisplayName: string) => {
+  const prepareForAuth = (name: string) => {
     setError(null);
     if (typeof window !== 'undefined') {
-      if (currentDisplayName) sessionStorage.setItem(SESSION_STORAGE_DISPLAY_NAME_KEY, currentDisplayName);
+      if (name) sessionStorage.setItem(SESSION_STORAGE_DISPLAY_NAME_KEY, name);
       else sessionStorage.removeItem(SESSION_STORAGE_DISPLAY_NAME_KEY);
     }
   };
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailFormDisplayName.trim()) { setError("Full Name is required."); toast({ title: 'Missing Information', description: 'Full Name is required.', variant: 'destructive' }); return; }
+    if (!displayName.trim()) { setError("Full Name is required."); toast({ title: 'Missing Information', description: 'Full Name is required.', variant: 'destructive' }); return; }
     if (!email || !password) { setError("Please enter email and password."); return; }
     if (password.length < 6) { setError("Password should be at least 6 characters."); return; }
-    prepareForAuth(emailFormDisplayName);
+    prepareForAuth(displayName);
     setEmailFormSubmitting(true);
     try {
-      await signUpWithEmail(email, password, emailFormDisplayName);
+      await signUpWithEmail(email, password, displayName);
     } catch (err: any) {
       let errorMessage = "Failed to sign up. Please try again.";
       if (err.code === 'auth/email-already-in-use') errorMessage = "This email is already registered.";
@@ -120,47 +111,7 @@ function SignupForm() {
     }
   };
 
-  const handlePhoneSignUpSendCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phoneFormDisplayName.trim()) { setError("Full Name is required."); toast({ title: 'Missing Information', description: 'Full Name is required.', variant: 'destructive' }); return; }
-    prepareForAuth(phoneFormDisplayName);
-    setPhoneFormSubmitting(true);
-    try {
-      const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber.replace(/\D/g, '')}`;
-      if (formattedPhoneNumber.length < 10) { setError("Please enter a valid phone number with country code."); setPhoneFormSubmitting(false); return; }
-      const result = await signInWithPhoneNumberFlow(formattedPhoneNumber, 'recaptcha-container-signup');
-      setConfirmationResult(result);
-      setIsCodeSent(true);
-      toast({ title: 'Verification Code Sent', description: 'Please check your phone for the code.' });
-    } catch (err: any) {
-      let errorMessage = "Failed to send verification code. Please try again.";
-      if (err.code === 'auth/invalid-phone-number') errorMessage = "Invalid phone number format.";
-      else if (err.code === 'auth/too-many-requests') errorMessage = "Too many requests. Please try again later.";
-      setError(errorMessage);
-      toast({ title: 'Phone Sign-up Failed', description: errorMessage, variant: 'destructive' });
-    } finally {
-      setPhoneFormSubmitting(false);
-    }
-  };
-
-  const handlePhoneSignUpVerifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!confirmationResult || !verificationCode) { setError("Confirmation result or code is missing."); return; }
-    setPhoneFormSubmitting(true);
-    try {
-      await confirmPhoneNumberCode(confirmationResult, verificationCode);
-    } catch (err: any) {
-      let errorMessage = "Failed to verify code. Please try again.";
-      if (err.code === 'auth/invalid-verification-code') errorMessage = "Invalid verification code.";
-      else if (err.code === 'auth/code-expired') errorMessage = "Verification code has expired.";
-      setError(errorMessage);
-      toast({ title: 'Phone Sign-up Failed', description: errorMessage, variant: 'destructive' });
-    } finally {
-      setPhoneFormSubmitting(false);
-    }
-  };
-
-  const isAnyAuthActionLoading = emailFormSubmitting || googleSubmitting || phoneFormSubmitting || isAuthLoading || isLoadingOrgDetails;
+  const isAnyAuthActionLoading = emailFormSubmitting || googleSubmitting || isAuthLoading || isLoadingOrgDetails;
 
   if (isAuthLoading || currentUser) {
     return (
@@ -196,10 +147,10 @@ function SignupForm() {
         <CardContent className="space-y-6">
           <form onSubmit={handleEmailSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="email-displayName-signup">Full Name</Label>
+              <Label htmlFor="displayName-signup">Full Name</Label>
               <div className="relative">
                 <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input id="email-displayName-signup" type="text" value={emailFormDisplayName} onChange={(e) => setEmailFormDisplayName(e.target.value)} placeholder="e.g. John Doe" required disabled={isAnyAuthActionLoading} className="pl-10" />
+                <Input id="displayName-signup" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="e.g. John Doe" required disabled={isAnyAuthActionLoading} className="pl-10" />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -217,7 +168,7 @@ function SignupForm() {
               </div>
               <p className="text-xs text-muted-foreground">Password should be at least 6 characters.</p>
             </div>
-            {error && !isCodeSent && !emailFormSubmitting && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isAnyAuthActionLoading}>
               {emailFormSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
               {emailFormSubmitting ? 'Creating Account...' : 'Create Account with Email'}
@@ -226,61 +177,15 @@ function SignupForm() {
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or sign up with</span></div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">Or sign up with</span>
+            </div>
           </div>
 
           <Button variant="outline" onClick={handleGoogleSignUp} className="w-full" disabled={isAnyAuthActionLoading}>
             {googleSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon />}
             <span className="ml-2">{googleSubmitting ? "Redirecting..." : "Sign up with Google"}</span>
           </Button>
-
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or sign up with phone</span></div>
-          </div>
-
-          {!isCodeSent ? (
-            <form onSubmit={handlePhoneSignUpSendCode} className="space-y-4 pt-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="phone-displayName-signup">Full Name</Label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input id="phone-displayName-signup" type="text" value={phoneFormDisplayName} onChange={(e) => setPhoneFormDisplayName(e.target.value)} placeholder="e.g. Jane Doe" required disabled={isAnyAuthActionLoading} className="pl-10" />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="phone-signup">Phone Number</Label>
-                <div className="relative">
-                  <PhoneIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input id="phone-signup" type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+1 650 555 1234" required disabled={isAnyAuthActionLoading} className="pl-10" />
-                </div>
-                <CardDescription className="text-xs">Enter your phone number with country code.</CardDescription>
-              </div>
-              {error && !isCodeSent && !emailFormSubmitting && !googleSubmitting && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" variant="outline" className="w-full" disabled={isAnyAuthActionLoading}>
-                {phoneFormSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {phoneFormSubmitting ? 'Sending Code...' : 'Sign up with Phone'}
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handlePhoneSignUpVerifyCode} className="space-y-4 pt-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="code-signup">Verification Code</Label>
-                <Input id="code-signup" type="text" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value)} placeholder="Enter 6-digit code" required disabled={isAnyAuthActionLoading} />
-              </div>
-              {error && isCodeSent && <p className="text-sm text-destructive">{error}</p>}
-              <div className="flex gap-2">
-                <Button type="submit" variant="outline" className="flex-grow" disabled={isAnyAuthActionLoading}>
-                  {phoneFormSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {phoneFormSubmitting ? 'Verifying...' : 'Verify Code & Sign Up'}
-                </Button>
-                <Button variant="link" onClick={() => { setIsCodeSent(false); setError(null); setPhoneNumber(''); setVerificationCode(''); setConfirmationResult(null); }} disabled={isAnyAuthActionLoading}>
-                  Change Number
-                </Button>
-              </div>
-            </form>
-          )}
-          {phoneNumber && !isCodeSent && <div id="recaptcha-container-signup"></div>}
         </CardContent>
         <CardFooter className="flex flex-col items-center gap-2 text-sm">
           <p>Already have an account?{' '}
