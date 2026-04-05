@@ -25,8 +25,11 @@ const EXPECTED_HEADERS = [
   'BowlingStyle', 'PrimaryClubName', 'PrimaryTeamName'
 ];
 
+interface PlayerImportFormProps {
+  mode?: 'csv' | 'xlsx';
+}
 
-export function PlayerImportForm() {
+export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
   const { activeOrganizationId, loading: authLoading } = useAuth(); // Get activeOrganizationId
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<CsvPlayerImportRow[]>([]);
@@ -284,6 +287,8 @@ export function PlayerImportForm() {
 
   return (
     <div className="space-y-6">
+      {/* ── CSV section — only shown in csv mode ── */}
+      {mode === 'csv' && (<>
       <div className="space-y-2">
         <Label htmlFor="csv-file" className="text-base">Select CSV File</Label>
         <Input
@@ -360,13 +365,13 @@ export function PlayerImportForm() {
         </Card>
       )}
 
-      {/* ── Excel Import Section ──────────────────────────────────────────── */}
-      <Separator className="my-6" />
+      {/* end csv mode */}
+      </>)}
+
+      {/* ── Excel section — only shown in xlsx mode ── */}
+      {mode === 'xlsx' && (<>
+      <Separator className="my-2" />
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5 text-green-700" />
-          <h3 className="text-base font-semibold text-green-700">Import from Excel (.xlsx)</h3>
-        </div>
         <p className="text-sm text-muted-foreground">
           Upload the downloaded Excel template with your player data. The first sheet named <strong>Players Import</strong> will be used.
         </p>
@@ -444,6 +449,8 @@ export function PlayerImportForm() {
           </Card>
         )}
       </div>
+      {/* end xlsx mode */}
+      </>)}
     </div>
   );
 }
