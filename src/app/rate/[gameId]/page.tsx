@@ -360,6 +360,8 @@ function MobileRatePage() {
       setIsCertifying(false);
     }
   };
+
+  const handleSaveAndNext = async () => {
     const player = players[currentPlayerIndex];
     if (!player || !currentUser) return;
     const uidToUse = resolvedSelectorUid || currentUser.uid;
