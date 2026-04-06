@@ -537,6 +537,7 @@ function MobileRatePage() {
   const playerRatings = ratings[player?.id] || getDefaultRatings(player);
   const isSaved = savedPlayers.has(player?.id);
   const isFinalized = game.ratingsFinalized;
+  const isReadOnly = isFinalized || isCertified;
 
   const skillLabels: Record<SkillKey, string> = {
     batting: 'Batting',
@@ -717,6 +718,14 @@ function MobileRatePage() {
             ✓ Ratings for this game are finalized (read-only)
           </div>
         )}
+        {!isFinalized && isCertified && (
+          <button
+            className="w-full bg-blue-50 border border-blue-200 rounded-xl p-3 text-center text-blue-700 text-sm font-medium active:bg-blue-100 transition-colors"
+            onClick={() => setIsCertified(false)}
+          >
+            🔒 You have certified your ratings — tap here to edit and re-certify
+          </button>
+        )}
 
         {/* Rating sections — all 4 skills */}
         {ALL_SKILLS.map(skill => {
@@ -740,7 +749,7 @@ function MobileRatePage() {
                 type="button"
                 className="w-full flex items-center gap-2 px-4 py-3 text-left"
                 onClick={() => toggleSkillExpanded(player.id, skill)}
-                disabled={isFinalized}
+                disabled={isReadOnly}
               >
                 <span className="font-semibold text-sm text-muted-foreground uppercase tracking-wide flex-1">
                   {skillLabels[skill]}
@@ -769,7 +778,7 @@ function MobileRatePage() {
                       <button
                         key={val}
                         type="button"
-                        disabled={isFinalized}
+                        disabled={isReadOnly}
                         onClick={() => handleRatingChange(player.id, skill, val)}
                         className={cn(
                           "h-11 rounded-lg text-sm font-bold border-2 transition-all",
@@ -789,7 +798,7 @@ function MobileRatePage() {
                       <button
                         key={val}
                         type="button"
-                        disabled={isFinalized}
+                        disabled={isReadOnly}
                         onClick={() => {
                           handleRatingChange(player.id, skill, val);
                           if (val === 'Not Applicable') {
@@ -819,7 +828,7 @@ function MobileRatePage() {
                       type="button"
                       onClick={() => toggleNoteExpanded(player.id, skill)}
                       className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                      disabled={isFinalized}
+                      disabled={isReadOnly}
                     >
                       <MessageSquare className="h-3.5 w-3.5" />
                       {isNoteExpanded ? 'Hide note' : noteValue ? `Note: "${noteValue.slice(0, 30)}${noteValue.length > 30 ? '...' : ''}"` : 'Add note'}
@@ -833,7 +842,7 @@ function MobileRatePage() {
                         onChange={e => handleNoteChange(player.id, skill, e.target.value)}
                         rows={2}
                         className="mt-2 text-sm resize-none"
-                        disabled={isFinalized}
+                        disabled={isReadOnly}
                         maxLength={200}
                       />
                     )}
@@ -845,7 +854,7 @@ function MobileRatePage() {
         })}
 
         {/* Save & navigation */}
-        {!isFinalized && (
+        {!isReadOnly && (
           <Button
             onClick={handleSaveAndNext}
             disabled={isSaving}
@@ -860,7 +869,7 @@ function MobileRatePage() {
           </Button>
         )}
 
-        {/* Certify section */}
+        {/* Certify section — always visible unless fully finalized */}
         {!isFinalized && (
           <div className="border rounded-xl p-4 space-y-3 bg-card">
             <div className="flex items-center justify-between">
@@ -871,7 +880,7 @@ function MobileRatePage() {
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {isCertified
-                    ? 'You have certified your current ratings for this game.'
+                    ? 'To make changes, tap the banner above to re-enter edit mode, then re-certify.'
                     : `Rate all ${players.length} players, then certify to confirm your ratings are complete.`}
                 </p>
               </div>
