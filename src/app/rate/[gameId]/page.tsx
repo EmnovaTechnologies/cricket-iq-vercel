@@ -577,7 +577,12 @@ function MobileRatePage() {
       <div className="px-4 pt-4 pb-2">
         <div className="flex justify-between text-sm text-muted-foreground mb-1">
           <span>Player {currentPlayerIndex + 1} of {players.length}</span>
-          <span>{savedPlayers.size} rated</span>
+          <span>{players.filter(p => {
+            const pr = ratings[p.id];
+            return savedPlayers.has(p.id) || (pr && NUMERIC_RATINGS.some(v =>
+              pr.batting === v || pr.bowling === v || pr.fielding === v || pr.wicketKeeping === v
+            ));
+          }).length} rated</span>
         </div>
         <div className="w-full bg-muted rounded-full h-2">
           <div
@@ -588,20 +593,28 @@ function MobileRatePage() {
 
         {/* Player dots */}
         <div className="flex gap-1 mt-2 flex-wrap">
-          {players.map((p, i) => (
-            <button
-              key={p.id}
-              onClick={() => setCurrentPlayerIndex(i)}
-              className={cn(
-                "w-6 h-6 rounded-full text-xs font-medium transition-colors",
-                i === currentPlayerIndex ? "bg-primary text-primary-foreground" :
-                savedPlayers.has(p.id) ? "bg-green-500 text-white" :
-                "bg-muted text-muted-foreground"
-              )}
-            >
-              {i + 1}
-            </button>
-          ))}
+          {players.map((p, i) => {
+            const playerRating = ratings[p.id];
+            const hasRating = playerRating && NUMERIC_RATINGS.some(v =>
+              playerRating.batting === v || playerRating.bowling === v ||
+              playerRating.fielding === v || playerRating.wicketKeeping === v
+            );
+            const isRated = savedPlayers.has(p.id) || !!hasRating;
+            return (
+              <button
+                key={p.id}
+                onClick={() => setCurrentPlayerIndex(i)}
+                className={cn(
+                  "w-6 h-6 rounded-full text-xs font-medium transition-colors",
+                  i === currentPlayerIndex ? "bg-primary text-primary-foreground" :
+                  isRated ? "bg-green-500 text-white" :
+                  "bg-muted text-muted-foreground"
+                )}
+              >
+                {i + 1}
+              </button>
+            );
+          })}
         </div>
       </div>
 
