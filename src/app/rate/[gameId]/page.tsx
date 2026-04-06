@@ -270,7 +270,7 @@ function MobileRatePage() {
               wicketKeeping: (er?.wicketKeeping as RatingValue) || defaults.wicketKeeping,
             };
             if (er) {
-              const uid = currentUser.uid;
+              const uid = authorizedUid || currentUser.uid;
               initialNotes[player.id] = {
                 batting: (er.battingComments as any)?.[uid] || '',
                 bowling: (er.bowlingComments as any)?.[uid] || '',
@@ -283,7 +283,8 @@ function MobileRatePage() {
           setNotes(initialNotes);
 
           // Check if current selector already certified
-          const uidToCheck = resolvedSelectorUid || currentUser.uid;
+          // Use authorizedUid directly — resolvedSelectorUid state not yet updated
+          const uidToCheck = authorizedUid || currentUser.uid;
           const cert = g.selectorCertifications?.[uidToCheck];
           const lastModified = g.ratingsLastModifiedAt ? new Date(g.ratingsLastModifiedAt) : null;
           const certifiedAt = cert?.certifiedAt ? new Date(cert.certifiedAt) : null;
