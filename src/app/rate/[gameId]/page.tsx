@@ -4,14 +4,14 @@ import { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { getGameByIdFromDB, getPlayerByIdFromDB, getRatingsForGameFromDB } from '@/lib/db';
-import { saveMobileRatingAction } from '@/lib/actions/mobile-rating-action';
+import { saveMobileRatingAction, certifyMobileRatingAction } from '@/lib/actions/mobile-rating-action';
 import type { Game, Player, PlayerRating, RatingValue } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Phone, ChevronLeft, ChevronRight, CheckCircle, ShieldAlert, Send, ChevronDown, MessageSquare, Search, X } from 'lucide-react';
+import { Loader2, Phone, ChevronLeft, ChevronRight, CheckCircle, ShieldAlert, Send, ChevronDown, MessageSquare, Search, X, ShieldCheck } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -96,6 +96,9 @@ function MobileRatePage() {
   const [expandedNotes, setExpandedNotes] = useState<Record<string, Set<SkillKey>>>({});
   const [savedPlayers, setSavedPlayers] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
+  const [isCertifying, setIsCertifying] = useState(false);
+  const [isCertified, setIsCertified] = useState(false);
+  const [showCertifyConfirm, setShowCertifyConfirm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
@@ -278,6 +281,14 @@ function MobileRatePage() {
           });
           setRatings(initialRatings);
           setNotes(initialNotes);
+
+          // Check if current selector already certified
+          const uidToCheck = resolvedSelectorUid || currentUser.uid;
+          const cert = g.selectorCertifications?.[uidToCheck];
+          const lastModified = g.ratingsLastModifiedAt ? new Date(g.ratingsLastModifiedAt) : null;
+          const certifiedAt = cert?.certifiedAt ? new Date(cert.certifiedAt) : null;
+          const isCurrent = certifiedAt && (!lastModified || certifiedAt >= lastModified);
+          setIsCertified(!!(cert?.status === 'certified' && isCurrent));
         }
       } catch (e) {
         console.error('Error loading game:', e);
@@ -325,7 +336,30 @@ function MobileRatePage() {
     }));
   };
 
-  const handleSaveAndNext = async () => {
+  const handleCertify = async () => {
+    if (!currentUser) return;
+    const uidToUse = resolvedSelectorUid || currentUser.uid;
+    setIsCertifying(true);
+    setShowCertifyConfirm(false);
+    try {
+      const displayName = userProfile?.displayName || currentUser.phoneNumber || currentUser.email || 'Selector';
+      const result = await certifyMobileRatingAction(gameId, uidToUse, displayName);
+      if (!result.success) {
+        toast({ title: 'Certification failed', description: result.error, variant: 'destructive' });
+      } else {
+        setIsCertified(true);
+        if (result.autoFinalized) {
+          toast({ title: '✅ Ratings certified & finalized!', description: 'All selectors have certified. Ratings are now finalized.' });
+        } else {
+          toast({ title: '✅ Ratings certified!', description: 'Your ratings have been certified successfully.' });
+        }
+      }
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setIsCertifying(false);
+    }
+  };
     const player = players[currentPlayerIndex];
     if (!player || !currentUser) return;
     const uidToUse = resolvedSelectorUid || currentUser.uid;
@@ -822,6 +856,68 @@ function MobileRatePage() {
             ) : null}
             {isSaving ? 'Saving...' : isSaved ? 'Update & Next' : 'Save & Next →'}
           </Button>
+        )}
+
+        {/* Certify section */}
+        {!isFinalized && (
+          <div className="border rounded-xl p-4 space-y-3 bg-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-sm flex items-center gap-2">
+                  <ShieldCheck className={`h-5 w-5 ${isCertified ? 'text-green-600' : 'text-muted-foreground'}`} />
+                  {isCertified ? 'Ratings Certified' : 'Certify My Ratings'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {isCertified
+                    ? 'You have certified your current ratings for this game.'
+                    : `Rate all ${players.length} players, then certify to confirm your ratings are complete.`}
+                </p>
+              </div>
+              {isCertified && <CheckCircle className="h-6 w-6 text-green-500 shrink-0" />}
+            </div>
+            {!isCertified && (
+              <>
+                <div className="text-xs text-muted-foreground bg-muted rounded-lg p-2">
+                  ⚠️ Certifying confirms all ratings are final. Any rating change after certification will reset your certification status.
+                </div>
+                <Button
+                  onClick={() => setShowCertifyConfirm(true)}
+                  disabled={isCertifying || savedPlayers.size === 0}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white h-12"
+                >
+                  {isCertifying
+                    ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Certifying...</>
+                    : <><ShieldCheck className="mr-2 h-4 w-4" /> Certify My Ratings ({savedPlayers.size}/{players.length} rated)</>}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Certify confirmation dialog */}
+        {showCertifyConfirm && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+            <div className="bg-card rounded-xl p-6 w-full max-w-sm space-y-4 shadow-xl">
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="h-8 w-8 text-green-600 shrink-0" />
+                <div>
+                  <p className="font-bold text-base">Certify Ratings?</p>
+                  <p className="text-sm text-muted-foreground">You have rated {savedPlayers.size} of {players.length} players.</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                This confirms your ratings are accurate and complete. If all selectors certify, ratings will be automatically finalized.
+              </p>
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => setShowCertifyConfirm(false)}>
+                  Cancel
+                </Button>
+                <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleCertify}>
+                  Confirm & Certify
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
 
         <p className="text-center text-xs text-muted-foreground pb-4">
