@@ -1,6 +1,5 @@
 
 import { PlayerImportForm } from '@/components/players/player-import-form';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info, Download, ArrowLeft, Users, ShieldAlert, FileText, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -54,22 +53,6 @@ export default function ImportPlayersPage() {
           </Button>
         </div>
 
-        {/* Download templates row — CSV only; Excel template is generated dynamically in the accordion */}
-        <Card className="border-dashed">
-          <CardContent className="py-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-            <p className="text-sm text-muted-foreground shrink-0">Download a template to get started:</p>
-            <div className="flex gap-2 flex-wrap">
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/sample-players-import.csv" download>
-                  <FileText className="mr-1.5 h-4 w-4 text-blue-600" />
-                  Sample CSV Template
-                  <Download className="ml-1.5 h-3 w-3" />
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Accordion — CSV and Excel import */}
         <Accordion type="single" collapsible className="space-y-3">
 
@@ -108,6 +91,13 @@ export default function ImportPlayersPage() {
                 </AlertDescription>
               </Alert>
               {/* CSV import form — completely unchanged */}
+              <Button variant="outline" size="sm" asChild className="mb-4">
+                <Link href="/sample-players-import.csv" download>
+                  <FileText className="mr-1.5 h-4 w-4 text-blue-600" />
+                  Download Sample CSV
+                  <Download className="ml-1.5 h-3 w-3" />
+                </Link>
+              </Button>
               <PlayerImportForm mode="csv" />
             </AccordionContent>
           </AccordionItem>

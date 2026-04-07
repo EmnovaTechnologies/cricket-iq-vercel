@@ -34,18 +34,6 @@ export default function ImportSeriesPage() {
         </Button>
       </div>
 
-      {/* Download CSV sample */}
-      <div className="flex items-center gap-3">
-        <p className="text-sm text-muted-foreground">Download a template to get started:</p>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/sample-series-import.csv" download>
-            <FileText className="mr-1.5 h-4 w-4 text-blue-600" />
-            Sample CSV Template
-            <Download className="ml-1.5 h-3 w-3" />
-          </Link>
-        </Button>
-      </div>
-
       {/* Accordion */}
       <Accordion type="single" collapsible className="space-y-3">
 
@@ -78,6 +66,13 @@ export default function ImportSeriesPage() {
                 </ul>
               </AlertDescription>
             </Alert>
+            <Button variant="outline" size="sm" asChild className="mb-4">
+              <Link href="/sample-series-import.csv" download>
+                <FileText className="mr-1.5 h-4 w-4 text-blue-600" />
+                Download Sample CSV
+                <Download className="ml-1.5 h-3 w-3" />
+              </Link>
+            </Button>
             <SeriesImportForm mode="csv" />
           </AccordionContent>
         </AccordionItem>
