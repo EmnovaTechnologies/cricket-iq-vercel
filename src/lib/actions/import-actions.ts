@@ -1,5 +1,5 @@
 
-'use client';
+'use server';
 
 import {
   doc,
