@@ -66,6 +66,13 @@ export default function ImportTeamsPage() {
                 </ul>
               </AlertDescription>
             </Alert>
+            <Button variant="outline" size="sm" asChild className="mb-4">
+              <Link href="/sample-team-import.csv" download>
+                <FileText className="mr-1.5 h-4 w-4 text-blue-600" />
+                Download Sample CSV
+                <Download className="ml-1.5 h-3 w-3" />
+              </Link>
+            </Button>
             <TeamImportForm mode="csv" />
           </AccordionContent>
         </AccordionItem>
