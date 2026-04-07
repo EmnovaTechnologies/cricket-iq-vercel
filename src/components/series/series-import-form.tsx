@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { importSeriesAction } from '@/lib/actions/import-actions';
+import { getSeriesTemplateData } from '@/lib/actions/series-template-action';
 import type { CsvSeriesImportRow, SeriesImportResult } from '@/types';
 import { Loader2, Upload, AlertTriangle, CheckCircle, ListChecks, FileSpreadsheet, Download } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -156,14 +157,23 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
   };
 
   // ── Dynamic template generation ────────────────────────────────────────────
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
+    if (!activeOrganizationId) {
+      toast({ title: 'No Organization', description: 'Please select an active organization first.', variant: 'destructive' });
+      return;
+    }
     setIsGeneratingTemplate(true);
     try {
+      const data = await getSeriesTemplateData(activeOrganizationId);
+
+      const currentYear = new Date().getFullYear();
+      const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2].map(String);
+
       const wb = XLSX.utils.book_new();
 
       // ── Sheet 1: Series Import ─────────────────────────────────────────────
       const ws = XLSX.utils.aoa_to_sheet([EXPECTED_HEADERS]);
-      ws['!cols'] = [{ wch: 36 }, { wch: 18 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 36 }];
+      ws['!cols'] = [{ wch: 36 }, { wch: 18 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 40 }];
       ws['!rows'] = [{ hpt: 28 }];
 
       const reqCols = new Set(['SeriesName', 'AgeCategory', 'Year', 'MaleCutoffDate', 'FemaleCutoffDate']);
@@ -174,9 +184,13 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
         cell.s = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: color } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
       });
 
-      // Blank rows with AgeCategory dropdown
       if (!ws['!dataValidation']) ws['!dataValidation'] = [];
       const ageCatFormula = '"' + [...AGE_CATEGORIES].join(',') + '"';
+      const yearFormula = '"' + years.join(',') + '"';
+      const emailFormula = data.selectorEmails.length > 0
+        ? '"' + data.selectorEmails.slice(0, 50).join(',') + '"'
+        : null;
+
       for (let r = 1; r <= 100; r++) {
         EXPECTED_HEADERS.forEach((_, c) => {
           ws[XLSX.utils.encode_cell({ r, c })] = { t: 's', v: '' };
@@ -184,17 +198,59 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
         // AgeCategory dropdown (col 1)
         (ws['!dataValidation'] as any[]).push({
           sqref: XLSX.utils.encode_cell({ r, c: 1 }),
-          type: 'list',
-          formula1: ageCatFormula,
-          showErrorMessage: true,
-          errorTitle: 'Invalid Value',
+          type: 'list', formula1: ageCatFormula,
+          showErrorMessage: true, errorTitle: 'Invalid Value',
           error: 'Please select a valid age category from the dropdown.',
         });
+        // Year dropdown (col 2) — also allows free entry via whole number validation
+        (ws['!dataValidation'] as any[]).push({
+          sqref: XLSX.utils.encode_cell({ r, c: 2 }),
+          type: 'list', formula1: yearFormula,
+          showErrorMessage: false, // allow free entry of other years
+        });
+        // SeriesAdminEmails dropdown (col 5) if emails exist
+        if (emailFormula) {
+          (ws['!dataValidation'] as any[]).push({
+            sqref: XLSX.utils.encode_cell({ r, c: 5 }),
+            type: 'list', formula1: emailFormula,
+            showErrorMessage: false, // allow free entry of multiple emails
+          });
+        }
       }
+
       ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 100, c: 5 } });
       XLSX.utils.book_append_sheet(wb, ws, 'Series Import');
 
-      // ── Sheet 2: Instructions ──────────────────────────────────────────────
+      // ── Sheet 2: Valid Values ──────────────────────────────────────────────
+      const vvRows: string[][] = [];
+      vvRows.push(['VALID VALUES REFERENCE', '']);
+      vvRows.push(['', '']);
+      vvRows.push(['AGE CATEGORIES', '']);
+      vvRows.push(['Value', '']);
+      [...AGE_CATEGORIES].forEach(c => vvRows.push([c, '']));
+      vvRows.push(['', '']);
+      vvRows.push(['SUGGESTED YEARS', '']);
+      vvRows.push(['Value', '']);
+      years.forEach(y => vvRows.push([y, '']));
+      vvRows.push(['You may also type any year between 2000–2100', '']);
+      vvRows.push(['', '']);
+      vvRows.push(['SERIES ADMIN EMAILS (Selectors / Admins in your organization)', '']);
+      vvRows.push(['Email', '']);
+      if (data.selectorEmails.length > 0) {
+        data.selectorEmails.forEach(e => vvRows.push([e, '']));
+      } else {
+        vvRows.push(['No eligible users found for this organization', '']);
+      }
+      const vvWs = XLSX.utils.aoa_to_sheet(vvRows);
+      vvWs['!cols'] = [{ wch: 55 }, { wch: 20 }];
+      [0, vvRows.findIndex(r => r[0] === 'SUGGESTED YEARS'), vvRows.findIndex(r => r[0].startsWith('SERIES ADMIN'))].forEach(r => {
+        if (r < 0) return;
+        const cell = vvWs[XLSX.utils.encode_cell({ r, c: 0 })];
+        if (cell) cell.s = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '0B6E8C' } } };
+      });
+      XLSX.utils.book_append_sheet(wb, vvWs, 'Valid Values');
+
+      // ── Sheet 3: Instructions ──────────────────────────────────────────────
       const instrRows = [
         ['🏏  Cricket IQ — Series Import Template Instructions', '', '', ''],
         ['', '', '', ''],
@@ -204,30 +260,36 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
         ['', '', '', ''],
         ['COLUMN RULES', '', '', ''],
         ['Column', 'Required?', 'Rule', ''],
-        ['SeriesName', 'YES', 'Must be unique — existing series names will cause an error for that row.', ''],
-        ['AgeCategory', 'YES', `Must be one of: ${[...AGE_CATEGORIES].join(', ')}. Use the dropdown.`, ''],
-        ['Year', 'YES', 'Valid year e.g. 2026', ''],
+        ['SeriesName', 'YES', 'Must be unique — existing series names will error for that row.', ''],
+        ['AgeCategory', 'YES', `Select from dropdown. Must be one of: ${[...AGE_CATEGORIES].join(', ')}.`, ''],
+        ['Year', 'YES', 'Select from dropdown or type any 4-digit year between 2000–2100.', ''],
         ['MaleCutoffDate', 'YES', 'Format: MM/DD/YYYY  e.g. 01/01/2008', ''],
         ['FemaleCutoffDate', 'YES', 'Format: MM/DD/YYYY  e.g. 01/01/2008', ''],
-        ['SeriesAdminEmails', 'Optional', 'Comma-separated list of emails of existing users. Non-existent emails are ignored with a warning.', ''],
+        ['SeriesAdminEmails', 'Optional', 'Comma-separated emails of existing users. See Valid Values for eligible emails. Unknown emails are ignored with a warning.', ''],
         ['', '', '', ''],
         ['TIPS', '', '', ''],
         ['• Do NOT change the column headers in row 1 of the Series Import sheet.', '', '', ''],
-        ['• AgeCategory has a dropdown — select from the list to avoid errors.', '', '', ''],
+        ['• AgeCategory has a required dropdown — select from it to avoid errors.', '', '', ''],
+        ['• Year shows common years as a dropdown but you may type any valid year.', '', '', ''],
+        ['• SeriesAdminEmails shows a dropdown of eligible users — you may also type emails manually.', '', '', ''],
+        ['• For multiple admin emails, separate them with commas: admin1@example.com,admin2@example.com', '', '', ''],
         ['• Dates must be typed as MM/DD/YYYY text — not Excel date values.', '', '', ''],
-        ['• The system will NOT create new user accounts for Series Admins. They must pre-exist.', '', '', ''],
+        ['• The system will NOT create new user accounts. Series Admins must pre-exist.', '', '', ''],
         ['• Series are imported into the currently active organization.', '', '', ''],
       ];
       const instrWs = XLSX.utils.aoa_to_sheet(instrRows);
-      instrWs['!cols'] = [{ wch: 20 }, { wch: 12 }, { wch: 75 }, { wch: 10 }];
+      instrWs['!cols'] = [{ wch: 20 }, { wch: 12 }, { wch: 80 }, { wch: 10 }];
       instrWs['!rows'] = [{ hpt: 30 }];
       XLSX.utils.book_append_sheet(wb, instrWs, 'Instructions');
 
       XLSX.writeFile(wb, 'series_import_template.xlsx');
-      toast({ title: 'Template downloaded!', description: 'Fill in the Series Import sheet and upload it below.' });
+      toast({
+        title: 'Template downloaded!',
+        description: `Includes ${[...AGE_CATEGORIES].length} age categories and ${data.selectorEmails.length} selector emails for your organization.`,
+      });
     } catch (e: any) {
       console.error('Template generation error:', e);
-      toast({ title: 'Error', description: 'Could not generate template.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Could not generate template. Please try again.', variant: 'destructive' });
     } finally {
       setIsGeneratingTemplate(false);
     }
@@ -307,11 +369,12 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
             <p className="text-sm text-muted-foreground">
               Download the Excel template — it includes a dropdown for AgeCategory and an Instructions sheet with all field rules.
             </p>
-            <Button variant="outline" onClick={handleDownloadTemplate} disabled={isGeneratingTemplate} className="border-green-600 text-green-700 hover:bg-green-50 gap-2">
+            <Button variant="outline" onClick={handleDownloadTemplate} disabled={isGeneratingTemplate || !activeOrganizationId} className="border-green-600 text-green-700 hover:bg-green-50 gap-2">
               {isGeneratingTemplate
                 ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
                 : <><FileSpreadsheet className="h-4 w-4" /> Download Excel Template <Download className="h-3.5 w-3.5" /></>}
             </Button>
+            {!activeOrganizationId && <p className="text-xs text-destructive">Select an active organization to generate the template.</p>}
           </div>
 
           <Separator />
