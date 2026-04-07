@@ -105,18 +105,27 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array', raw: false });
-        const sheetName = workbook.SheetNames[0];
-        const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '', raw: false });
-        if (rows.length === 0) { toast({ title: 'Empty File', description: 'No data rows found.', variant: 'destructive' }); setXlsxFile(null); setXlsxFileName(null); event.target.value = ''; return; }
-        const headers = Object.keys(rows[0]);
+        // Always use the first sheet named 'Games Import' if present, else first sheet
+        const sheetName = workbook.SheetNames.find(n => n === 'Games Import') || workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        // Read headers explicitly from row 1
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:E1');
+        const headers: string[] = [];
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const cell = worksheet[XLSX.utils.encode_cell({ r: 0, c })];
+          headers.push(cell ? String(cell.v).trim() : '');
+        }
         if (!EXPECTED_HEADERS.every(h => headers.includes(h))) {
-          toast({ title: 'Invalid Headers', description: `Excel must contain: ${EXPECTED_HEADERS.join(', ')}`, variant: 'destructive' });
+          toast({ title: 'Invalid Headers', description: `Excel must contain: ${EXPECTED_HEADERS.join(', ')}. Found: ${headers.filter(Boolean).join(', ')}`, variant: 'destructive' });
           setXlsxFile(null); setXlsxFileName(null); event.target.value = ''; return;
         }
-        const validRows = rows.filter(row => EXPECTED_HEADERS.some(h => row[h] && String(row[h]).trim() !== '')) as CsvGameImportRow[];
+        const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false, header: headers });
+        // Skip header row (index 0) and filter empty rows
+        const validRows = rows.slice(1).filter(row => EXPECTED_HEADERS.some(h => row[h] && String(row[h]).trim() !== '')) as CsvGameImportRow[];
         setXlsxParsedData(validRows);
         toast({ title: 'Excel file ready', description: `${validRows.length} rows found.` });
-      } catch {
+      } catch (err) {
+        console.error('Excel parse error:', err);
         toast({ title: 'Excel Parsing Error', description: 'Could not read the Excel file.', variant: 'destructive' });
         setXlsxFile(null); setXlsxFileName(null); event.target.value = '';
       }
