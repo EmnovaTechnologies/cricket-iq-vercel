@@ -19,7 +19,7 @@ import {
   limit,
   setDoc,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { adminDb as db } from '../firebase-admin';
 import type {
   Game,
   Series,
