@@ -253,6 +253,10 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
       headerRow.height = 32;
       headers.forEach((h, i) => {
         ws.getColumn(i + 1).width = h.width;
+        // Force date columns to text to prevent Excel auto-converting to date serial
+        if (h.key === 'MaleCutoffDate' || h.key === 'FemaleCutoffDate') {
+          ws.getColumn(i + 1).numFmt = '@';
+        }
         const cell = headerRow.getCell(i + 1);
         cell.value = h.label;
         cell.font = { bold: true, color: { argb: 'FF' + white }, size: 11, name: 'Arial' };
@@ -280,6 +284,10 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
             left: { style: 'thin', color: { argb: 'FFE8E8E8' } },
             right: { style: 'thin', color: { argb: 'FFE8E8E8' } },
           };
+          // Force date columns (MaleCutoffDate=4, FemaleCutoffDate=5) to Text
+          if (i === 3 || i === 4) {
+            cell.numFmt = '@';
+          }
         });
 
         // AgeCategory dropdown (col 2)
