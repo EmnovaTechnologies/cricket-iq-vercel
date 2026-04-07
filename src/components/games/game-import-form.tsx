@@ -2,7 +2,7 @@
 
 import { useState, type ChangeEvent } from 'react';
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx'; // used for parsing uploaded Excel files
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -147,144 +147,231 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
     setIsGeneratingTemplate(true);
     try {
       const data = await getGamesTemplateData(activeOrganizationId);
-      const wb = XLSX.utils.book_new();
 
-      // ── Sheet 1: Games Import ──────────────────────────────────────────────
-      const ws = XLSX.utils.aoa_to_sheet([EXPECTED_HEADERS]);
+      // Dynamic import of exceljs (client-side)
+      const ExcelJS = (await import('exceljs')).default;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Cricket IQ';
 
-      // Style header row
-      const headerStyle = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '0F2A54' } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
-      EXPECTED_HEADERS.forEach((_, i) => {
-        const cell = ws[XLSX.utils.encode_cell({ r: 0, c: i })];
-        if (cell) cell.s = headerStyle;
-      });
+      // ── COLORS ────────────────────────────────────────────────────────────
+      const navy   = '0F2A54';
+      const teal   = '0B6E8C';
+      const amber  = 'F4B942';
+      const offwh  = 'F4F7FA';
+      const white  = 'FFFFFF';
+      const green  = '1D7A5F';
 
-      // Column widths
-      ws['!cols'] = [{ wch: 16 }, { wch: 24 }, { wch: 36 }, { wch: 28 }, { wch: 28 }];
-      ws['!rows'] = [{ hpt: 28 }];
+      // ── Sheet 1: Hidden Lists (for dropdown source data) ──────────────────
+      const listsSheet = wb.addWorksheet('_Lists', { state: 'veryHidden' });
+      const seriesNames = data.series.map(s => s.name);
+      const venueNames  = data.venues.map(v => v.name);
+      const teamNames   = data.teams.map(t => t.name);
 
-      // Add 50 blank data rows
-      for (let r = 1; r <= 50; r++) {
-        EXPECTED_HEADERS.forEach((_, c) => {
-          const cellRef = XLSX.utils.encode_cell({ r, c });
-          ws[cellRef] = { t: 's', v: '' };
-        });
+      // Column A = series, B = venues, C = teams
+      const maxRows = Math.max(seriesNames.length, venueNames.length, teamNames.length);
+      for (let i = 0; i < maxRows; i++) {
+        listsSheet.getCell(i + 1, 1).value = seriesNames[i] || null;
+        listsSheet.getCell(i + 1, 2).value = venueNames[i]  || null;
+        listsSheet.getCell(i + 1, 3).value = teamNames[i]   || null;
       }
 
-      // Update sheet range
-      ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 50, c: 4 } });
+      // Define named ranges for each list
+      const sLen = seriesNames.length || 1;
+      const vLen = venueNames.length  || 1;
+      const tLen = teamNames.length   || 1;
+      wb.definedNames.add(`_Lists!$A$1:$A$${sLen}`, 'SeriesList');
+      wb.definedNames.add(`_Lists!$B$1:$B$${vLen}`, 'VenueList');
+      wb.definedNames.add(`_Lists!$C$1:$C$${tLen}`, 'TeamList');
 
-      // Data validations for dropdowns
-      if (!ws['!dataValidation']) ws['!dataValidation'] = [];
+      // ── Sheet 2: Games Import ─────────────────────────────────────────────
+      const ws = wb.addWorksheet('Games Import');
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
 
-      const makeDropdown = (col: number, list: string[]) => {
-        if (list.length === 0) return;
-        const formula = '"' + list.slice(0, 50).join(',') + '"'; // Excel limit
-        for (let r = 1; r <= 50; r++) {
-          ws['!dataValidation']!.push({
-            sqref: XLSX.utils.encode_cell({ r, c: col }),
-            type: 'list',
-            formula1: formula,
-            showErrorMessage: true,
-            errorTitle: 'Invalid Value',
-            error: 'Please select from the dropdown list.',
-          });
-        }
-      };
-
-      makeDropdown(2, data.series.map(s => s.name));   // SeriesName col C
-      makeDropdown(1, data.venues.map(v => v.name));    // VenueName col B
-      makeDropdown(3, data.teams.map(t => t.name));     // Team1Name col D
-      makeDropdown(4, data.teams.map(t => t.name));     // Team2Name col E
-
-      XLSX.utils.book_append_sheet(wb, ws, 'Games Import');
-
-      // ── Sheet 2: Valid Values ──────────────────────────────────────────────
-      const vvRows: string[][] = [];
-      vvRows.push(['VALID VALUES REFERENCE', '', '', '', '']);
-      vvRows.push(['Use this sheet to find which venues and teams belong to each series.', '', '', '', '']);
-      vvRows.push(['', '', '', '', '']);
-
-      // Series list
-      vvRows.push(['ACTIVE SERIES', '', '', '', '']);
-      vvRows.push(['Series Name', '', '', '', '']);
-      data.series.forEach(s => vvRows.push([s.name, '', '', '', '']));
-      vvRows.push(['', '', '', '', '']);
-
-      // Venues per series
-      vvRows.push(['VENUES BY SERIES', '', '', '', '']);
-      vvRows.push(['Series Name', 'Venue Name', '', '', '']);
-      data.venues.forEach(v => {
-        v.seriesNames.forEach(sn => vvRows.push([sn, v.name, '', '', '']));
-      });
-      vvRows.push(['', '', '', '', '']);
-
-      // Teams per series
-      vvRows.push(['TEAMS BY SERIES', '', '', '', '']);
-      vvRows.push(['Series Name', 'Team Name', '', '', '']);
-      data.teams.forEach(t => {
-        t.seriesNames.forEach(sn => vvRows.push([sn, t.name, '', '', '']));
-      });
-
-      const vvWs = XLSX.utils.aoa_to_sheet(vvRows);
-      vvWs['!cols'] = [{ wch: 36 }, { wch: 28 }, { wch: 20 }, { wch: 20 }, { wch: 20 }];
-
-      // Style the section headers
-      const sectionRows = [0, 3, vvRows.findIndex(r => r[0] === 'VENUES BY SERIES'), vvRows.findIndex(r => r[0] === 'TEAMS BY SERIES')];
-      sectionRows.forEach(r => {
-        const cell = vvWs[XLSX.utils.encode_cell({ r, c: 0 })];
-        if (cell) cell.s = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '0B6E8C' } } };
-      });
-
-      XLSX.utils.book_append_sheet(wb, vvWs, 'Valid Values');
-
-      // ── Sheet 3: Instructions ──────────────────────────────────────────────
-      const instrRows = [
-        ['🏏  Cricket IQ — Game Import Template Instructions', '', '', '', ''],
-        ['', '', '', '', ''],
-        ['COLUMN RULES', '', '', '', ''],
-        ['Column', 'Required', 'Rule', '', ''],
-        ['GameDate', 'YES', 'Format: MM/DD/YYYY  e.g. 04/15/2026', '', ''],
-        ['SeriesName', 'YES', 'Must match an active series in your organization. See Valid Values sheet.', '', ''],
-        ['VenueName', 'YES', 'Must match a venue associated with the selected series. See Valid Values sheet.', '', ''],
-        ['Team1Name', 'YES', 'Must match a team associated with the selected series. See Valid Values sheet.', '', ''],
-        ['Team2Name', 'YES', 'Must match a different team in the same series. Cannot be the same as Team1Name.', '', ''],
-        ['', '', '', '', ''],
-        ['IMPORTANT NOTES', '', '', '', ''],
-        ['• Series, venues, and teams must already exist in the system. They will NOT be created from this file.', '', '', '', ''],
-        ['• Player rosters are auto-populated with age-eligible players from each team\'s full roster.', '', '', '', ''],
-        ['• Selectors can be assigned to games after import from the Game Details page.', '', '', '', ''],
-        ['• Duplicate games (same series + date + teams) will be skipped with an error.', '', '', '', ''],
-        ['• Do NOT change the column headers in the Games Import sheet.', '', '', '', ''],
-        ['• Use the Valid Values sheet to look up which venues and teams belong to each series.', '', '', '', ''],
-        ['• Dates must be typed as MM/DD/YYYY text — not Excel date values.', '', '', '', ''],
+      const headers = [
+        { key: 'GameDate',   label: 'GameDate',   width: 16, required: true,  color: '2E75B6' },
+        { key: 'SeriesName', label: 'SeriesName',  width: 36, required: true,  color: '2E75B6' },
+        { key: 'VenueName',  label: 'VenueName',   width: 28, required: true,  color: '2E75B6' },
+        { key: 'Team1Name',  label: 'Team1Name',   width: 28, required: true,  color: '2E75B6' },
+        { key: 'Team2Name',  label: 'Team2Name',   width: 28, required: true,  color: '2E75B6' },
       ];
 
-      const instrWs = XLSX.utils.aoa_to_sheet(instrRows);
-      instrWs['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 70 }, { wch: 10 }, { wch: 10 }];
-      instrWs['!rows'] = [{ hpt: 30 }];
-
-      // Style title
-      const titleCell = instrWs['A1'];
-      if (titleCell) titleCell.s = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 13 }, fill: { fgColor: { rgb: '0F2A54' } }, alignment: { horizontal: 'center' } };
-
-      // Style section headers
-      ['A3', 'A11'].forEach(ref => {
-        const c = instrWs[ref];
-        if (c) c.s = { font: { bold: true, color: { rgb: '0F2A54' }, sz: 11 } };
+      // Header row
+      const headerRow = ws.getRow(1);
+      headerRow.height = 32;
+      headers.forEach((h, i) => {
+        ws.getColumn(i + 1).width = h.width;
+        const cell = headerRow.getCell(i + 1);
+        cell.value = h.label;
+        cell.font = { bold: true, color: { argb: 'FF' + white }, size: 11, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + h.color } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFD0DCE8' } },
+          bottom: { style: 'thin', color: { argb: 'FFD0DCE8' } },
+          left: { style: 'thin', color: { argb: 'FFD0DCE8' } },
+          right: { style: 'thin', color: { argb: 'FFD0DCE8' } },
+        };
       });
 
-      // Style column header row
-      ['A4', 'B4', 'C4'].forEach(ref => {
-        const c = instrWs[ref];
-        if (c) c.s = { font: { bold: true }, fill: { fgColor: { rgb: 'E0EAF2' } } };
+      // Data rows with dropdowns
+      for (let r = 2; r <= 201; r++) {
+        const row = ws.getRow(r);
+        row.height = 18;
+        headers.forEach((_, i) => {
+          const cell = row.getCell(i + 1);
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + white } };
+          cell.font = { name: 'Arial', size: 10 };
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE8E8E8' } },
+            bottom: { style: 'thin', color: { argb: 'FFE8E8E8' } },
+            left: { style: 'thin', color: { argb: 'FFE8E8E8' } },
+            right: { style: 'thin', color: { argb: 'FFE8E8E8' } },
+          };
+        });
+
+        // Dropdowns using named ranges
+        ws.getCell(r, 2).dataValidation = {
+          type: 'list', allowBlank: true, showErrorMessage: true,
+          formulae: ['SeriesList'],
+          errorStyle: 'warning', errorTitle: 'Invalid Series',
+          error: 'Please select from the dropdown list.',
+          showDropDown: false,
+        };
+        ws.getCell(r, 3).dataValidation = {
+          type: 'list', allowBlank: true, showErrorMessage: true,
+          formulae: ['VenueList'],
+          errorStyle: 'warning', errorTitle: 'Invalid Venue',
+          error: 'Please select from the dropdown list.',
+          showDropDown: false,
+        };
+        ws.getCell(r, 4).dataValidation = {
+          type: 'list', allowBlank: true, showErrorMessage: true,
+          formulae: ['TeamList'],
+          errorStyle: 'warning', errorTitle: 'Invalid Team',
+          error: 'Please select from the dropdown list.',
+          showDropDown: false,
+        };
+        ws.getCell(r, 5).dataValidation = {
+          type: 'list', allowBlank: true, showErrorMessage: true,
+          formulae: ['TeamList'],
+          errorStyle: 'warning', errorTitle: 'Invalid Team',
+          error: 'Please select from the dropdown list.',
+          showDropDown: false,
+        };
+      }
+
+      // ── Sheet 3: Valid Values ─────────────────────────────────────────────
+      const vvWs = wb.addWorksheet('Valid Values');
+      vvWs.getColumn(1).width = 38;
+      vvWs.getColumn(2).width = 30;
+
+      const addSection = (title: string, colHeaders: string[], rows: string[][]) => {
+        const titleRow = vvWs.addRow([title]);
+        titleRow.height = 24;
+        const tc = titleRow.getCell(1);
+        tc.font = { bold: true, color: { argb: 'FF' + white }, size: 11, name: 'Arial' };
+        tc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + teal } };
+        tc.alignment = { vertical: 'middle' };
+
+        const hRow = vvWs.addRow(colHeaders);
+        hRow.height = 18;
+        colHeaders.forEach((_, i) => {
+          const c = hRow.getCell(i + 1);
+          c.font = { bold: true, name: 'Arial', size: 10 };
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + offwh } };
+        });
+
+        rows.forEach(r => {
+          const dr = vvWs.addRow(r);
+          dr.height = 16;
+          r.forEach((_, i) => {
+            dr.getCell(i + 1).font = { name: 'Arial', size: 10 };
+          });
+        });
+        vvWs.addRow([]);
+      };
+
+      addSection('ACTIVE SERIES', ['Series Name'],
+        data.series.map(s => [s.name])
+      );
+
+      addSection('VENUES BY SERIES', ['Series Name', 'Venue Name'],
+        data.venues.flatMap(v => v.seriesNames.map(sn => [sn, v.name]))
+          .sort((a, b) => a[0].localeCompare(b[0]))
+      );
+
+      addSection('TEAMS BY SERIES', ['Series Name', 'Team Name'],
+        data.teams.flatMap(t => t.seriesNames.map(sn => [sn, t.name]))
+          .sort((a, b) => a[0].localeCompare(b[0]))
+      );
+
+      // ── Sheet 4: Instructions ─────────────────────────────────────────────
+      const instrWs = wb.addWorksheet('Instructions');
+      instrWs.getColumn(1).width = 22;
+      instrWs.getColumn(2).width = 14;
+      instrWs.getColumn(3).width = 68;
+
+      const addInstrRow = (vals: string[], bold = false, bgColor?: string) => {
+        const row = instrWs.addRow(vals);
+        row.height = bold ? 22 : 18;
+        vals.forEach((_, i) => {
+          const c = row.getCell(i + 1);
+          c.font = { bold, name: 'Arial', size: bold ? 11 : 10, color: { argb: bgColor ? 'FF' + white : 'FF000000' } };
+          if (bgColor) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + bgColor } };
+          c.alignment = { wrapText: true, vertical: 'middle' };
+        });
+        return row;
+      };
+
+      // Title
+      const tRow = instrWs.addRow(['🏏  Cricket IQ — Game Import Template Instructions', '', '']);
+      tRow.height = 30;
+      const tCell = tRow.getCell(1);
+      tCell.font = { bold: true, color: { argb: 'FF' + white }, size: 13, name: 'Arial' };
+      tCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + navy } };
+      tCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      instrWs.mergeCells('A1:C1');
+
+      instrWs.addRow([]);
+      addInstrRow(['COLUMN RULES', '', ''], true, navy);
+      addInstrRow(['Column', 'Required', 'Rule'], true);
+
+      const rules = [
+        ['GameDate',   'YES', 'Date of the game. Format: MM/DD/YYYY  e.g. 04/15/2026. Type as text — do not use Excel date format.'],
+        ['SeriesName', 'YES', 'Must match an active series in your organization. Select from the dropdown or refer to the Valid Values sheet.'],
+        ['VenueName',  'YES', 'Must match a venue already associated with the selected series. Select from dropdown or see Valid Values sheet.'],
+        ['Team1Name',  'YES', 'Must match a team already in the selected series. Select from dropdown or see Valid Values sheet.'],
+        ['Team2Name',  'YES', 'Must be a different team in the same series. Cannot be the same as Team1Name.'],
+      ];
+      rules.forEach(r => addInstrRow(r));
+
+      instrWs.addRow([]);
+      addInstrRow(['IMPORTANT NOTES', '', ''], true, teal);
+      [
+        '• The system will NOT create new Series, Venues, or Teams — they must already exist.',
+        '• Player rosters are auto-populated with age-eligible players from each team\'s full roster.',
+        '• Selectors can be assigned after import from the Game Details page.',
+        '• Duplicate games (same series + date + teams) will be skipped with an error.',
+        '• Do NOT rename or reorder the column headers in the Games Import sheet.',
+        '• Use the Valid Values sheet to find which venues and teams belong to each series.',
+        '• Dropdowns on the Games Import sheet show all valid values for your organization.',
+      ].forEach(tip => addInstrRow([tip, '', '']));
+
+      // ── Download ──────────────────────────────────────────────────────────
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'game_import_template.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Template downloaded!',
+        description: `Includes ${data.series.length} series, ${data.venues.length} venues, ${data.teams.length} teams as dropdown options.`,
       });
-
-      XLSX.utils.book_append_sheet(wb, instrWs, 'Instructions');
-
-      // ── Download ───────────────────────────────────────────────────────────
-      XLSX.writeFile(wb, 'game_import_template.xlsx');
-      toast({ title: 'Template downloaded!', description: `Includes ${data.series.length} series, ${data.venues.length} venues, ${data.teams.length} teams.` });
     } catch (e: any) {
       console.error('Template generation error:', e);
       toast({ title: 'Error', description: 'Could not generate template. Please try again.', variant: 'destructive' });
