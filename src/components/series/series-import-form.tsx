@@ -82,6 +82,22 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
     if (!file || parsedData.length === 0) {
       toast({ title: 'No Data to Import', description: 'Please select a valid CSV file.', variant: 'destructive' }); return;
     }
+    // Pre-validate dates
+    const dateRegex = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
+    const dateErrors: string[] = [];
+    parsedData.forEach((row, i) => {
+      const rowNum = i + 2;
+      if (row.MaleCutoffDate && !dateRegex.test(String(row.MaleCutoffDate).trim())) {
+        dateErrors.push(`Row ${rowNum}: MaleCutoffDate "${row.MaleCutoffDate}" — use MM/DD/YYYY with 4-digit year`);
+      }
+      if (row.FemaleCutoffDate && !dateRegex.test(String(row.FemaleCutoffDate).trim())) {
+        dateErrors.push(`Row ${rowNum}: FemaleCutoffDate "${row.FemaleCutoffDate}" — use MM/DD/YYYY with 4-digit year`);
+      }
+    });
+    if (dateErrors.length > 0) {
+      toast({ title: 'Invalid Date Format', description: dateErrors[0] + (dateErrors.length > 1 ? ` (+${dateErrors.length - 1} more)` : ''), variant: 'destructive' });
+      return;
+    }
     setIsLoading(true); setImportResult(null); setCurrentProgress(0);
     try {
       const interval = setInterval(() => setCurrentProgress(p => p < 90 ? p + 10 : p), 200);
@@ -144,6 +160,27 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
     }
     if (!xlsxFile || xlsxParsedData.length === 0) {
       toast({ title: 'No Data to Import', description: 'Please select a valid Excel file.', variant: 'destructive' }); return;
+    }
+
+    // Pre-validate dates — must be MM/DD/YYYY with 4-digit year
+    const dateRegex = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
+    const dateErrors: string[] = [];
+    xlsxParsedData.forEach((row, i) => {
+      const rowNum = i + 2;
+      if (row.MaleCutoffDate && !dateRegex.test(String(row.MaleCutoffDate).trim())) {
+        dateErrors.push(`Row ${rowNum}: MaleCutoffDate "${row.MaleCutoffDate}" — use MM/DD/YYYY with 4-digit year (e.g. 09/01/2009)`);
+      }
+      if (row.FemaleCutoffDate && !dateRegex.test(String(row.FemaleCutoffDate).trim())) {
+        dateErrors.push(`Row ${rowNum}: FemaleCutoffDate "${row.FemaleCutoffDate}" — use MM/DD/YYYY with 4-digit year (e.g. 09/01/2009)`);
+      }
+    });
+    if (dateErrors.length > 0) {
+      toast({
+        title: 'Invalid Date Format',
+        description: dateErrors[0] + (dateErrors.length > 1 ? ` (+${dateErrors.length - 1} more)` : ''),
+        variant: 'destructive',
+      });
+      return;
     }
     setXlsxIsLoading(true); setXlsxImportResult(null); setXlsxProgress(0);
     try {
