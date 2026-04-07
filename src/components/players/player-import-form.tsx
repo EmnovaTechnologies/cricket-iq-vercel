@@ -233,101 +233,193 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
     try {
       const data = await getPlayersTemplateData(activeOrganizationId);
 
-      const HEADERS = [
-        'FirstName', 'LastName', 'CricClubsID', 'DateOfBirth', 'Gender',
-        'PrimarySkill', 'DominantHandBatting', 'BattingOrder',
-        'DominantHandBowling', 'BowlingStyle', 'PrimaryClubName', 'PrimaryTeamName'
-      ];
-
-      const FIXED_DROPDOWNS: Record<string, string[]> = {
-        Gender: ['Male', 'Female'],
-        PrimarySkill: ['Batting', 'Bowling', 'Wicket Keeping'],
-        DominantHandBatting: ['Right Hand', 'Left Hand'],
-        BattingOrder: ['Top Order', 'Middle Order', 'Low Order'],
-        DominantHandBowling: ['Right Hand', 'Left Hand'],
-        BowlingStyle: ['Fast', 'Medium', 'Off Spin', 'Leg Spin', 'Left Hand - Orthodox', 'Left Hand - Unorthodox'],
-        PrimaryClubName: data.clubs.length > 0 ? data.clubs : [],
-        PrimaryTeamName: data.teams.length > 0 ? data.teams : [],
+      const LISTS: Record<string, string[]> = {
+        Gender:             ['Male', 'Female'],
+        PrimarySkill:       ['Batting', 'Bowling', 'Wicket Keeping'],
+        DominantHandBatting:['Right Hand', 'Left Hand'],
+        BattingOrder:       ['Top Order', 'Middle Order', 'Low Order'],
+        DominantHandBowling:['Right Hand', 'Left Hand'],
+        BowlingStyle:       ['Fast', 'Medium', 'Off Spin', 'Leg Spin', 'Left Hand - Orthodox', 'Left Hand - Unorthodox'],
+        PrimaryClubName:    data.clubs,
+        PrimaryTeamName:    data.teams,
       };
 
-      const wb = XLSX.utils.book_new();
+      const HEADERS = [
+        { key: 'FirstName',          label: 'FirstName',          width: 16, color: '2E75B6' }, // required
+        { key: 'LastName',           label: 'LastName',           width: 16, color: '2E75B6' }, // required
+        { key: 'CricClubsID',        label: 'CricClubsID',        width: 18, color: '1F4E79' },
+        { key: 'DateOfBirth',        label: 'DateOfBirth',        width: 16, color: '1F4E79' },
+        { key: 'Gender',             label: 'Gender',             width: 12, color: '1F4E79' },
+        { key: 'PrimarySkill',       label: 'PrimarySkill',       width: 20, color: '1F4E79' },
+        { key: 'DominantHandBatting',label: 'DominantHandBatting',width: 22, color: '1F4E79' },
+        { key: 'BattingOrder',       label: 'BattingOrder',       width: 18, color: '1F4E79' },
+        { key: 'DominantHandBowling',label: 'DominantHandBowling',width: 22, color: 'F4B942' }, // conditional
+        { key: 'BowlingStyle',       label: 'BowlingStyle',       width: 32, color: 'F4B942' }, // conditional
+        { key: 'PrimaryClubName',    label: 'PrimaryClubName',    width: 22, color: '1F4E79' },
+        { key: 'PrimaryTeamName',    label: 'PrimaryTeamName',    width: 26, color: '1F4E79' },
+      ];
 
-      // ── Sheet 1: Players Import ──────────────────────────────────────────
-      const ws = XLSX.utils.aoa_to_sheet([HEADERS]);
-      ws['!cols'] = [14, 14, 16, 16, 10, 18, 20, 16, 20, 30, 20, 24].map(w => ({ wch: w }));
-      ws['!rows'] = [{ hpt: 28 }];
+      const ExcelJS = (await import('exceljs')).default;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Cricket IQ';
 
-      // Header styles
-      const reqCols = new Set(['FirstName', 'LastName']);
-      const condCols = new Set(['DominantHandBowling', 'BowlingStyle']);
-      HEADERS.forEach((h, i) => {
-        const cell = ws[XLSX.utils.encode_cell({ r: 0, c: i })];
-        if (!cell) return;
-        const color = reqCols.has(h) ? '2E75B6' : condCols.has(h) ? 'F4B942' : '1F4E79';
-        cell.s = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: color } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
+      const white = 'FFFFFF';
+      const offwh = 'F4F7FA';
+      const teal  = '0B6E8C';
+      const navy  = '0F2A54';
+
+      // ── Hidden _Lists sheet ───────────────────────────────────────────────
+      const listsSheet = wb.addWorksheet('_Lists', { state: 'veryHidden' });
+      const listKeys = Object.keys(LISTS);
+      const maxLen = Math.max(...listKeys.map(k => LISTS[k].length), 1);
+      for (let i = 0; i < maxLen; i++) {
+        listKeys.forEach((key, col) => {
+          listsSheet.getCell(i + 1, col + 1).value = LISTS[key][i] || null;
+        });
+      }
+      // Define named ranges
+      listKeys.forEach((key, col) => {
+        const len = LISTS[key].length || 1;
+        const colLetter = String.fromCharCode(65 + col);
+        wb.definedNames.add(`_Lists!$${colLetter}$1:$${colLetter}$${len}`, `${key}List`);
       });
 
-      // Blank data rows with dropdowns
-      if (!ws['!dataValidation']) ws['!dataValidation'] = [];
-      for (let r = 1; r <= 200; r++) {
-        HEADERS.forEach((h, c) => {
-          ws[XLSX.utils.encode_cell({ r, c })] = { t: 's', v: '' };
-          const opts = FIXED_DROPDOWNS[h];
-          if (opts && opts.length > 0) {
-            (ws['!dataValidation'] as any[]).push({
-              sqref: XLSX.utils.encode_cell({ r, c }),
-              type: 'list',
-              formula1: '"' + opts.slice(0, 50).join(',') + '"',
+      // ── Sheet 1: Players Import ───────────────────────────────────────────
+      const ws = wb.addWorksheet('Players Import');
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+      // Header row
+      const headerRow = ws.getRow(1);
+      headerRow.height = 32;
+      HEADERS.forEach((h, i) => {
+        ws.getColumn(i + 1).width = h.width;
+        // Force DateOfBirth column to text
+        if (h.key === 'DateOfBirth') ws.getColumn(i + 1).numFmt = '@';
+        const cell = headerRow.getCell(i + 1);
+        cell.value = h.label;
+        cell.font = { bold: true, color: { argb: 'FF' + white }, size: 11, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + h.color } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = {
+          top:    { style: 'thin', color: { argb: 'FFD0DCE8' } },
+          bottom: { style: 'thin', color: { argb: 'FFD0DCE8' } },
+          left:   { style: 'thin', color: { argb: 'FFD0DCE8' } },
+          right:  { style: 'thin', color: { argb: 'FFD0DCE8' } },
+        };
+      });
+
+      // Data rows with dropdowns
+      for (let r = 2; r <= 201; r++) {
+        const row = ws.getRow(r);
+        row.height = 18;
+        HEADERS.forEach((h, i) => {
+          const cell = row.getCell(i + 1);
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + offwh } };
+          cell.font = { name: 'Arial', size: 10 };
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+          cell.border = {
+            top:    { style: 'thin', color: { argb: 'FFE8E8E8' } },
+            bottom: { style: 'thin', color: { argb: 'FFE8E8E8' } },
+            left:   { style: 'thin', color: { argb: 'FFE8E8E8' } },
+            right:  { style: 'thin', color: { argb: 'FFE8E8E8' } },
+          };
+          // Add dropdown if this column has a list
+          if (LISTS[h.key] && LISTS[h.key].length > 0) {
+            cell.dataValidation = {
+              type: 'list', allowBlank: true,
+              formulae: [`${h.key}List`],
               showErrorMessage: true,
+              errorStyle: h.key === 'DominantHandBowling' || h.key === 'BowlingStyle' ? 'warning' : 'warning',
               errorTitle: 'Invalid Value',
-              error: 'Please select a value from the dropdown list.',
-            });
+              error: 'Please select from the dropdown list.',
+              showDropDown: false,
+            };
           }
         });
       }
 
-      ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 200, c: HEADERS.length - 1 } });
-      XLSX.utils.book_append_sheet(wb, ws, 'Players Import');
+      // ── Sheet 2: Valid Values ─────────────────────────────────────────────
+      const vvWs = wb.addWorksheet('Valid Values');
+      vvWs.getColumn(1).width = 30;
+      vvWs.getColumn(2).width = 40;
 
-      // ── Sheet 2: Instructions ────────────────────────────────────────────
-      const instrRows = [
-        ['🏏  Cricket IQ — Player Import Template Instructions', '', '', ''],
-        ['', '', '', ''],
-        ['COLUMN COLOUR LEGEND', '', '', ''],
-        ['Medium Blue', 'Required — must be filled in', '', ''],
-        ['Amber', 'Conditional — required only if PrimarySkill = Bowling', '', ''],
-        ['Dark Blue', 'Optional', '', ''],
-        ['', '', '', ''],
-        ['COLUMN RULES', '', '', ''],
-        ['Column', 'Required?', 'Rule', ''],
-        ['FirstName', 'YES', 'Player first name', ''],
-        ['LastName', 'YES', 'Player last name. Combined with FirstName for full display name.', ''],
-        ['CricClubsID', 'Optional', 'Must be unique across all players in the system.', ''],
-        ['DateOfBirth', 'Optional', 'Format: MM/DD/YYYY  e.g. 03/15/2008', ''],
-        ['Gender', 'Optional', 'Must be one of: Male, Female', ''],
-        ['PrimarySkill', 'Optional', 'Must be one of: Batting, Bowling, Wicket Keeping', ''],
-        ['DominantHandBatting', 'Optional', 'Must be one of: Right Hand, Left Hand', ''],
-        ['BattingOrder', 'Optional', 'Must be one of: Top Order, Middle Order, Low Order', ''],
-        ['DominantHandBowling', 'CONDITIONAL', 'Required if PrimarySkill = Bowling. Must be one of: Right Hand, Left Hand', ''],
-        ['BowlingStyle', 'CONDITIONAL', 'Required if PrimarySkill = Bowling. Must be one of: Fast, Medium, Off Spin, Leg Spin, Left Hand - Orthodox, Left Hand - Unorthodox', ''],
-        ['PrimaryClubName', 'Optional', 'Must match a club defined for your active organization.', ''],
-        ['PrimaryTeamName', 'Optional', 'Must match an existing team in your active organization.', ''],
-        ['', '', '', ''],
-        ['TIPS', '', '', ''],
-        ['• Do NOT change the column headers in row 1 of the Players Import sheet.', '', '', ''],
-        ['• Dropdown menus are provided for columns with fixed values.', '', '', ''],
-        ['• Dates must be typed as MM/DD/YYYY text (e.g. 03/15/2008) — not Excel date values.', '', '', ''],
-        ['• Leave optional columns blank if not applicable.', '', '', ''],
-        ['• CricClubsID must be unique. Duplicate IDs will be skipped.', '', '', ''],
-      ];
-      const instrWs = XLSX.utils.aoa_to_sheet(instrRows);
-      instrWs['!cols'] = [{ wch: 22 }, { wch: 14 }, { wch: 70 }, { wch: 10 }];
-      instrWs['!rows'] = [{ hpt: 30 }];
-      XLSX.utils.book_append_sheet(wb, instrWs, 'Instructions');
+      const addVVSection = (title: string, values: string[]) => {
+        const tr = vvWs.addRow([title]);
+        tr.height = 24;
+        const tc = tr.getCell(1);
+        tc.font = { bold: true, color: { argb: 'FF' + white }, size: 11, name: 'Arial' };
+        tc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + teal } };
+        const hr = vvWs.addRow(['Value']);
+        hr.getCell(1).font = { bold: true, name: 'Arial', size: 10 };
+        hr.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0EAF2' } };
+        values.forEach(v => { const dr = vvWs.addRow([v]); dr.getCell(1).font = { name: 'Arial', size: 10 }; });
+        vvWs.addRow(['']);
+      };
 
-      // ── Download ─────────────────────────────────────────────────────────
-      XLSX.writeFile(wb, 'player_import_template.xlsx');
-      toast({ title: 'Template downloaded!', description: `Includes dropdowns for ${data.teams.length} teams and ${data.clubs.length} clubs from your organization.` });
+      addVVSection('GENDER',               LISTS.Gender);
+      addVVSection('PRIMARY SKILL',         LISTS.PrimarySkill);
+      addVVSection('DOMINANT HAND BATTING', LISTS.DominantHandBatting);
+      addVVSection('BATTING ORDER',         LISTS.BattingOrder);
+      addVVSection('DOMINANT HAND BOWLING (required if Bowling)', LISTS.DominantHandBowling);
+      addVVSection('BOWLING STYLE (required if Bowling)',          LISTS.BowlingStyle);
+      if (data.clubs.length > 0) addVVSection('PRIMARY CLUB NAME (your organization)', data.clubs);
+      if (data.teams.length > 0) addVVSection('PRIMARY TEAM NAME (your organization)', data.teams);
+
+      // ── Sheet 3: Instructions ─────────────────────────────────────────────
+      const instrWs = wb.addWorksheet('Instructions');
+      instrWs.getColumn(1).width = 24;
+      instrWs.getColumn(2).width = 14;
+      instrWs.getColumn(3).width = 75;
+
+      const addI = (vals: string[], bold = false, bg?: string) => {
+        const row = instrWs.addRow(vals);
+        row.height = bg ? 26 : 18;
+        vals.forEach((_, i) => {
+          const c = row.getCell(i + 1);
+          c.font = { name: 'Arial', size: bold ? 11 : 10, bold };
+          if (bg) { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + bg } }; c.font = { ...c.font, color: { argb: 'FF' + white } }; }
+        });
+      };
+
+      addI(['🏏  Cricket IQ — Player Import Template Instructions', '', ''], true, navy);
+      instrWs.addRow(['']);
+      addI(['COLUMN COLOUR LEGEND', '', ''], true);
+      instrWs.addRow(['Medium Blue', 'Required', '']);
+      instrWs.addRow(['Amber', 'Conditional — required only if PrimarySkill = Bowling', '']);
+      instrWs.addRow(['Dark Blue', 'Optional', '']);
+      instrWs.addRow(['']);
+      addI(['COLUMN RULES', '', ''], true);
+      instrWs.addRow(['Column', 'Required?', 'Rule']).eachCell(c => { c.font = { bold: true, name: 'Arial', size: 10 }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0EAF2' } }; });
+      instrWs.addRow(['FirstName',           'YES',         'Player first name.']);
+      instrWs.addRow(['LastName',            'YES',         'Player last name. Combined with FirstName for full display name.']);
+      instrWs.addRow(['CricClubsID',         'Optional',    'Must be unique across all players.']);
+      instrWs.addRow(['DateOfBirth',         'Optional',    'Format: MM/DD/YYYY  e.g. 03/15/2008']);
+      instrWs.addRow(['Gender',              'Optional',    'Select from dropdown: Male, Female']);
+      instrWs.addRow(['PrimarySkill',        'Optional',    'Select from dropdown: Batting, Bowling, Wicket Keeping']);
+      instrWs.addRow(['DominantHandBatting', 'Optional',    'Select from dropdown: Right Hand, Left Hand']);
+      instrWs.addRow(['BattingOrder',        'Optional',    'Select from dropdown: Top Order, Middle Order, Low Order']);
+      instrWs.addRow(['DominantHandBowling', 'CONDITIONAL', 'Required if PrimarySkill = Bowling. Select from dropdown.']);
+      instrWs.addRow(['BowlingStyle',        'CONDITIONAL', 'Required if PrimarySkill = Bowling. Select from dropdown.']);
+      instrWs.addRow(['PrimaryClubName',     'Optional',    'Must match a club in your organization. Select from dropdown.']);
+      instrWs.addRow(['PrimaryTeamName',     'Optional',    'Must match a team in your organization. Select from dropdown.']);
+      instrWs.addRow(['']);
+      addI(['TIPS', '', ''], true);
+      ['Do NOT change the column headers in row 1.',
+       'Use dropdowns to avoid spelling errors — all value columns have dropdowns.',
+       'DateOfBirth must be typed as MM/DD/YYYY text — not an Excel date value.',
+       'Leave optional columns blank if not applicable.',
+       'CricClubsID must be unique. Duplicate IDs will be skipped with an error.',
+      ].forEach(tip => instrWs.addRow(['• ' + tip, '', '']));
+
+      // ── Download ──────────────────────────────────────────────────────────
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'player_import_template.xlsx'; a.click();
+      URL.revokeObjectURL(url);
+
+      toast({ title: 'Template downloaded!', description: `Dropdowns include ${data.teams.length} teams and ${data.clubs.length} clubs from your organization.` });
     } catch (e: any) {
       console.error('Template generation error:', e);
       toast({ title: 'Error', description: 'Could not generate template. Please try again.', variant: 'destructive' });
