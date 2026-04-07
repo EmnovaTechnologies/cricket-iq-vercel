@@ -248,7 +248,7 @@ export default function GamesPage() {
         <div className="flex flex-col sm:flex-row gap-2">
           {isPermissionsLoading ? (
             <>
-              <Button disabled variant="secondary"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Import Games (CSV)</Button>
+              <Button disabled variant="secondary"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Import Games</Button>
               <Button disabled className="bg-primary hover:bg-primary/90"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Add New Game</Button>
             </>
           ) : (
@@ -256,7 +256,7 @@ export default function GamesPage() {
               {canImportGames && (
                 <Button asChild variant="secondary" disabled={!activeOrganizationId}>
                   <Link href="/games/import" className="flex items-center gap-2">
-                    <Upload className="h-5 w-5" /> Import Games (CSV)
+                    <Upload className="h-5 w-5" /> Import Games
                   </Link>
                 </Button>
               )}

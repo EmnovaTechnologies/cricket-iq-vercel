@@ -161,7 +161,7 @@ export default function SeriesPage() {
           {!isPermissionsLoading && canImportCsv && (
             <Button asChild variant="secondary" disabled={!activeOrganizationId}>
               <Link href="/series/import" className="flex items-center gap-2">
-                <Upload className="h-5 w-5" /> Import Series (CSV)
+                <Upload className="h-5 w-5" /> Import Series
               </Link>
             </Button>
           )}

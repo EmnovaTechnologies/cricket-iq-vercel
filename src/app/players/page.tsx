@@ -173,7 +173,7 @@ export default function PlayersPage() {
             {canImportPlayers && (
               <Button asChild variant="secondary" disabled={!activeOrganizationId}>
                 <Link href="/players/import" className="flex items-center gap-2">
-                  <Upload className="h-5 w-5" /> Import Players (CSV)
+                  <Upload className="h-5 w-5" /> Import Players
                 </Link>
               </Button>
             )}
