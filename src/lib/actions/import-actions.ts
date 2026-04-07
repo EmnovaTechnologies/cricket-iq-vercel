@@ -1,5 +1,5 @@
 
-'use server';
+'use client';
 
 import {
   doc,
@@ -19,7 +19,7 @@ import {
   limit,
   setDoc,
 } from 'firebase/firestore';
-import { adminDb as db } from '../firebase-admin';
+import { db } from '../firebase';
 import type {
   Game,
   Series,

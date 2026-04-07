@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { importSeriesAction } from '@/lib/actions/import-actions';
+import { importSeriesAdminAction } from '@/lib/actions/import-series-admin-action';
 import { getSeriesTemplateData } from '@/lib/actions/series-template-action';
 import type { CsvSeriesImportRow, SeriesImportResult } from '@/types';
 import { Loader2, Upload, AlertTriangle, CheckCircle, ListChecks, FileSpreadsheet, Download } from 'lucide-react';
@@ -101,7 +101,7 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
     setIsLoading(true); setImportResult(null); setCurrentProgress(0);
     try {
       const interval = setInterval(() => setCurrentProgress(p => p < 90 ? p + 10 : p), 200);
-      const result = await importSeriesAction(parsedData, activeOrganizationId);
+      const result = await importSeriesAdminAction(parsedData, activeOrganizationId);
       clearInterval(interval); setCurrentProgress(100); setImportResult(result);
       toast({ title: result.success ? 'Import Completed' : 'Import Failed', description: `${result.successfulImports} imported, ${result.failedImports} failed.`, variant: result.success ? 'default' : 'destructive' });
     } catch {
@@ -187,7 +187,7 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
     setXlsxIsLoading(true); setXlsxImportResult(null); setXlsxProgress(0);
     try {
       const interval = setInterval(() => setXlsxProgress(p => p < 90 ? p + 10 : p), 200);
-      const result = await importSeriesAction(xlsxParsedData, activeOrganizationId);
+      const result = await importSeriesAdminAction(xlsxParsedData, activeOrganizationId);
       clearInterval(interval); setXlsxProgress(100); setXlsxImportResult(result);
       toast({ title: result.success ? 'Import Completed' : 'Import Failed', description: `${result.successfulImports} imported, ${result.failedImports} failed.`, variant: result.success ? 'default' : 'destructive' });
     } catch {
