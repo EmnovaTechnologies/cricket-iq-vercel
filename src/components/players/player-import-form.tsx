@@ -10,8 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { importPlayersAction } from '@/lib/actions/import-actions';
+import { getPlayersTemplateData } from '@/lib/actions/players-template-action';
 import type { CsvPlayerImportRow, PlayerImportResult } from '@/types';
-import { Loader2, Upload, AlertTriangle, CheckCircle, ListChecks, FileSpreadsheet } from 'lucide-react';
+import { Loader2, Upload, AlertTriangle, CheckCircle, ListChecks, FileSpreadsheet, Download } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -46,6 +47,7 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
   const [xlsxIsLoading, setXlsxIsLoading] = useState(false);
   const [xlsxImportResult, setXlsxImportResult] = useState<PlayerImportResult | null>(null);
   const [xlsxProgress, setXlsxProgress] = useState(0);
+  const [isGeneratingTemplate, setIsGeneratingTemplate] = useState(false);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     setFile(null);
@@ -172,11 +174,7 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
 
-    const validTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-    ];
-    if (!validTypes.includes(selectedFile.type) && !selectedFile.name.match(/\.(xlsx|xls)$/i)) {
+    if (!selectedFile.name.match(/\.(xlsx|xls)$/i)) {
       toast({ title: 'Invalid File Type', description: 'Please upload an Excel file (.xlsx or .xls).', variant: 'destructive' });
       event.target.value = '';
       return;
@@ -189,38 +187,31 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: false });
-
-        // Use first sheet
-        const sheetName = workbook.SheetNames[0];
+        const workbook = XLSX.read(data, { type: 'array', raw: false });
+        // Use 'Players Import' sheet if present, else first sheet
+        const sheetName = workbook.SheetNames.find(n => n === 'Players Import') || workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(worksheet, {
-          defval: '',
-          raw: false, // format all values as strings
-        });
-
-        if (rows.length === 0) {
-          toast({ title: 'Empty File', description: 'No data rows found in the Excel file.', variant: 'destructive' });
-          setXlsxFile(null); setXlsxFileName(null); event.target.value = '';
-          return;
+        // Read headers explicitly from row 1
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:L1');
+        const headers: string[] = [];
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const cell = worksheet[XLSX.utils.encode_cell({ r: 0, c })];
+          headers.push(cell ? String(cell.v).trim() : '');
         }
-
-        const headers = Object.keys(rows[0]);
         if (!EXPECTED_HEADERS.every(h => headers.includes(h))) {
           toast({
             title: 'Invalid Excel Headers',
-            description: `Excel must contain headers: ${EXPECTED_HEADERS.join(', ')}. Found: ${headers.join(', ')}`,
+            description: `Excel must contain: ${EXPECTED_HEADERS.join(', ')}. Found: ${headers.filter(Boolean).join(', ')}`,
             variant: 'destructive',
           });
           setXlsxFile(null); setXlsxFileName(null); event.target.value = '';
           return;
         }
-
-        // Filter out completely empty rows and the example row (row 2 in template)
-        const validRows = rows.filter(row =>
+        const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false, header: headers });
+        // Skip header row (index 0), filter empty rows
+        const validRows = rows.slice(1).filter(row =>
           EXPECTED_HEADERS.some(h => row[h] && String(row[h]).trim() !== '')
         ) as CsvPlayerImportRow[];
-
         setXlsxParsedData(validRows);
         toast({ title: 'Excel file ready', description: `${validRows.length} rows found. Click Import to proceed.` });
       } catch (err) {
@@ -230,6 +221,119 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
       }
     };
     reader.readAsArrayBuffer(selectedFile);
+  };
+
+  // ── Dynamic template download ─────────────────────────────────────────────
+  const handleDownloadTemplate = async () => {
+    if (!activeOrganizationId) {
+      toast({ title: 'No Organization', description: 'Please select an active organization first.', variant: 'destructive' });
+      return;
+    }
+    setIsGeneratingTemplate(true);
+    try {
+      const data = await getPlayersTemplateData(activeOrganizationId);
+
+      const HEADERS = [
+        'FirstName', 'LastName', 'CricClubsID', 'DateOfBirth', 'Gender',
+        'PrimarySkill', 'DominantHandBatting', 'BattingOrder',
+        'DominantHandBowling', 'BowlingStyle', 'PrimaryClubName', 'PrimaryTeamName'
+      ];
+
+      const FIXED_DROPDOWNS: Record<string, string[]> = {
+        Gender: ['Male', 'Female'],
+        PrimarySkill: ['Batting', 'Bowling', 'Wicket Keeping'],
+        DominantHandBatting: ['Right Hand', 'Left Hand'],
+        BattingOrder: ['Top Order', 'Middle Order', 'Low Order'],
+        DominantHandBowling: ['Right Hand', 'Left Hand'],
+        BowlingStyle: ['Fast', 'Medium', 'Off Spin', 'Leg Spin', 'Left Hand - Orthodox', 'Left Hand - Unorthodox'],
+        PrimaryClubName: data.clubs.length > 0 ? data.clubs : [],
+        PrimaryTeamName: data.teams.length > 0 ? data.teams : [],
+      };
+
+      const wb = XLSX.utils.book_new();
+
+      // ── Sheet 1: Players Import ──────────────────────────────────────────
+      const ws = XLSX.utils.aoa_to_sheet([HEADERS]);
+      ws['!cols'] = [14, 14, 16, 16, 10, 18, 20, 16, 20, 30, 20, 24].map(w => ({ wch: w }));
+      ws['!rows'] = [{ hpt: 28 }];
+
+      // Header styles
+      const reqCols = new Set(['FirstName', 'LastName']);
+      const condCols = new Set(['DominantHandBowling', 'BowlingStyle']);
+      HEADERS.forEach((h, i) => {
+        const cell = ws[XLSX.utils.encode_cell({ r: 0, c: i })];
+        if (!cell) return;
+        const color = reqCols.has(h) ? '2E75B6' : condCols.has(h) ? 'F4B942' : '1F4E79';
+        cell.s = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: color } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
+      });
+
+      // Blank data rows with dropdowns
+      if (!ws['!dataValidation']) ws['!dataValidation'] = [];
+      for (let r = 1; r <= 200; r++) {
+        HEADERS.forEach((h, c) => {
+          ws[XLSX.utils.encode_cell({ r, c })] = { t: 's', v: '' };
+          const opts = FIXED_DROPDOWNS[h];
+          if (opts && opts.length > 0) {
+            (ws['!dataValidation'] as any[]).push({
+              sqref: XLSX.utils.encode_cell({ r, c }),
+              type: 'list',
+              formula1: '"' + opts.slice(0, 50).join(',') + '"',
+              showErrorMessage: true,
+              errorTitle: 'Invalid Value',
+              error: 'Please select a value from the dropdown list.',
+            });
+          }
+        });
+      }
+
+      ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 200, c: HEADERS.length - 1 } });
+      XLSX.utils.book_append_sheet(wb, ws, 'Players Import');
+
+      // ── Sheet 2: Instructions ────────────────────────────────────────────
+      const instrRows = [
+        ['🏏  Cricket IQ — Player Import Template Instructions', '', '', ''],
+        ['', '', '', ''],
+        ['COLUMN COLOUR LEGEND', '', '', ''],
+        ['Medium Blue', 'Required — must be filled in', '', ''],
+        ['Amber', 'Conditional — required only if PrimarySkill = Bowling', '', ''],
+        ['Dark Blue', 'Optional', '', ''],
+        ['', '', '', ''],
+        ['COLUMN RULES', '', '', ''],
+        ['Column', 'Required?', 'Rule', ''],
+        ['FirstName', 'YES', 'Player first name', ''],
+        ['LastName', 'YES', 'Player last name. Combined with FirstName for full display name.', ''],
+        ['CricClubsID', 'Optional', 'Must be unique across all players in the system.', ''],
+        ['DateOfBirth', 'Optional', 'Format: MM/DD/YYYY  e.g. 03/15/2008', ''],
+        ['Gender', 'Optional', 'Must be one of: Male, Female', ''],
+        ['PrimarySkill', 'Optional', 'Must be one of: Batting, Bowling, Wicket Keeping', ''],
+        ['DominantHandBatting', 'Optional', 'Must be one of: Right Hand, Left Hand', ''],
+        ['BattingOrder', 'Optional', 'Must be one of: Top Order, Middle Order, Low Order', ''],
+        ['DominantHandBowling', 'CONDITIONAL', 'Required if PrimarySkill = Bowling. Must be one of: Right Hand, Left Hand', ''],
+        ['BowlingStyle', 'CONDITIONAL', 'Required if PrimarySkill = Bowling. Must be one of: Fast, Medium, Off Spin, Leg Spin, Left Hand - Orthodox, Left Hand - Unorthodox', ''],
+        ['PrimaryClubName', 'Optional', 'Must match a club defined for your active organization.', ''],
+        ['PrimaryTeamName', 'Optional', 'Must match an existing team in your active organization.', ''],
+        ['', '', '', ''],
+        ['TIPS', '', '', ''],
+        ['• Do NOT change the column headers in row 1 of the Players Import sheet.', '', '', ''],
+        ['• Dropdown menus are provided for columns with fixed values.', '', '', ''],
+        ['• Dates must be typed as MM/DD/YYYY text (e.g. 03/15/2008) — not Excel date values.', '', '', ''],
+        ['• Leave optional columns blank if not applicable.', '', '', ''],
+        ['• CricClubsID must be unique. Duplicate IDs will be skipped.', '', '', ''],
+      ];
+      const instrWs = XLSX.utils.aoa_to_sheet(instrRows);
+      instrWs['!cols'] = [{ wch: 22 }, { wch: 14 }, { wch: 70 }, { wch: 10 }];
+      instrWs['!rows'] = [{ hpt: 30 }];
+      XLSX.utils.book_append_sheet(wb, instrWs, 'Instructions');
+
+      // ── Download ─────────────────────────────────────────────────────────
+      XLSX.writeFile(wb, 'player_import_template.xlsx');
+      toast({ title: 'Template downloaded!', description: `Includes dropdowns for ${data.teams.length} teams and ${data.clubs.length} clubs from your organization.` });
+    } catch (e: any) {
+      console.error('Template generation error:', e);
+      toast({ title: 'Error', description: 'Could not generate template. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsGeneratingTemplate(false);
+    }
   };
 
   const handleXlsxSubmit = async () => {
@@ -372,9 +476,22 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
       {mode === 'xlsx' && (<>
       <Separator className="my-2" />
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Upload the downloaded Excel template with your player data. The first sheet named <strong>Players Import</strong> will be used.
-        </p>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Download the Excel template — it includes dropdowns for Gender, Primary Skill, Batting Order, Bowling Style, and your organization's clubs and teams.
+          </p>
+          <Button
+            variant="outline"
+            onClick={handleDownloadTemplate}
+            disabled={isGeneratingTemplate || !activeOrganizationId}
+            className="border-green-600 text-green-700 hover:bg-green-50 gap-2"
+          >
+            {isGeneratingTemplate
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
+              : <><FileSpreadsheet className="h-4 w-4" /> Download Excel Template <Download className="h-3.5 w-3.5" /></>}
+          </Button>
+          {!activeOrganizationId && <p className="text-xs text-destructive">Select an active organization to generate the template.</p>}
+        </div>
 
         <div className="space-y-2">
           <Label htmlFor="xlsx-file" className="text-base">Select Excel File</Label>

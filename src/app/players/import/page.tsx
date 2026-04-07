@@ -54,7 +54,7 @@ export default function ImportPlayersPage() {
           </Button>
         </div>
 
-        {/* Download templates row */}
+        {/* Download templates row — CSV only; Excel template is generated dynamically in the accordion */}
         <Card className="border-dashed">
           <CardContent className="py-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
             <p className="text-sm text-muted-foreground shrink-0">Download a template to get started:</p>
@@ -63,13 +63,6 @@ export default function ImportPlayersPage() {
                 <Link href="/sample-players-import.csv" download>
                   <FileText className="mr-1.5 h-4 w-4 text-blue-600" />
                   Sample CSV Template
-                  <Download className="ml-1.5 h-3 w-3" />
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" asChild className="border-green-600 text-green-700 hover:bg-green-50">
-                <Link href="/player_import_template.xlsx" download>
-                  <FileSpreadsheet className="mr-1.5 h-4 w-4" />
-                  Excel Template
                   <Download className="ml-1.5 h-3 w-3" />
                 </Link>
               </Button>
