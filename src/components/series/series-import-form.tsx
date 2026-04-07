@@ -168,124 +168,193 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
 
       const currentYear = new Date().getFullYear();
       const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2].map(String);
+      const ageCategories = [...AGE_CATEGORIES];
 
-      const wb = XLSX.utils.book_new();
+      const ExcelJS = (await import('exceljs')).default;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Cricket IQ';
 
-      // ── Sheet 1: Series Import ─────────────────────────────────────────────
-      const ws = XLSX.utils.aoa_to_sheet([EXPECTED_HEADERS]);
-      ws['!cols'] = [{ wch: 36 }, { wch: 18 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 40 }];
-      ws['!rows'] = [{ hpt: 28 }];
+      const navy  = '0F2A54';
+      const blue  = '2E75B6';
+      const teal  = '0B6E8C';
+      const white = 'FFFFFF';
+      const offwh = 'F4F7FA';
 
-      const reqCols = new Set(['SeriesName', 'AgeCategory', 'Year', 'MaleCutoffDate', 'FemaleCutoffDate']);
-      EXPECTED_HEADERS.forEach((h, i) => {
-        const cell = ws[XLSX.utils.encode_cell({ r: 0, c: i })];
-        if (!cell) return;
-        const color = reqCols.has(h) ? '2E75B6' : '1F4E79';
-        cell.s = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: color } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
+      // ── Hidden Lists sheet ────────────────────────────────────────────────
+      const listsSheet = wb.addWorksheet('_Lists', { state: 'veryHidden' });
+      const maxRows = Math.max(ageCategories.length, years.length, data.selectorEmails.length, 1);
+      for (let i = 0; i < maxRows; i++) {
+        listsSheet.getCell(i + 1, 1).value = ageCategories[i] || null;   // A = age categories
+        listsSheet.getCell(i + 1, 2).value = years[i] || null;            // B = years
+        listsSheet.getCell(i + 1, 3).value = data.selectorEmails[i] || null; // C = emails
+      }
+      const aLen = ageCategories.length || 1;
+      const yLen = years.length || 1;
+      const eLen = data.selectorEmails.length || 1;
+      wb.definedNames.add(`_Lists!$A$1:$A$${aLen}`, 'AgeCategoryList');
+      wb.definedNames.add(`_Lists!$B$1:$B$${yLen}`, 'YearList');
+      if (data.selectorEmails.length > 0) {
+        wb.definedNames.add(`_Lists!$C$1:$C$${eLen}`, 'EmailList');
+      }
+
+      // ── Sheet 1: Series Import ────────────────────────────────────────────
+      const ws = wb.addWorksheet('Series Import');
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+      const headers = [
+        { key: 'SeriesName',       label: 'SeriesName',       width: 36, required: true,  color: blue },
+        { key: 'AgeCategory',      label: 'AgeCategory',      width: 20, required: true,  color: blue },
+        { key: 'Year',             label: 'Year',             width: 10, required: true,  color: blue },
+        { key: 'MaleCutoffDate',   label: 'MaleCutoffDate',   width: 18, required: true,  color: blue },
+        { key: 'FemaleCutoffDate', label: 'FemaleCutoffDate', width: 18, required: true,  color: blue },
+        { key: 'SeriesAdminEmails',label: 'SeriesAdminEmails',width: 40, required: false, color: navy },
+      ];
+
+      const headerRow = ws.getRow(1);
+      headerRow.height = 32;
+      headers.forEach((h, i) => {
+        ws.getColumn(i + 1).width = h.width;
+        const cell = headerRow.getCell(i + 1);
+        cell.value = h.label;
+        cell.font = { bold: true, color: { argb: 'FF' + white }, size: 11, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + h.color } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFD0DCE8' } },
+          bottom: { style: 'thin', color: { argb: 'FFD0DCE8' } },
+          left: { style: 'thin', color: { argb: 'FFD0DCE8' } },
+          right: { style: 'thin', color: { argb: 'FFD0DCE8' } },
+        };
       });
 
-      if (!ws['!dataValidation']) ws['!dataValidation'] = [];
-      const ageCatFormula = '"' + [...AGE_CATEGORIES].join(',') + '"';
-      const yearFormula = '"' + years.join(',') + '"';
-      const emailFormula = data.selectorEmails.length > 0
-        ? '"' + data.selectorEmails.slice(0, 50).join(',') + '"'
-        : null;
+      for (let r = 2; r <= 101; r++) {
+        const row = ws.getRow(r);
+        row.height = 18;
+        headers.forEach((_, i) => {
+          const cell = row.getCell(i + 1);
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + offwh } };
+          cell.font = { name: 'Arial', size: 10 };
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE8E8E8' } },
+            bottom: { style: 'thin', color: { argb: 'FFE8E8E8' } },
+            left: { style: 'thin', color: { argb: 'FFE8E8E8' } },
+            right: { style: 'thin', color: { argb: 'FFE8E8E8' } },
+          };
+        });
 
-      for (let r = 1; r <= 100; r++) {
-        EXPECTED_HEADERS.forEach((_, c) => {
-          ws[XLSX.utils.encode_cell({ r, c })] = { t: 's', v: '' };
-        });
-        // AgeCategory dropdown (col 1)
-        (ws['!dataValidation'] as any[]).push({
-          sqref: XLSX.utils.encode_cell({ r, c: 1 }),
-          type: 'list', formula1: ageCatFormula,
-          showErrorMessage: true, errorTitle: 'Invalid Value',
+        // AgeCategory dropdown (col 2)
+        ws.getCell(r, 2).dataValidation = {
+          type: 'list', allowBlank: true, showErrorMessage: true,
+          formulae: ['AgeCategoryList'],
+          errorStyle: 'stop', errorTitle: 'Invalid Age Category',
           error: 'Please select a valid age category from the dropdown.',
-        });
-        // Year dropdown (col 2) — also allows free entry via whole number validation
-        (ws['!dataValidation'] as any[]).push({
-          sqref: XLSX.utils.encode_cell({ r, c: 2 }),
-          type: 'list', formula1: yearFormula,
-          showErrorMessage: false, // allow free entry of other years
-        });
-        // SeriesAdminEmails dropdown (col 5) if emails exist
-        if (emailFormula) {
-          (ws['!dataValidation'] as any[]).push({
-            sqref: XLSX.utils.encode_cell({ r, c: 5 }),
-            type: 'list', formula1: emailFormula,
-            showErrorMessage: false, // allow free entry of multiple emails
-          });
+          showDropDown: false,
+        };
+        // Year dropdown (col 3)
+        ws.getCell(r, 3).dataValidation = {
+          type: 'list', allowBlank: true, showErrorMessage: false,
+          formulae: ['YearList'],
+          showDropDown: false,
+        };
+        // SeriesAdminEmails dropdown (col 6) — only if emails exist
+        if (data.selectorEmails.length > 0) {
+          ws.getCell(r, 6).dataValidation = {
+            type: 'list', allowBlank: true, showErrorMessage: false,
+            formulae: ['EmailList'],
+            showDropDown: false,
+          };
         }
       }
 
-      ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 100, c: 5 } });
-      XLSX.utils.book_append_sheet(wb, ws, 'Series Import');
+      // ── Sheet 2: Valid Values ─────────────────────────────────────────────
+      const vvWs = wb.addWorksheet('Valid Values');
+      vvWs.getColumn(1).width = 50;
+      vvWs.getColumn(2).width = 20;
 
-      // ── Sheet 2: Valid Values ──────────────────────────────────────────────
-      const vvRows: string[][] = [];
-      vvRows.push(['VALID VALUES REFERENCE', '']);
-      vvRows.push(['', '']);
-      vvRows.push(['AGE CATEGORIES', '']);
-      vvRows.push(['Value', '']);
-      [...AGE_CATEGORIES].forEach(c => vvRows.push([c, '']));
-      vvRows.push(['', '']);
-      vvRows.push(['SUGGESTED YEARS', '']);
-      vvRows.push(['Value', '']);
-      years.forEach(y => vvRows.push([y, '']));
-      vvRows.push(['You may also type any year between 2000–2100', '']);
-      vvRows.push(['', '']);
-      vvRows.push(['SERIES ADMIN EMAILS (Selectors / Admins in your organization)', '']);
-      vvRows.push(['Email', '']);
-      if (data.selectorEmails.length > 0) {
-        data.selectorEmails.forEach(e => vvRows.push([e, '']));
-      } else {
-        vvRows.push(['No eligible users found for this organization', '']);
-      }
-      const vvWs = XLSX.utils.aoa_to_sheet(vvRows);
-      vvWs['!cols'] = [{ wch: 55 }, { wch: 20 }];
-      [0, vvRows.findIndex(r => r[0] === 'SUGGESTED YEARS'), vvRows.findIndex(r => r[0].startsWith('SERIES ADMIN'))].forEach(r => {
-        if (r < 0) return;
-        const cell = vvWs[XLSX.utils.encode_cell({ r, c: 0 })];
-        if (cell) cell.s = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '0B6E8C' } } };
-      });
-      XLSX.utils.book_append_sheet(wb, vvWs, 'Valid Values');
+      const addSection = (title: string, colHeader: string, rows: string[]) => {
+        const tr = vvWs.addRow([title]);
+        tr.height = 24;
+        const tc = tr.getCell(1);
+        tc.font = { bold: true, color: { argb: 'FF' + white }, size: 11, name: 'Arial' };
+        tc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + teal } };
+        tc.alignment = { vertical: 'middle' };
 
-      // ── Sheet 3: Instructions ──────────────────────────────────────────────
-      const instrRows = [
-        ['🏏  Cricket IQ — Series Import Template Instructions', '', '', ''],
-        ['', '', '', ''],
-        ['COLUMN COLOUR LEGEND', '', '', ''],
-        ['Medium Blue', 'Required — must be filled in', '', ''],
-        ['Dark Blue', 'Optional', '', ''],
-        ['', '', '', ''],
-        ['COLUMN RULES', '', '', ''],
-        ['Column', 'Required?', 'Rule', ''],
-        ['SeriesName', 'YES', 'Must be unique — existing series names will error for that row.', ''],
-        ['AgeCategory', 'YES', `Select from dropdown. Must be one of: ${[...AGE_CATEGORIES].join(', ')}.`, ''],
-        ['Year', 'YES', 'Select from dropdown or type any 4-digit year between 2000–2100.', ''],
-        ['MaleCutoffDate', 'YES', 'Format: MM/DD/YYYY  e.g. 01/01/2008', ''],
-        ['FemaleCutoffDate', 'YES', 'Format: MM/DD/YYYY  e.g. 01/01/2008', ''],
-        ['SeriesAdminEmails', 'Optional', 'Comma-separated emails of existing users. See Valid Values for eligible emails. Unknown emails are ignored with a warning.', ''],
-        ['', '', '', ''],
-        ['TIPS', '', '', ''],
-        ['• Do NOT change the column headers in row 1 of the Series Import sheet.', '', '', ''],
-        ['• AgeCategory has a required dropdown — select from it to avoid errors.', '', '', ''],
-        ['• Year shows common years as a dropdown but you may type any valid year.', '', '', ''],
-        ['• SeriesAdminEmails shows a dropdown of eligible users — you may also type emails manually.', '', '', ''],
-        ['• For multiple admin emails, separate them with commas: admin1@example.com,admin2@example.com', '', '', ''],
-        ['• Dates must be typed as MM/DD/YYYY text — not Excel date values.', '', '', ''],
-        ['• The system will NOT create new user accounts. Series Admins must pre-exist.', '', '', ''],
-        ['• Series are imported into the currently active organization.', '', '', ''],
-      ];
-      const instrWs = XLSX.utils.aoa_to_sheet(instrRows);
-      instrWs['!cols'] = [{ wch: 20 }, { wch: 12 }, { wch: 80 }, { wch: 10 }];
-      instrWs['!rows'] = [{ hpt: 30 }];
-      XLSX.utils.book_append_sheet(wb, instrWs, 'Instructions');
+        const hr = vvWs.addRow([colHeader]);
+        hr.getCell(1).font = { bold: true, name: 'Arial', size: 10 };
+        hr.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0EAF2' } };
 
-      XLSX.writeFile(wb, 'series_import_template.xlsx');
+        rows.forEach(v => {
+          const dr = vvWs.addRow([v]);
+          dr.height = 16;
+          dr.getCell(1).font = { name: 'Arial', size: 10 };
+        });
+        vvWs.addRow(['']);
+      };
+
+      addSection('AGE CATEGORIES', 'Value', ageCategories);
+      addSection('SUGGESTED YEARS (you may also type any year 2000–2100)', 'Value', years);
+      addSection(
+        'SERIES ADMIN EMAILS (Selectors / Admins in your org)',
+        'Email',
+        data.selectorEmails.length > 0 ? data.selectorEmails : ['No eligible users found for this organization']
+      );
+
+      // ── Sheet 3: Instructions ─────────────────────────────────────────────
+      const instrWs = wb.addWorksheet('Instructions');
+      instrWs.getColumn(1).width = 22;
+      instrWs.getColumn(2).width = 12;
+      instrWs.getColumn(3).width = 80;
+
+      const addInstrRow = (vals: string[], bold = false, bgColor?: string) => {
+        const row = instrWs.addRow(vals);
+        row.height = bgColor ? 24 : 18;
+        vals.forEach((_, i) => {
+          const cell = row.getCell(i + 1);
+          cell.font = { name: 'Arial', size: bold ? 11 : 10, bold };
+          if (bgColor) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + bgColor } };
+            cell.font = { ...cell.font, color: { argb: 'FF' + white } };
+          }
+        });
+      };
+
+      addInstrRow(['🏏  Cricket IQ — Series Import Template Instructions', '', ''], true, navy);
+      instrWs.addRow(['']);
+      addInstrRow(['COLUMN COLOUR LEGEND', '', ''], true);
+      instrWs.addRow(['Medium Blue (required)', 'Required — must be filled in', '']);
+      instrWs.addRow(['Dark Blue (optional)', 'Optional field', '']);
+      instrWs.addRow(['']);
+      addInstrRow(['COLUMN RULES', '', ''], true);
+      instrWs.addRow(['Column', 'Required?', 'Rule']).eachCell(c => { c.font = { bold: true, name: 'Arial', size: 10 }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0EAF2' } }; });
+      instrWs.addRow(['SeriesName', 'YES', 'Must be unique — existing names will error for that row.']);
+      instrWs.addRow(['AgeCategory', 'YES', `Select from dropdown. Must be one of: ${ageCategories.join(', ')}.`]);
+      instrWs.addRow(['Year', 'YES', 'Select from dropdown or type any 4-digit year (2000–2100).']);
+      instrWs.addRow(['MaleCutoffDate', 'YES', 'Format: MM/DD/YYYY  e.g. 01/01/2008']);
+      instrWs.addRow(['FemaleCutoffDate', 'YES', 'Format: MM/DD/YYYY  e.g. 01/01/2008']);
+      instrWs.addRow(['SeriesAdminEmails', 'Optional', 'Select from dropdown or type comma-separated emails of existing users. Unknown emails are ignored.']);
+      instrWs.addRow(['']);
+      addInstrRow(['TIPS', '', ''], true);
+      ['Do NOT change the column headers in row 1.',
+       'AgeCategory has a required dropdown — must select from the list.',
+       'Year dropdown shows common years — you may also type any valid year.',
+       'SeriesAdminEmails dropdown shows eligible users — you may type multiple emails separated by commas.',
+       'Dates must be typed as MM/DD/YYYY text — not Excel date values.',
+       'Series are imported into the currently active organization.',
+       'The system will NOT create new user accounts for Series Admins.',
+      ].forEach(tip => instrWs.addRow(['• ' + tip, '', '']));
+
+      // ── Download ──────────────────────────────────────────────────────────
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'series_import_template.xlsx'; a.click();
+      URL.revokeObjectURL(url);
+
       toast({
         title: 'Template downloaded!',
-        description: `Includes ${[...AGE_CATEGORIES].length} age categories and ${data.selectorEmails.length} selector emails for your organization.`,
+        description: `Includes ${ageCategories.length} age categories and ${data.selectorEmails.length} selector emails.`,
       });
     } catch (e: any) {
       console.error('Template generation error:', e);
