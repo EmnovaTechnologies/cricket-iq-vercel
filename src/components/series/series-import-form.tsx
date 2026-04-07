@@ -139,7 +139,7 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
           toast({ title: 'Invalid Headers', description: `Excel must contain: ${EXPECTED_HEADERS.join(', ')}. Found: ${headers.filter(Boolean).join(', ')}`, variant: 'destructive' });
           setXlsxFile(null); setXlsxFileName(null); event.target.value = ''; return;
         }
-        const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false, header: headers });
+        const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false, header: headers, dateNF: 'MM/DD/YYYY' });
         const validRows = rows.slice(1).filter(row =>
           EXPECTED_HEADERS.some(h => row[h] && String(row[h]).trim() !== '')
         ) as CsvSeriesImportRow[];
@@ -162,16 +162,18 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
       toast({ title: 'No Data to Import', description: 'Please select a valid Excel file.', variant: 'destructive' }); return;
     }
 
-    // Pre-validate dates — must be MM/DD/YYYY with 4-digit year
+    // Pre-validate dates — must have 4-digit year (Excel may strip leading zeros from month/day)
     const dateRegex = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
     const dateErrors: string[] = [];
     xlsxParsedData.forEach((row, i) => {
       const rowNum = i + 2;
-      if (row.MaleCutoffDate && !dateRegex.test(String(row.MaleCutoffDate).trim())) {
-        dateErrors.push(`Row ${rowNum}: MaleCutoffDate "${row.MaleCutoffDate}" — use MM/DD/YYYY with 4-digit year (e.g. 09/01/2009)`);
+      const malDate = String(row.MaleCutoffDate || '').trim();
+      const femDate = String(row.FemaleCutoffDate || '').trim();
+      if (malDate && !dateRegex.test(malDate)) {
+        dateErrors.push(`Row ${rowNum}: MaleCutoffDate "${malDate}" — must be MM/DD/YYYY with 4-digit year (e.g. 9/1/2009 or 09/01/2009)`);
       }
-      if (row.FemaleCutoffDate && !dateRegex.test(String(row.FemaleCutoffDate).trim())) {
-        dateErrors.push(`Row ${rowNum}: FemaleCutoffDate "${row.FemaleCutoffDate}" — use MM/DD/YYYY with 4-digit year (e.g. 09/01/2009)`);
+      if (femDate && !dateRegex.test(femDate)) {
+        dateErrors.push(`Row ${rowNum}: FemaleCutoffDate "${femDate}" — must be MM/DD/YYYY with 4-digit year (e.g. 9/1/2007 or 09/01/2007)`);
       }
     });
     if (dateErrors.length > 0) {
