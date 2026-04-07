@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -6,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import TeamCard from '@/components/team-card';
 import { getAllTeamsFromDB } from '@/lib/db';
 import type { Team, AgeCategory } from '@/types';
-import { PlusCircle, Users, Search as SearchIcon, Filter, Info, Loader2 } from 'lucide-react';
+import { PlusCircle, Users, Search as SearchIcon, Filter, Info, Loader2, Upload } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -15,10 +14,10 @@ import { AGE_CATEGORIES } from '@/lib/constants';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/auth-context';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { PERMISSIONS } from '@/lib/permissions-master-list'; // Import PERMISSIONS
+import { PERMISSIONS } from '@/lib/permissions-master-list';
 
 export default function TeamsPage() {
-  const { activeOrganizationId, loading: authLoading, effectivePermissions, isPermissionsLoading } = useAuth(); // Get permissions state
+  const { activeOrganizationId, loading: authLoading, effectivePermissions, isPermissionsLoading } = useAuth();
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAgeCategory, setSelectedAgeCategory] = useState<AgeCategory | 'all'>('all');
@@ -27,16 +26,8 @@ export default function TeamsPage() {
 
   useEffect(() => {
     const fetchTeams = async () => {
-      if (authLoading) {
-        setIsLoading(true);
-        return;
-      }
-      if (!activeOrganizationId) {
-        setAllTeams([]);
-        setIsLoading(false);
-        return;
-      }
-
+      if (authLoading) { setIsLoading(true); return; }
+      if (!activeOrganizationId) { setAllTeams([]); setIsLoading(false); return; }
       setIsLoading(true);
       try {
         const teamsFromDB = await getAllTeamsFromDB(activeOrganizationId);
@@ -63,10 +54,10 @@ export default function TeamsPage() {
 
   if (authLoading || isPermissionsLoading || (isLoading && activeOrganizationId)) {
     return (
-        <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="ml-4 text-lg text-muted-foreground">Loading teams...</p>
-        </div>
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Loading teams...</p>
+      </div>
     );
   }
 
@@ -83,11 +74,18 @@ export default function TeamsPage() {
           </Button>
         )}
         {!isPermissionsLoading && canAddTeams && (
-          <Button asChild className="bg-primary hover:bg-primary/90" disabled={!activeOrganizationId}>
-            <Link href="/teams/add" className="flex items-center gap-2">
-               <PlusCircle className="h-5 w-5" /> Add New Team
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" disabled={!activeOrganizationId}>
+              <Link href="/teams/import" className="flex items-center gap-2">
+                <Upload className="h-5 w-5" /> Import Teams
+              </Link>
+            </Button>
+            <Button asChild className="bg-primary hover:bg-primary/90" disabled={!activeOrganizationId}>
+              <Link href="/teams/add" className="flex items-center gap-2">
+                <PlusCircle className="h-5 w-5" /> Add New Team
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 
@@ -146,7 +144,9 @@ export default function TeamsPage() {
             <p className="text-muted-foreground text-center py-6">Loading teams for the selected organization...</p>
           ) : filteredTeams.length === 0 ? (
             <p className="text-muted-foreground text-center py-6">
-              {searchQuery || selectedAgeCategory !== 'all' ? 'No teams found matching your criteria for this organization.' : 'No teams found for this organization. Add some teams to get started.'}
+              {searchQuery || selectedAgeCategory !== 'all'
+                ? 'No teams found matching your criteria for this organization.'
+                : 'No teams found for this organization. Add some teams to get started.'}
             </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
