@@ -68,10 +68,10 @@ export default function TeamsPage() {
           <Users className="h-8 w-8" /> Teams
         </h1>
         {isPermissionsLoading && (
-          <Button disabled className="bg-primary hover:bg-primary/90">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Add New Team
-          </Button>
+          <div className="flex gap-2">
+            <Button disabled variant="secondary"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Import Teams</Button>
+            <Button disabled variant="secondary"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Add New Team</Button>
+          </div>
         )}
         {!isPermissionsLoading && canAddTeams && (
           <div className="flex gap-2">
