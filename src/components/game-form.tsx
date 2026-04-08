@@ -18,9 +18,10 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { addGameAction } from '@/lib/actions/game-actions';
 import { getTeamsForSeriesAction, getVenuesForSeriesAction } from '@/lib/actions/series-actions';
-import React, { useEffect, useState, type ChangeEvent } from 'react';
+import React, { useEffect, useState, useMemo, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -254,7 +255,12 @@ export function GameForm({ initialData, onSubmitSuccess, allSeriesForForm, prese
       const gamePayload = {
         ...data,
         date: data.date.toISOString(),
-        selectorUserIds: data.selectorUserIds || [],
+        selectorUserIds: [
+          ...new Set([
+            ...(data.selectorUserIds || []),
+            ...lockedSuperAdmins.map(u => u.uid),
+          ])
+        ],
       };
       const newOrUpdatedGame = await addGameAction(gamePayload);
 
@@ -289,6 +295,15 @@ export function GameForm({ initialData, onSubmitSuccess, allSeriesForForm, prese
   const seriesForForm = preselectedSeriesId ? currentSeriesObject : activeSeriesList.find(s => s.id === selectedSeriesIdForm);
   const preselectedSeriesName = preselectedSeriesId ? seriesForForm?.name : undefined;
   const isCurrentSeriesArchived = seriesForForm?.status === 'archived';
+
+  const lockedSuperAdmins = useMemo(() =>
+    potentialSelectors.filter(u => u.roles.includes('admin')),
+    [potentialSelectors]
+  );
+  const selectableSelectors = useMemo(() =>
+    potentialSelectors.filter(u => !u.roles.includes('admin')),
+    [potentialSelectors]
+  );
 
   if (!isClient && !initialData) {
     return null;
@@ -467,15 +482,30 @@ export function GameForm({ initialData, onSubmitSuccess, allSeriesForForm, prese
                   <UserCheck className="h-5 w-5 text-primary" /> Assign Selectors (Optional)
                 </FormLabel>
                 <FormDescription>
-                  Select users who will be responsible for rating players in this game. Users with 'selector', 'admin', or 'Series Admin' roles can be assigned.
+                  Select users with 'selector' or 'Series Admin' role in this organization. Super admins are always included.
                 </FormDescription>
               </div>
-              {potentialSelectors.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No users found with eligible roles to assign as selectors.</p>
+
+              {/* Locked super admins */}
+              {lockedSuperAdmins.length > 0 && (
+                <div className="rounded-md border bg-muted/30 p-2 mb-2 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned)</p>
+                  {lockedSuperAdmins.map(user => (
+                    <div key={user.uid} className="flex items-center gap-2 px-2 py-1 rounded opacity-70">
+                      <Checkbox checked disabled />
+                      <span className="text-sm flex-grow">{user.displayName || user.email}</span>
+                      <Badge variant="default" className="text-xs">Super Admin</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {selectableSelectors.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No users with 'selector' or 'Series Admin' role found for this organization.</p>
               ) : (
                 <ScrollArea className="h-40 rounded-md border p-2">
                   <div className="space-y-1.5">
-                  {potentialSelectors.map((selectorUser) => (
+                  {selectableSelectors.map((selectorUser) => (
                     <FormField
                       key={selectorUser.uid}
                       control={form.control}
@@ -502,7 +532,8 @@ export function GameForm({ initialData, onSubmitSuccess, allSeriesForForm, prese
                               />
                             </FormControl>
                             <FormLabel className="font-normal text-sm cursor-pointer flex-grow">
-                              {selectorUser.displayName || selectorUser.email} ({selectorUser.roles.join(', ')})
+                              {selectorUser.displayName || selectorUser.email}
+                              <span className="text-muted-foreground ml-1 text-xs">({selectorUser.roles.filter(r => r !== 'admin').join(', ')})</span>
                             </FormLabel>
                           </FormItem>
                         )

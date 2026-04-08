@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { GameForm } from '@/components/game-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Series, UserProfile } from '@/types';
-import { getAllPotentialGameSelectors } from '@/lib/actions/user-actions';
+import { getPotentialSelectorsForOrg } from '@/lib/actions/user-actions';
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2, Info, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -32,7 +32,7 @@ function AddGameForm() {
       try {
         const [seriesFromDB, selectorsFromDB] = await Promise.all([
           activeOrganizationId ? getAllSeriesFromDB('active', activeOrganizationId) : Promise.resolve([]),
-          getAllPotentialGameSelectors()
+          activeOrganizationId ? getPotentialSelectorsForOrg(activeOrganizationId) : Promise.resolve([])
         ]);
         setSeriesForForm(seriesFromDB);
         setPotentialSelectors(selectorsFromDB);
