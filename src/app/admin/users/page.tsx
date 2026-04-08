@@ -19,6 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { USER_ROLES } from '@/lib/constants';
+import { UserOrgCell } from '@/components/admin/user-org-cell';
 
 export default function AdminUserManagementPage() {
   const { currentUser, userProfile, isAuthLoading, effectivePermissions, activeOrganizationId } = useAuth();
@@ -78,13 +79,6 @@ export default function AdminUserManagementPage() {
 
     fetchData();
   }, [currentUser, isAuthLoading, effectivePermissions, activeOrganizationId, router, isSuperAdmin, refreshKey]);
-
-  // Build org name lookup for super admin
-  const orgNameById = useMemo(() => {
-    const map: Record<string, string> = {};
-    organizations.forEach(o => { map[o.id] = o.name; });
-    return map;
-  }, [organizations]);
 
   // Filtered users
   const filteredUsers = useMemo(() => {
@@ -229,7 +223,7 @@ export default function AdminUserManagementPage() {
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
-                      {isSuperAdmin && <TableHead>Organization(s)</TableHead>}
+                      {isSuperAdmin && <TableHead className="min-w-[220px]">Organization(s)</TableHead>}
                       <TableHead>Roles</TableHead>
                       <TableHead>Last Login</TableHead>
                       <TableHead className="min-w-[280px]">Change Roles</TableHead>
@@ -249,15 +243,12 @@ export default function AdminUserManagementPage() {
                         <TableCell>{user.phoneNumber || 'N/A'}</TableCell>
                         {isSuperAdmin && (
                           <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {(user.assignedOrganizationIds || []).length > 0
-                                ? (user.assignedOrganizationIds || []).map(orgId => (
-                                    <Badge key={orgId} variant="outline" className="text-xs">
-                                      {orgNameById[orgId] || orgId}
-                                    </Badge>
-                                  ))
-                                : <span className="text-xs text-muted-foreground">None</span>}
-                            </div>
+                            <UserOrgCell
+                              userId={user.uid}
+                              assignedOrgIds={user.assignedOrganizationIds || []}
+                              allOrgs={organizations}
+                              onUpdated={handleRolesUpdated}
+                            />
                           </TableCell>
                         )}
                         <TableCell>
