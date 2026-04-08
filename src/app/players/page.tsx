@@ -179,7 +179,7 @@ export default function PlayersPage() {
             )}
             {canAddPlayers && (
               <Button asChild className="bg-primary hover:bg-primary/90" disabled={!activeOrganizationId}>
-                <Link href="/players/add" className="flex items-center gap-2">
+                <Link href="/players/add?from=players" className="flex items-center gap-2">
                   <PlusCircle className="h-5 w-5" /> Add New Player
                 </Link>
               </Button>

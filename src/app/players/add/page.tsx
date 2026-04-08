@@ -8,8 +8,10 @@ import { getAllTeamsFromDB } from '@/lib/db';
 import type { Team, AgeCategory } from '@/types';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
-import { ShieldAlert, Loader2, Info } from 'lucide-react';
+import { ShieldAlert, Loader2, Info, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
 function AddPlayerForm() {
@@ -22,6 +24,24 @@ function AddPlayerForm() {
   const preselectedPrimaryTeamName = searchParamsHook.get('primaryTeamName') as string | undefined;
   const preselectedPrimaryTeamAgeCategory = searchParamsHook.get('primaryTeamAgeCategory') as AgeCategory | undefined;
   const preselectedClubName = searchParamsHook.get('clubName') as string | undefined;
+  const preselectedOrgId = searchParamsHook.get('organizationId') as string | undefined;
+  const from = searchParamsHook.get('from');
+
+  // Determine back navigation
+  // If came from team details (has primaryTeamId), go back there
+  // If came from players list, go back there
+  // Otherwise default to players list
+  const teamDetailsHref = preselectedPrimaryTeamId && preselectedOrgId
+    ? `/teams/${preselectedPrimaryTeamId}/details`
+    : null;
+  const backHref = teamDetailsHref
+    ? teamDetailsHref
+    : from === 'players'
+    ? '/players'
+    : '/players';
+  const backLabel = teamDetailsHref
+    ? 'Team Details'
+    : 'Players List';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,6 +86,13 @@ function AddPlayerForm() {
       }
     >
       <div className="max-w-2xl mx-auto">
+        <div className="mb-4">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={backHref}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to {backLabel}
+            </Link>
+          </Button>
+        </div>
         {!activeOrganizationId && !authLoading && (
           <Alert variant="default" className="mb-6 border-primary/50">
             <Info className="h-5 w-5 text-primary" />
