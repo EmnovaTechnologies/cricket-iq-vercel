@@ -60,7 +60,7 @@ export default function RoleManagementPage() {
                     </CardContent>
                     <CardFooter>
                       <Button asChild variant="outline" size="sm" className="w-full">
-                        <Link href={`/admin/role-management/${role}/edit`}>
+                        <Link href={`/admin/role-management/${encodeURIComponent(role)}/edit`}>
                            <Edit className="mr-2 h-4 w-4" /> Edit Permissions
                         </Link>
                       </Button>
