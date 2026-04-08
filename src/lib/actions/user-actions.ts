@@ -402,6 +402,20 @@ export async function getPotentialSelectorsForOrg(organizationId: string): Promi
   }
 }
 
+
+export async function getPotentialTeamManagersForOrg(organizationId: string): Promise<UserProfile[]> {
+  try {
+    const allUsers = await getAllUsersFromDB();
+    return allUsers.filter(user =>
+      user.roles.includes('admin') ||
+      ((user.roles.includes('Team Manager') || user.roles.includes('Series Admin')) &&
+        (user.assignedOrganizationIds || []).includes(organizationId))
+    );
+  } catch (error) {
+    console.error("Error fetching potential team managers for org:", error);
+    return [];
+  }
+}
 export async function getAllPotentialGameSelectors(): Promise<UserProfile[]> {
   try {
     const allUsers = await getAllUsersFromDB();

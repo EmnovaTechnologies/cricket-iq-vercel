@@ -6,7 +6,7 @@ import { TeamForm } from '@/components/team-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, ShieldAlert, Info } from 'lucide-react';
-import { getAllPotentialTeamManagers } from '@/lib/actions/user-actions';
+import { getPotentialTeamManagersForOrg } from '@/lib/actions/user-actions';
 import type { UserProfile, AgeCategory } from '@/types';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
@@ -21,10 +21,12 @@ function AddTeamForm() {
   const seriesAgeCategoryToEnforce = searchParams.get('seriesAgeCategoryToEnforce') as AgeCategory | null;
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!activeOrganizationId) { setDataLoading(false); return; }
     const fetchData = async () => {
       setDataLoading(true);
       try {
-        const potentialManagers = await getAllPotentialTeamManagers();
+        const potentialManagers = await getPotentialTeamManagersForOrg(activeOrganizationId);
         setPotentialTeamManagers(potentialManagers);
       } catch (error) {
         console.error("Error fetching potential team managers:", error);
@@ -34,7 +36,7 @@ function AddTeamForm() {
       }
     };
     fetchData();
-  }, []);
+  }, [activeOrganizationId, authLoading]);
 
   if (authLoading || dataLoading) {
     return (

@@ -16,6 +16,7 @@ import { addTeamAction } from '@/lib/actions/team-actions';
 import { addTeamToSeriesAction } from '@/lib/actions/series-actions';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { useState, useMemo, useEffect } from 'react'; 
 import { Search, Loader2 } from 'lucide-react'; 
 import { useAuth } from '@/contexts/auth-context';
@@ -73,15 +74,23 @@ export function TeamForm({
   }, [preselectedSeriesAgeCategoryToEnforce, form]);
 
 
+  const lockedSuperAdmins = useMemo(() =>
+    potentialTeamManagers.filter(u => u.roles.includes('admin')),
+    [potentialTeamManagers]
+  );
+
+  const selectableManagers = useMemo(() =>
+    potentialTeamManagers.filter(u => !u.roles.includes('admin')),
+    [potentialTeamManagers]
+  );
+
   const filteredTeamManagers = useMemo(() => {
-    if (!managerSearchQuery) {
-      return potentialTeamManagers;
-    }
-    return potentialTeamManagers.filter(user =>
+    if (!managerSearchQuery) return selectableManagers;
+    return selectableManagers.filter(user =>
       (user.displayName?.toLowerCase() || '').includes(managerSearchQuery.toLowerCase()) ||
       (user.email?.toLowerCase() || '').includes(managerSearchQuery.toLowerCase())
     );
-  }, [potentialTeamManagers, managerSearchQuery]);
+  }, [selectableManagers, managerSearchQuery]);
 
   async function onSubmit(data: TeamFormValues) {
     if (!activeOrganizationId) {
@@ -101,7 +110,12 @@ export function TeamForm({
 
       const teamDataForAction = { 
         ...trimmedData, 
-        teamManagerUids: data.teamManagerUids || [],
+        teamManagerUids: [
+          ...new Set([
+            ...(data.teamManagerUids || []),
+            ...lockedSuperAdmins.map(u => u.uid),
+          ])
+        ],
         organizationId: activeOrganizationId,
       };
 
@@ -237,9 +251,24 @@ export function TeamForm({
               <div className="mb-2">
                 <FormLabel className="text-base">Assign Team Managers (Optional)</FormLabel>
                 <FormDescription>
-                  Select users with 'Team Manager', 'admin', or 'Series Admin' roles to manage this team.
+                  Select users with 'Team Manager' or 'Series Admin' role in this organization. Super admins are always included.
                 </FormDescription>
               </div>
+
+              {/* Locked super admins */}
+              {lockedSuperAdmins.length > 0 && (
+                <div className="rounded-md border bg-muted/30 p-2 mb-2 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned)</p>
+                  {lockedSuperAdmins.map(user => (
+                    <div key={user.uid} className="flex items-center gap-2 px-2 py-1 rounded opacity-70">
+                      <Checkbox checked disabled />
+                      <span className="text-sm flex-grow">{user.displayName || user.email}</span>
+                      <Badge variant="default" className="text-xs">Super Admin</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="relative mb-2">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -251,8 +280,8 @@ export function TeamForm({
                   disabled={isSubmitting}
                 />
               </div>
-              {potentialTeamManagers.length === 0 ? (
-                 <p className="text-sm text-muted-foreground">No users found with eligible roles ('Team Manager', 'admin', 'Series Admin') to assign.</p>
+              {selectableManagers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No users with 'Team Manager' or 'Series Admin' role found for this organization.</p>
               ) : filteredTeamManagers.length === 0 && managerSearchQuery ? (
                 <p className="text-sm text-muted-foreground">No managers found matching your search.</p>
               ) : (
@@ -263,33 +292,32 @@ export function TeamForm({
                         key={managerUser.uid}
                         control={form.control}
                         name="teamManagerUids"
-                        render={({ field }) => {
-                          return (
-                            <FormItem
-                              key={managerUser.uid}
-                              className="flex flex-row items-center space-x-3 space-y-0 py-1 hover:bg-muted/50 rounded px-2"
-                            >
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value?.includes(managerUser.uid)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...(field.value || []), managerUser.uid])
-                                      : field.onChange(
-                                          (field.value || []).filter(
-                                            (value) => value !== managerUser.uid
-                                          )
-                                        );
-                                  }}
-                                  disabled={isSubmitting}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal text-sm cursor-pointer flex-grow">
-                                {managerUser.displayName || managerUser.email} ({managerUser.roles.join(', ')})
-                              </FormLabel>
-                            </FormItem>
-                          );
-                        }}
+                        render={({ field }) => (
+                          <FormItem
+                            key={managerUser.uid}
+                            className="flex flex-row items-center space-x-3 space-y-0 py-1 hover:bg-muted/50 rounded px-2"
+                          >
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(managerUser.uid)}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? field.onChange([...(field.value || []), managerUser.uid])
+                                    : field.onChange(
+                                        (field.value || []).filter(
+                                          (value) => value !== managerUser.uid
+                                        )
+                                      );
+                                }}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal text-sm cursor-pointer flex-grow">
+                              {managerUser.displayName || managerUser.email}
+                              <span className="text-muted-foreground ml-1 text-xs">({managerUser.roles.filter(r => r !== 'admin').join(', ')})</span>
+                            </FormLabel>
+                          </FormItem>
+                        )}
                       />
                     ))}
                   </div>
