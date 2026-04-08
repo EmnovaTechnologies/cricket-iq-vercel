@@ -26,6 +26,7 @@ export function UserOrgCell({ userId, assignedOrgIds, allOrgs, onUpdated }: User
   const [pending, setPending] = useState<string | null>(null); // orgId currently being toggled
   const [open, setOpen] = useState(false);
 
+  const hasOrg = assignedOrgIds.length > 0;
   const assignedSet = new Set(assignedOrgIds);
 
   const handleToggle = async (org: Organization) => {
@@ -87,20 +88,28 @@ export function UserOrgCell({ userId, assignedOrgIds, allOrgs, onUpdated }: User
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-64 p-2" align="start">
-          <p className="text-xs font-medium text-muted-foreground mb-2 px-1">Toggle organization assignment</p>
+          <p className="text-xs font-medium text-muted-foreground mb-1 px-1">Toggle organization assignment</p>
+          {hasOrg && (
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-2">
+              Users can only belong to one organization. Remove the current one first to assign another.
+            </p>
+          )}
           <div className="space-y-1 max-h-52 overflow-y-auto">
             {allOrgs.map(org => {
               const isAssigned = assignedSet.has(org.id);
               const isLoading = pending === org.id;
+              const isBlocked = hasOrg && !isAssigned; // can't add if already has a different org
               return (
                 <button
                   key={org.id}
-                  onClick={() => handleToggle(org)}
-                  disabled={!!pending}
+                  onClick={() => !isBlocked && handleToggle(org)}
+                  disabled={!!pending || isBlocked}
                   className={cn(
                     'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left transition-colors',
                     isAssigned
                       ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                      : isBlocked
+                      ? 'opacity-40 cursor-not-allowed text-foreground'
                       : 'hover:bg-muted text-foreground'
                   )}
                 >

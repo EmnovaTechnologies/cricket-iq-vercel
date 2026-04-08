@@ -19,13 +19,25 @@ export async function assignOrgToUserAction(
       return { success: false, error: 'User not found.' };
     }
 
-    // Prevent modifying super admins
     const roles: string[] = userSnap.data()!.roles || [];
-    if (roles.includes('admin')) {
+    const isSuperAdmin = roles.includes('admin');
+
+    // Prevent modifying super admins
+    if (isSuperAdmin) {
       return { success: false, error: 'Cannot modify organization assignments for super admins.' };
     }
 
     if (action === 'add') {
+      // Enforce one-org limit for non-super-admins
+      const existingOrgs: string[] = userSnap.data()!.assignedOrganizationIds || [];
+      if (existingOrgs.length > 0 && !existingOrgs.includes(orgId)) {
+        const orgSnap = await adminDb.collection('organizations').doc(existingOrgs[0]).get();
+        const existingOrgName = orgSnap.exists ? (orgSnap.data()!.name || existingOrgs[0]) : existingOrgs[0];
+        return {
+          success: false,
+          error: `This user is already assigned to "${existingOrgName}". Remove that organization first, or contact a Super Admin.`,
+        };
+      }
       await userRef.update({
         assignedOrganizationIds: admin.firestore.FieldValue.arrayUnion(orgId),
       });

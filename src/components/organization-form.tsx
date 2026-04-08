@@ -649,7 +649,12 @@ export function OrganizationForm({ initialData, allUsersForAdminSelection, onSub
               ) : (
                 <ScrollArea className="h-48 rounded-md border p-2">
                   <div className="space-y-1.5">
-                    {filteredAdminUsers.map((user) => (
+                    {filteredAdminUsers.map((user) => {
+                      const alreadyInDifferentOrg =
+                        isEditMode &&
+                        (user.assignedOrganizationIds || []).length > 0 &&
+                        !(user.assignedOrganizationIds || []).includes(initialData?.id || '');
+                      return (
                       <FormField
                         key={user.uid}
                         control={form.control}
@@ -669,12 +674,17 @@ export function OrganizationForm({ initialData, allUsersForAdminSelection, onSub
                               />
                             </FormControl>
                             <FormLabel className="font-normal text-sm cursor-pointer flex-grow">
-                              {user.displayName || user.email} ({user.roles.join(', ')})
+                              {user.displayName || user.email}
+                              <span className="text-muted-foreground ml-1">({user.roles.filter(r => r !== 'admin').join(', ')})</span>
+                              {alreadyInDifferentOrg && (
+                                <span className="ml-2 text-xs text-amber-600 font-normal">⚠ already in another org</span>
+                              )}
                             </FormLabel>
                           </FormItem>
                         )}
                       />
-                    ))}
+                      );
+                    })}
                   </div>
                 </ScrollArea>
               )}
