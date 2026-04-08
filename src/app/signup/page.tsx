@@ -30,17 +30,29 @@ function SignupForm() {
   const [displayName, setDisplayName] = useState('');
   const [verificationSent, setVerificationSent] = useState(false);
   const [resending, setResending] = useState(false);
-  const [showPlayerDialog, setShowPlayerDialog] = useState(false);
+
+  // Org picker state — shown when no orgId in URL
   const [orgs, setOrgs] = useState<{ id: string; name: string; branding?: any }[]>([]);
   const [orgsLoading, setOrgsLoading] = useState(false);
+  const [orgPickerStep, setOrgPickerStep] = useState(false); // true = show org picker
+
+  // Player register dialog (still needed in footer)
+  const [showPlayerDialog, setShowPlayerDialog] = useState(false);
 
   const handleOpenPlayerDialog = async () => {
     setShowPlayerDialog(true);
+    if (orgs.length === 0) {
+      setOrgsLoading(true);
+      try { const activeOrgs = await getAllPublicActiveOrganizations(); setOrgs(activeOrgs); }
+      catch { setOrgs([]); }
+      finally { setOrgsLoading(false); }
+    }
+  };
+
+  const loadOrgs = async () => {
     setOrgsLoading(true);
-    try {
-      const activeOrgs = await getAllPublicActiveOrganizations();
-      setOrgs(activeOrgs);
-    } catch { setOrgs([]); }
+    try { const activeOrgs = await getAllPublicActiveOrganizations(); setOrgs(activeOrgs); }
+    catch { setOrgs([]); }
     finally { setOrgsLoading(false); }
   };
 
@@ -61,6 +73,7 @@ function SignupForm() {
     const orgIdFromQuery = searchParams.get('orgId');
     if (orgIdFromQuery) {
       setTargetOrgId(orgIdFromQuery);
+      setOrgPickerStep(false);
       setIsLoadingOrgDetails(true);
       getPublicOrganizationDetails(orgIdFromQuery)
         .then(org => {
@@ -80,7 +93,10 @@ function SignupForm() {
         })
         .finally(() => setIsLoadingOrgDetails(false));
     } else {
+      // No orgId in URL — show org picker first
       if (typeof window !== 'undefined') sessionStorage.removeItem(SESSION_STORAGE_ORG_ID_KEY);
+      setOrgPickerStep(true);
+      loadOrgs();
     }
   }, [searchParams, toast]);
 
@@ -148,6 +164,61 @@ function SignupForm() {
   };
 
   const isAnyAuthActionLoading = emailFormSubmitting || googleSubmitting || isAuthLoading || isLoadingOrgDetails;
+
+  // ── Org picker step ────────────────────────────────────────────────────────
+  if (orgPickerStep && !verificationSent) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-10rem)] py-12">
+        <Card className="w-full max-w-md shadow-xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-headline text-primary">Create Your Account</CardTitle>
+            <CardDescription>First, select your organization to get started.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {orgsLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : orgs.length === 0 ? (
+              <div className="text-center py-6 space-y-3">
+                <Building className="h-10 w-10 text-muted-foreground mx-auto" />
+                <p className="text-sm text-muted-foreground">No active organizations found.</p>
+                <Button variant="outline" onClick={loadOrgs}>Try Again</Button>
+              </div>
+            ) : (
+              orgs.map(org => (
+                <button
+                  key={org.id}
+                  onClick={() => {
+                    setTargetOrgId(org.id);
+                    setTargetOrgDetails({ id: org.id, name: org.name, status: 'active' });
+                    if (typeof window !== 'undefined') sessionStorage.setItem(SESSION_STORAGE_ORG_ID_KEY, org.id);
+                    setOrgPickerStep(false);
+                  }}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-muted hover:border-primary/50 transition-colors group text-left"
+                >
+                  <div className="h-10 w-10 rounded-md border bg-muted flex items-center justify-center shrink-0">
+                    {org.branding?.logoUrl ? (
+                      <img src={org.branding.logoUrl} alt={org.name} className="h-9 w-9 object-contain rounded" />
+                    ) : (
+                      <Building className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <span className="flex-1 font-medium text-sm">{org.name}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                </button>
+              ))
+            )}
+          </CardContent>
+          <CardFooter className="flex flex-col items-center gap-2 text-sm">
+            <p>Already have an account?{' '}
+              <Button variant="link" asChild className="p-0 h-auto"><Link href="/login">Log In</Link></Button>
+            </p>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   // ── Loading / already logged in ────────────────────────────────────────────
   if (isAuthLoading || userProfile) {
@@ -232,6 +303,9 @@ function SignupForm() {
           {targetOrgDetails && (
             <CardDescription className="flex items-center justify-center gap-1 text-accent font-semibold">
               <Building className="h-4 w-4" /> Signing up for {targetOrgDetails.name}
+              <button onClick={() => setOrgPickerStep(true)} className="ml-1 text-xs text-muted-foreground underline underline-offset-2 font-normal hover:text-primary">
+                Change
+              </button>
             </CardDescription>
           )}
           {!isLoadingOrgDetails && !targetOrgDetails && targetOrgId && (
