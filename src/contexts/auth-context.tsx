@@ -222,7 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const rootStyle = document.documentElement.style;
 
     const themeNameToApply: PredefinedThemeName = activeOrganizationDetails?.branding?.themeName || 'Default';
-    const activePalette = THEME_PREVIEW_COLORS[themeNameToApply];
+    const activePalette = THEME_PREVIEW_COLORS[themeNameToApply] || THEME_PREVIEW_COLORS['Default'];
     const defaultPalette = THEME_PREVIEW_COLORS['Default'];
 
     // Iterate over all possible theme variables
