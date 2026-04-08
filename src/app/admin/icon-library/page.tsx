@@ -2,19 +2,16 @@
 'use client';
 
 import {
-  Activity, AlertCircle, AlertTriangle, Aperture, Archive, ArchiveRestore, ArrowLeft, ArrowRight, Award, BarChart3,
-  Bell, Binary, Bone, Bookmark, Building, Bug, Cake, Calendar, CalendarClock, CalendarDays,
-  CalendarFold, CalendarIcon, CalendarX, Camera, Check, CheckCircle, CheckSquare, ChevronDown, ChevronLeft, ChevronRight,
-  ChevronsUpDown, Circle, CircleUser, Clipboard, ClipboardCheck, Clock, Cloud, Code2, Coins, Copy, CreditCard,
-  Crosshair, Database, Download, Dumbbell, Edit, Edit3, ExternalLink, Eye, File, FileText, Film, Filter, Flag, Folder,
-  Gamepad2, GitBranch, Github, Globe, Grid, Heart, Home, Hourglass, Image as ImageIcon, Info, Key, Keyboard,
-  Laptop, Layers, Leaf, LifeBuoy, Link, Link2, ListChecks, ListFilter, ListOrdered, Loader2, Lock, LogIn, LogOut,
-  Mail, Map as MapIconLucide, MapPin, MapPinned, Menu, MessageSquare, Mic, Moon, MousePointer, Move, Music,
-  Palette, Package, PanelLeft, Paperclip, PenTool, Phone, PlusCircle, Power, Printer, Quote, Rocket, Rss, Save, Search,
-  Send, Settings, Share2, Shield, ShieldAlert, ShieldCheck, ShieldPlus, ShoppingBag, Siren, Slack, SlidersHorizontal,
-  Smartphone, Speaker, Square, Star, Sun, Tag, Target, Terminal, ThumbsUp, ToggleRight, Trash2, TrendingUp,
-  Trophy, Twitch, Twitter, Type, Upload, UploadCloud, User, UserCheck, UserCog, UserPlus, UserSquare2, Users, Users2,
-  UserX, Video, Voicemail, Wallet, Watch, Wifi, Wind, X, XCircle, Zap
+  Activity, AlertCircle, AlertTriangle, Archive, ArchiveRestore, ArrowLeft, ArrowRight, BarChart3,
+  Binary, Building, Cake, CalendarClock, CalendarDays, CalendarFold, CalendarIcon, CalendarX,
+  Check, CheckCheck, CheckCircle, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown,
+  ClipboardCheck, Clock, Copy, CreditCard, Download, Dumbbell, Edit, Edit3, ExternalLink,
+  FileSpreadsheet, FileText, Filter, Gamepad2, Globe, Hourglass, Image, ImageIcon, Info, Key,
+  Layers, Leaf, Link, Link2, ListChecks, ListFilter, ListOrdered, Loader2, LogIn, LogOut,
+  Mail, Map, MapPin, MapPinned, Menu, MessageSquare, Palette, Phone, PlusCircle, QrCode,
+  Save, Search, Send, Share2, Shield, ShieldAlert, ShieldCheck, ShieldPlus, Square, Star,
+  Tag, Target, Terminal, Trash2, TrendingUp, Trophy, Upload, UploadCloud,
+  User, UserCheck, UserCog, UserPlus, UserSquare2, UserX, Users, Users2, XCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
@@ -28,77 +25,118 @@ import {
   StumpsAndBallIcon,
   GoogleIcon,
   WicketKeeperGloves,
-  } from '@/components/custom-icons';
+} from '@/components/custom-icons';
 
+// Canonical aliases — same underlying icon, different import name used in codebase
+const FilterIcon = Filter;
+const LinkIcon = Link2;
+const MapIconLucide = Map;
+const PhoneIcon = Phone;
+const SearchIcon = Search;
+const UserIcon = User;
 
 const projectIcons = {
   'Lucide Icons (In Use)': [
-    { name: 'Activity', Icon: Activity }, { name: 'AlertCircle', Icon: AlertCircle }, { name: 'AlertTriangle', Icon: AlertTriangle },
-    { name: 'Archive', Icon: Archive }, { name: 'ArchiveRestore', Icon: ArchiveRestore }, { name: 'ArrowLeft', Icon: ArrowLeft },
-    { name: 'ArrowRight', Icon: ArrowRight }, { name: 'BarChart3', Icon: BarChart3 }, { name: 'Binary', Icon: Binary },
-    { name: 'Building', Icon: Building }, { name: 'Cake', Icon: Cake }, { name: 'CalendarClock', Icon: CalendarClock },
-    { name: 'CalendarDays', Icon: CalendarDays }, { name: 'CalendarFold', Icon: CalendarFold }, { name: 'CalendarIcon', Icon: CalendarIcon },
-    { name: 'CalendarX', Icon: CalendarX }, { name: 'Check', Icon: Check }, { name: 'CheckCircle', Icon: CheckCircle },
-    { name: 'CheckSquare', Icon: CheckSquare }, { name: 'ChevronLeft', Icon: ChevronLeft }, { name: 'ChevronRight', Icon: ChevronRight },
-    { name: 'ChevronsUpDown', Icon: ChevronsUpDown }, { name: 'Circle', Icon: Circle }, { name: 'ClipboardCheck', Icon: ClipboardCheck },
-    { name: 'Clock', Icon: Clock }, { name: 'Copy', Icon: Copy }, { name: 'CreditCard', Icon: CreditCard },
-    { name: 'Crosshair', Icon: Crosshair }, { name: 'Download', Icon: Download }, { name: 'Dumbbell', Icon: Dumbbell },
-    { name: 'Edit', Icon: Edit }, { name: 'Edit3', Icon: Edit3 }, { name: 'ExternalLink', Icon: ExternalLink },
-    { name: 'FileText', Icon: FileText }, { name: 'Filter', Icon: Filter }, { name: 'Gamepad2', Icon: Gamepad2 },
-    { name: 'Globe', Icon: Globe }, { name: 'Hourglass', Icon: Hourglass }, { name: 'ImageIcon', Icon: ImageIcon },
-    { name: 'Info', Icon: Info }, { name: 'Key', Icon: Key }, { name: 'Layers', Icon: Layers },
-    { name: 'Leaf', Icon: Leaf }, { name: 'Link2', Icon: Link2 }, { name: 'ListChecks', Icon: ListChecks },
-    { name: 'ListFilter', Icon: ListFilter }, { name: 'ListOrdered', Icon: ListOrdered }, { name: 'Loader2', Icon: Loader2 },
-    { name: 'LogIn', Icon: LogIn }, { name: 'LogOut', Icon: LogOut }, { name: 'Mail', Icon: Mail },
-    { name: 'MapIconLucide', Icon: MapIconLucide }, { name: 'MapPin', Icon: MapPin }, { name: 'MapPinned', Icon: MapPinned },
-    { name: 'Menu', Icon: Menu }, { name: 'Palette', Icon: Palette }, { name: 'PanelLeft', Icon: PanelLeft },
-    { name: 'Phone', Icon: Phone }, { name: 'PlusCircle', Icon: PlusCircle }, { name: 'Save', Icon: Save },
-    { name: 'Search', Icon: Search }, { name: 'Shield', Icon: Shield }, { name: 'ShieldAlert', Icon: ShieldAlert },
-    { name: 'ShieldCheck', Icon: ShieldCheck }, { name: 'ShieldPlus', Icon: ShieldPlus }, { name: 'Square', Icon: Square },
-    { name: 'Star', Icon: Star }, { name: 'Tag', Icon: Tag }, { name: 'Target', Icon: Target },
-    { name: 'Terminal', Icon: Terminal }, { name: 'Trash2', Icon: Trash2 }, { name: 'Trophy', Icon: Trophy },
-    { name: 'Upload', Icon: Upload }, { name: 'UploadCloud', Icon: UploadCloud }, { name: 'User', Icon: User },
-    { name: 'UserCheck', Icon: UserCheck }, { name: 'UserCog', Icon: UserCog }, { name: 'UserPlus', Icon: UserPlus },
-    { name: 'UserSquare2', Icon: UserSquare2 }, { name: 'Users', Icon: Users }, { name: 'Users2', Icon: Users2 },
-    { name: 'UserX', Icon: UserX }, { name: 'X', Icon: X }, { name: 'XCircle', Icon: XCircle }
+    { name: 'Activity', Icon: Activity },
+    { name: 'AlertCircle', Icon: AlertCircle },
+    { name: 'AlertTriangle', Icon: AlertTriangle },
+    { name: 'Archive', Icon: Archive },
+    { name: 'ArchiveRestore', Icon: ArchiveRestore },
+    { name: 'ArrowLeft', Icon: ArrowLeft },
+    { name: 'ArrowRight', Icon: ArrowRight },
+    { name: 'BarChart3', Icon: BarChart3 },
+    { name: 'Binary', Icon: Binary },
+    { name: 'Building', Icon: Building },
+    { name: 'Cake', Icon: Cake },
+    { name: 'CalendarClock', Icon: CalendarClock },
+    { name: 'CalendarDays', Icon: CalendarDays },
+    { name: 'CalendarFold', Icon: CalendarFold },
+    { name: 'CalendarIcon', Icon: CalendarIcon },
+    { name: 'CalendarX', Icon: CalendarX },
+    { name: 'Check', Icon: Check },
+    { name: 'CheckCheck', Icon: CheckCheck },
+    { name: 'CheckCircle', Icon: CheckCircle },
+    { name: 'CheckSquare', Icon: CheckSquare },
+    { name: 'ChevronDown', Icon: ChevronDown },
+    { name: 'ChevronLeft', Icon: ChevronLeft },
+    { name: 'ChevronRight', Icon: ChevronRight },
+    { name: 'ChevronsUpDown', Icon: ChevronsUpDown },
+    { name: 'ClipboardCheck', Icon: ClipboardCheck },
+    { name: 'Clock', Icon: Clock },
+    { name: 'Copy', Icon: Copy },
+    { name: 'CreditCard', Icon: CreditCard },
+    { name: 'Download', Icon: Download },
+    { name: 'Dumbbell', Icon: Dumbbell },
+    { name: 'Edit', Icon: Edit },
+    { name: 'Edit3', Icon: Edit3 },
+    { name: 'ExternalLink', Icon: ExternalLink },
+    { name: 'FileSpreadsheet', Icon: FileSpreadsheet },
+    { name: 'FileText', Icon: FileText },
+    { name: 'Filter / FilterIcon', Icon: Filter },
+    { name: 'Gamepad2', Icon: Gamepad2 },
+    { name: 'Globe', Icon: Globe },
+    { name: 'Hourglass', Icon: Hourglass },
+    { name: 'Image / ImageIcon', Icon: Image },
+    { name: 'Info', Icon: Info },
+    { name: 'Key', Icon: Key },
+    { name: 'Layers', Icon: Layers },
+    { name: 'Leaf', Icon: Leaf },
+    { name: 'Link', Icon: Link },
+    { name: 'Link2 / LinkIcon', Icon: Link2 },
+    { name: 'ListChecks', Icon: ListChecks },
+    { name: 'ListFilter', Icon: ListFilter },
+    { name: 'ListOrdered', Icon: ListOrdered },
+    { name: 'Loader2', Icon: Loader2 },
+    { name: 'LogIn', Icon: LogIn },
+    { name: 'LogOut', Icon: LogOut },
+    { name: 'Mail', Icon: Mail },
+    { name: 'Map / MapIconLucide', Icon: Map },
+    { name: 'MapPin', Icon: MapPin },
+    { name: 'MapPinned', Icon: MapPinned },
+    { name: 'Menu', Icon: Menu },
+    { name: 'MessageSquare', Icon: MessageSquare },
+    { name: 'Palette', Icon: Palette },
+    { name: 'Phone / PhoneIcon', Icon: Phone },
+    { name: 'PlusCircle', Icon: PlusCircle },
+    { name: 'QrCode', Icon: QrCode },
+    { name: 'Save', Icon: Save },
+    { name: 'Search / SearchIcon', Icon: Search },
+    { name: 'Send', Icon: Send },
+    { name: 'Share2', Icon: Share2 },
+    { name: 'Shield', Icon: Shield },
+    { name: 'ShieldAlert', Icon: ShieldAlert },
+    { name: 'ShieldCheck', Icon: ShieldCheck },
+    { name: 'ShieldPlus', Icon: ShieldPlus },
+    { name: 'Square', Icon: Square },
+    { name: 'Star', Icon: Star },
+    { name: 'Tag', Icon: Tag },
+    { name: 'Target', Icon: Target },
+    { name: 'Terminal', Icon: Terminal },
+    { name: 'Trash2', Icon: Trash2 },
+    { name: 'TrendingUp', Icon: TrendingUp },
+    { name: 'Trophy', Icon: Trophy },
+    { name: 'Upload', Icon: Upload },
+    { name: 'UploadCloud', Icon: UploadCloud },
+    { name: 'User / UserIcon', Icon: User },
+    { name: 'UserCheck', Icon: UserCheck },
+    { name: 'UserCog', Icon: UserCog },
+    { name: 'UserPlus', Icon: UserPlus },
+    { name: 'UserSquare2', Icon: UserSquare2 },
+    { name: 'UserX', Icon: UserX },
+    { name: 'Users', Icon: Users },
+    { name: 'Users2', Icon: Users2 },
+    { name: 'XCircle', Icon: XCircle },
   ].sort((a, b) => a.name.localeCompare(b.name)),
+
   'Custom SVG Icons (In Use)': [
     { name: 'CricketBatAndBallIcon', Icon: CricketBatAndBallIcon },
     { name: 'CricketBallIcon', Icon: CricketBallIcon },
-    { name: 'StumpsAndBallIcon', Icon: StumpsAndBallIcon },
-    { name: 'GoogleIcon', Icon: GoogleIcon },
     { name: 'CricketBatIcon', Icon: CricketBatIcon },
+    { name: 'GoogleIcon', Icon: GoogleIcon },
+    { name: 'StumpsAndBallIcon', Icon: StumpsAndBallIcon },
     { name: 'WicketKeeperGloves', Icon: WicketKeeperGloves },
   ].sort((a, b) => a.name.localeCompare(b.name)),
 };
-
-const availableIcons = {
-  'Available Lucide Icons': [
-    { name: 'Aperture', Icon: Aperture }, { name: 'Award', Icon: Award }, { name: 'Bell', Icon: Bell },
-    { name: 'Bone', Icon: Bone }, { name: 'Bookmark', Icon: Bookmark }, { name: 'Bug', Icon: Bug },
-    { name: 'Calendar', Icon: Calendar }, { name: 'Camera', Icon: Camera }, { name: 'ChevronDown', Icon: ChevronDown },
-    { name: 'CircleUser', Icon: CircleUser }, { name: 'Clipboard', Icon: Clipboard }, { name: 'Cloud', Icon: Cloud },
-    { name: 'Code2', Icon: Code2 }, { name: 'Coins', Icon: Coins }, { name: 'Database', Icon: Database },
-    { name: 'Eye', Icon: Eye }, { name: 'File', Icon: File }, { name: 'Film', Icon: Film },
-    { name: 'Flag', Icon: Flag }, { name: 'Folder', Icon: Folder }, { name: 'GitBranch', Icon: GitBranch },
-    { name: 'Github', Icon: Github }, { name: 'Grid', Icon: Grid }, { name: 'Heart', Icon: Heart },
-    { name: 'Home', Icon: Home }, { name: 'Keyboard', Icon: Keyboard }, { name: 'Laptop', Icon: Laptop },
-    { name: 'LifeBuoy', Icon: LifeBuoy }, { name: 'Link', Icon: Link }, { name: 'Lock', Icon: Lock },
-    { name: 'MessageSquare', Icon: MessageSquare }, { name: 'Mic', Icon: Mic }, { name: 'Moon', Icon: Moon },
-    { name: 'MousePointer', Icon: MousePointer }, { name: 'Move', Icon: Move }, { name: 'Music', Icon: Music },
-    { name: 'Package', Icon: Package }, { name: 'Paperclip', Icon: Paperclip }, { name: 'PenTool', Icon: PenTool },
-    { name: 'Power', Icon: Power }, { name: 'Printer', Icon: Printer }, { name: 'Quote', Icon: Quote },
-    { name: 'Rocket', Icon: Rocket }, { name: 'Rss', Icon: Rss }, { name: 'Send', Icon: Send },
-    { name: 'Settings', Icon: Settings }, { name: 'Share2', Icon: Share2 }, { name: 'ShoppingBag', Icon: ShoppingBag },
-    { name: 'Siren', Icon: Siren }, { name: 'Slack', Icon: Slack }, { name: 'SlidersHorizontal', Icon: SlidersHorizontal },
-    { name: 'Smartphone', Icon: Smartphone }, { name: 'Speaker', Icon: Speaker }, { name: 'Sun', Icon: Sun },
-    { name: 'ThumbsUp', Icon: ThumbsUp }, { name: 'ToggleRight', Icon: ToggleRight }, { name: 'TrendingUp', Icon: TrendingUp },
-    { name: 'Twitch', Icon: Twitch }, { name: 'Twitter', Icon: Twitter }, { name: 'Type', Icon: Type },
-    { name: 'Video', Icon: Video }, { name: 'Voicemail', Icon: Voicemail }, { name: 'Wallet', Icon: Wallet },
-    { name: 'Watch', Icon: Watch }, { name: 'Wifi', Icon: Wifi }, { name: 'Wind', Icon: Wind }, { name: 'Zap', Icon: Zap }
-  ].sort((a, b) => a.name.localeCompare(b.name)),
-};
-
 
 const IconDisplayCard: React.FC<{
   name: string;
@@ -108,7 +146,7 @@ const IconDisplayCard: React.FC<{
 }> = ({ name, Icon, isCustom, onRemove }) => (
   <div className="relative flex flex-col items-center justify-center gap-2 rounded-lg border bg-card p-4 text-card-foreground shadow-sm group">
     <Icon className="h-8 w-8 text-primary" />
-    <code className="text-xs text-muted-foreground">{name}</code>
+    <code className="text-xs text-muted-foreground text-center">{name}</code>
     {isCustom && onRemove && (
       <Button
         variant="destructive"
@@ -128,7 +166,7 @@ export default function IconLibraryPage() {
 
   const handleRemoveIcon = (iconName: string) => {
     toast({
-      title: "Remove Icon Action",
+      title: 'Remove Icon Action',
       description: `In a real app, this would trigger an action to remove the '${iconName}' SVG component from the codebase.`,
     });
   };
@@ -149,14 +187,19 @@ export default function IconLibraryPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl font-headline text-primary">Icon Library</CardTitle>
-            <CardDescription>A visual reference of all icons used in this project, and a library of available icons for new features.</CardDescription>
+            <CardDescription>
+              All icons currently in use across the application. Aliases (e.g. <code>FilterIcon = Filter</code>) are shown on a single card.
+              The "Available" section has been removed — this page now reflects actual usage only.
+            </CardDescription>
           </CardHeader>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Project Icons</CardTitle>
-            <CardDescription>This is a curated set of icons currently in use in the application, including all custom SVGs.</CardDescription>
+            <CardDescription>
+              Every Lucide and custom SVG icon imported anywhere in the codebase. Last audited {new Date().toLocaleDateString()}.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {Object.entries(projectIcons).map(([category, icons]) => (
@@ -177,25 +220,7 @@ export default function IconLibraryPage() {
             ))}
           </CardContent>
         </Card>
-
-         <Card>
-          <CardHeader>
-            <CardTitle>Available Lucide Icons</CardTitle>
-            <CardDescription>A larger library of pre-installed icons available for use in new components and features.</CardDescription>
-          </CardHeader>
-          <CardContent>
-             {Object.entries(availableIcons).map(([category, icons]) => (
-                <div key={category}>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-                        {icons.map(({ name, Icon }) => (
-                            <IconDisplayCard key={name} name={name} Icon={Icon} />
-                        ))}
-                    </div>
-                </div>
-            ))}
-          </CardContent>
-        </Card>
-    </div>
-  </AuthProviderClientComponent>
+      </div>
+    </AuthProviderClientComponent>
   );
 }
