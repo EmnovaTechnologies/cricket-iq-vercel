@@ -7,7 +7,7 @@ import GameCard from '@/components/game-card';
 import { getAllSeriesFromDB, getAllTeamsFromDB } from '@/lib/db';
 import { getGamesForUserViewAction } from '@/lib/actions/game-actions';
 import type { Game, Series, Team } from '@/types';
-import { PlusCircle, Filter, Upload, Info, Loader2, CheckSquare, Square, UserCheck } from 'lucide-react'; // Added UserCheck
+import { PlusCircle, Filter, Upload, Info, Loader2, Gamepad2, CheckSquare, Square, UserCheck } from 'lucide-react'; // Added UserCheck
 import { useState, useEffect, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
