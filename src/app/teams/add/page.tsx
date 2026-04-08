@@ -31,16 +31,6 @@ function AddTeamForm() {
   const backLabel = seriesIdToLink
     ? 'Series Details'
     : 'Teams List';
-  const from = searchParams.get('from');
-
-  const backHref = seriesIdToLink
-    ? `/series/${seriesIdToLink}/details`
-    : from === 'teams'
-    ? '/teams'
-    : '/teams';
-  const backLabel = seriesIdToLink
-    ? 'Series Details'
-    : 'Teams List';
 
   useEffect(() => {
     if (authLoading) return;
