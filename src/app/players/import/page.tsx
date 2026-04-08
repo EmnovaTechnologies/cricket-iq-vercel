@@ -1,7 +1,7 @@
 
 import { PlayerImportForm } from '@/components/players/player-import-form';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info, Download, ArrowLeft, Users, ShieldAlert, FileText, FileSpreadsheet } from 'lucide-react';
+import { Info, Download, ArrowLeft, UserSquare2, ShieldAlert, FileText, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PRIMARY_SKILLS, BATTING_ORDERS, BOWLING_STYLES, DOMINANT_HANDS, GENDERS } from '@/lib/constants';
@@ -42,7 +42,7 @@ export default function ImportPlayersPage() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-headline font-bold text-primary flex items-center gap-2">
-              <Users className="h-6 w-6" /> Import Players
+              <UserSquare2 className="h-6 w-6" /> Import Players
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               Bulk import players using a CSV file or the Excel template. Expand your preferred method below.

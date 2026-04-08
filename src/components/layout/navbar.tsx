@@ -70,7 +70,7 @@ const Navbar = () => {
     { href: '/series', label: 'Series', icon: <Layers className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SERIES_LIST },
     { href: '/games', label: 'Games', icon: <Gamepad2 className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_GAMES_LIST },
     { href: '/teams', label: 'Teams', icon: <Users className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAMS_LIST },
-    { href: '/players', label: 'Players', icon: <Users className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_PLAYERS_LIST },
+    { href: '/players', label: 'Players', icon: <UserSquare2 className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_PLAYERS_LIST },
     { href: '/venues', label: 'Venues', icon: <MapPinned className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_VENUES_LIST },
     { href: '/team-composition', label: 'Team AI', icon: <Target className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAM_COMPOSITION },
     { href: '/export', label: 'Export', icon: <Download className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_EXPORT },
