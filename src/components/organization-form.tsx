@@ -135,13 +135,23 @@ export function OrganizationForm({ initialData, allUsersForAdminSelection, onSub
     );
   }, [allUsersForAdminSelection]);
 
+  // Super admins are always locked — shown as assigned but cannot be removed
+  const lockedSuperAdmins = useMemo(() => {
+    return eligibleAdmins.filter(user => user.roles.includes('admin'));
+  }, [eligibleAdmins]);
+
+  // Only non-super-admin users are selectable
+  const selectableAdmins = useMemo(() => {
+    return eligibleAdmins.filter(user => !user.roles.includes('admin'));
+  }, [eligibleAdmins]);
+
   const filteredAdminUsers = useMemo(() => {
-    if (!adminSearchQuery) return eligibleAdmins;
-    return eligibleAdmins.filter(user =>
+    if (!adminSearchQuery) return selectableAdmins;
+    return selectableAdmins.filter(user =>
       (user.displayName?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase()) ||
       (user.email?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase())
     );
-  }, [eligibleAdmins, adminSearchQuery]);
+  }, [selectableAdmins, adminSearchQuery]);
 
   const handleAddClub = () => {
     const newClub = clubInputValue.trim();
@@ -266,7 +276,13 @@ export function OrganizationForm({ initialData, allUsersForAdminSelection, onSub
         name: data.name.trim(),
         status: data.status,
         branding,
-        organizationAdminUids: data.organizationAdminUids || [],
+        // Always preserve super admin UIDs — merge locked admins back in
+        organizationAdminUids: [
+          ...new Set([
+            ...(data.organizationAdminUids || []),
+            ...lockedSuperAdmins.map(u => u.uid),
+          ])
+        ],
         clubs: data.clubs || [],
       };
 
@@ -598,8 +614,23 @@ export function OrganizationForm({ initialData, allUsersForAdminSelection, onSub
             <FormItem>
               <div className="mb-2">
                 <FormLabel className="text-base">Assign Organization Administrators (Optional)</FormLabel>
-                <FormDescription>Select users with 'admin' or 'Organization Admin' roles to manage this organization.</FormDescription>
+                <FormDescription>Select users with 'Organization Admin' role to manage this organization. Super admins are always included and cannot be removed.</FormDescription>
               </div>
+
+              {/* Locked super admins — always shown as assigned */}
+              {lockedSuperAdmins.length > 0 && (
+                <div className="rounded-md border bg-muted/30 p-2 mb-2 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned — cannot be removed)</p>
+                  {lockedSuperAdmins.map(user => (
+                    <div key={user.uid} className="flex items-center gap-2 px-2 py-1 rounded opacity-70">
+                      <Checkbox checked disabled />
+                      <span className="text-sm flex-grow">{user.displayName || user.email}</span>
+                      <Badge variant="default" className="text-xs">Super Admin</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="relative mb-2">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -611,8 +642,8 @@ export function OrganizationForm({ initialData, allUsersForAdminSelection, onSub
                   disabled={disableSubmitButton}
                 />
               </div>
-              {eligibleAdmins.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No users with 'admin' or 'Organization Admin' roles found.</p>
+              {selectableAdmins.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No users with 'Organization Admin' role found.</p>
               ) : filteredAdminUsers.length === 0 && adminSearchQuery ? (
                  <p className="text-sm text-muted-foreground">No eligible administrators found matching your search.</p>
               ) : (
