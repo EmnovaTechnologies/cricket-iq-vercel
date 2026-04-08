@@ -262,7 +262,7 @@ export default function GamesPage() {
               )}
               {canAddGames && (
                 <Button asChild className="bg-primary hover:bg-primary/90" disabled={!activeOrganizationId}>
-                  <Link href="/games/add" className="flex items-center gap-2">
+                  <Link href="/games/add?from=games" className="flex items-center gap-2">
                     <PlusCircle className="h-5 w-5" /> Add New Game
                   </Link>
                 </Button>

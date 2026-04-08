@@ -17,6 +17,19 @@ function AddGameForm() {
   const { activeOrganizationId, userProfile, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const preselectedSeriesId = searchParams.get('seriesId');
+  const from = searchParams.get('from'); // 'games' | null
+
+  // Determine back navigation
+  const backHref = preselectedSeriesId
+    ? `/series/${preselectedSeriesId}/details`
+    : from === 'games'
+    ? '/games'
+    : '/series';
+  const backLabel = preselectedSeriesId
+    ? 'Series Details'
+    : from === 'games'
+    ? 'Games List'
+    : 'Series List';
 
   const [seriesForForm, setSeriesForForm] = useState<Series[]>([]);
   const [potentialSelectors, setPotentialSelectors] = useState<UserProfile[]>([]);
@@ -74,8 +87,8 @@ function AddGameForm() {
     <div className="max-w-2xl mx-auto">
       <div className="mb-4">
         <Button variant="outline" size="sm" asChild>
-          <Link href={preselectedSeriesId ? `/series/${preselectedSeriesId}/details` : '/series'}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to {preselectedSeriesId ? 'Series Details' : 'Series List'}
+          <Link href={backHref}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to {backLabel}
           </Link>
         </Button>
       </div>
