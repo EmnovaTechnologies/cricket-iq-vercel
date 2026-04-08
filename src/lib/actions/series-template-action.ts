@@ -9,27 +9,31 @@ export interface SeriesTemplateData {
 export async function getSeriesTemplateData(organizationId: string): Promise<SeriesTemplateData> {
   if (!organizationId) throw new Error('Organization ID is required.');
 
-  // Fetch users assigned to this org who have selector or Series Admin role
-  const usersSnap = await adminDb.collection('users')
+  const emailSet = new Set<string>();
+
+  // 1. Fetch super admins globally (they are not in assignedOrganizationIds)
+  const superAdminSnap = await adminDb.collection('users')
+    .where('roles', 'array-contains', 'admin')
+    .get();
+  superAdminSnap.docs.forEach(d => {
+    const email = d.data().email?.trim();
+    if (email) emailSet.add(email);
+  });
+
+  // 2. Fetch Series Admins scoped to this org
+  const orgUsersSnap = await adminDb.collection('users')
     .where('assignedOrganizationIds', 'array-contains', organizationId)
     .get();
-
-  const selectorEmails: string[] = [];
-  usersSnap.docs.forEach(d => {
+  orgUsersSnap.docs.forEach(d => {
     const data = d.data();
     const roles: string[] = data.roles || [];
-    if (
-      roles.includes('selector') ||
-      roles.includes('Series Admin') ||
-      roles.includes('Organization Admin') ||
-      roles.includes('admin')
-    ) {
+    if (roles.includes('Series Admin')) {
       const email = data.email?.trim();
-      if (email) selectorEmails.push(email);
+      if (email) emailSet.add(email);
     }
   });
 
   return {
-    selectorEmails: selectorEmails.sort(),
+    selectorEmails: Array.from(emailSet).sort(),
   };
 }
