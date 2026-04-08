@@ -14,6 +14,7 @@ import {
   RecaptchaVerifier,
   signInWithPhoneNumber as firebaseSignInWithPhoneNumber,
   sendPasswordResetEmail,
+  sendEmailVerification,
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { createUserProfile, getUserProfile } from '@/lib/actions/user-actions';
@@ -43,6 +44,7 @@ interface AuthContextType {
   signInWithPhoneNumberFlow: (phoneNumber: string, recaptchaContainerId: string) => Promise<ConfirmationResult>;
   confirmPhoneNumberCode: (confirmationResult: ConfirmationResult, code: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -181,10 +183,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoggingOut(false);
       setCurrentUser(user);
       if (user) {
+        // Check if email verification is required
+        // Google users are already verified — check providerData
+        const isGoogleUser = user.providerData.some(p => p.providerId === 'google.com');
+        const isPhoneUser = user.providerData.some(p => p.providerId === 'phone');
+        const needsVerification = !isGoogleUser && !isPhoneUser && !user.emailVerified;
+
+        if (needsVerification) {
+          // User exists but email not verified — don't load profile, just stop loading
+          setIsAuthLoading(false);
+          return;
+        }
+
         if (user.uid !== userProfile?.uid) {
           await loadUserProfileAndData(user);
         } else {
-          setIsAuthLoading(false); 
+          setIsAuthLoading(false);
         }
       } else {
         setUserProfile(null);
@@ -265,6 +279,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (displayName && userCredential.user) {
         await updateFirebaseProfile(userCredential.user, { displayName });
       }
+      // Send verification email then sign out — user must verify before accessing app
+      await sendEmailVerification(userCredential.user);
+      await signOut(auth);
     } catch (error) {
       setPendingRegistrationToken(null);
       console.error('[AuthContext] signUpAsPlayer error:', error);
@@ -279,6 +296,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (displayName && userCredential.user) {
         await updateFirebaseProfile(userCredential.user, { displayName });
       }
+      // Send verification email then sign out — user must verify before accessing app
+      await sendEmailVerification(userCredential.user);
+      await signOut(auth);
     } catch (error) {
       console.error('[AuthContext] signUpWithEmail error:', error);
       throw error;
@@ -353,6 +373,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return sendPasswordResetEmail(auth, email);
   };
 
+  const resendVerificationEmail = async () => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('No user signed in.');
+    await sendEmailVerification(user);
+  };
+
   const value = {
     currentUser, userProfile,
     isAuthLoading, isLoggingOut, 
@@ -361,7 +387,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     effectivePermissions,
     signUpWithEmail, signInWithEmail, signInWithGoogle,
     signInWithPhoneNumberFlow, confirmPhoneNumberCode, logout,
-    sendPasswordReset,
+    sendPasswordReset, resendVerificationEmail,
     signUpAsPlayer,
   };
 

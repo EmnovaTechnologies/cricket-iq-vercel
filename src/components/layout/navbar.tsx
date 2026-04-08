@@ -4,7 +4,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Leaf, Users, UserSquare2, Gamepad2, Target, Menu, Layers, MapPinned, LogIn, LogOut, UserPlus, UserCog, ShieldCheck, Building, ChevronsUpDown, Check, Hourglass, ListFilter, ImageIcon, User, Download } from 'lucide-react';
+import { Leaf, Users, UserSquare2, Gamepad2, Target, Menu, Layers, MapPinned, LogIn, LogOut, UserPlus, UserCog, ShieldCheck, Building, ChevronsUpDown, Check, Hourglass, ListFilter, ImageIcon, User, Download, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useState, useEffect } from 'react';
@@ -24,11 +24,34 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Loader2 } from 'lucide-react';
+import { getAllPublicActiveOrganizations } from '@/lib/actions/public-org-action';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showPlayerDialog, setShowPlayerDialog] = useState(false);
+  const [orgs, setOrgs] = useState<{ id: string; name: string; branding?: any }[]>([]);
+  const [orgsLoading, setOrgsLoading] = useState(false);
+
+  const handleOpenPlayerDialog = async () => {
+    setShowPlayerDialog(true);
+    setOrgsLoading(true);
+    try {
+      const activeOrgs = await getAllPublicActiveOrganizations();
+      setOrgs(activeOrgs);
+    } catch { setOrgs([]); }
+    finally { setOrgsLoading(false); }
+  };
+
   const {
     currentUser,
     userProfile,
@@ -70,7 +93,7 @@ const Navbar = () => {
     { href: '/series', label: 'Series', icon: <Layers className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SERIES_LIST },
     { href: '/games', label: 'Games', icon: <Gamepad2 className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_GAMES_LIST },
     { href: '/teams', label: 'Teams', icon: <Users className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAMS_LIST },
-    { href: '/players', label: 'Players', icon: <UserSquare2 className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_PLAYERS_LIST },
+    { href: '/players', label: 'Players', icon: <Users className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_PLAYERS_LIST },
     { href: '/venues', label: 'Venues', icon: <MapPinned className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_VENUES_LIST },
     { href: '/team-composition', label: 'Team AI', icon: <Target className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAM_COMPOSITION },
     { href: '/export', label: 'Export', icon: <Download className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_EXPORT },
@@ -138,6 +161,7 @@ const Navbar = () => {
 
 
   return (
+    <>
     <header className="bg-card shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-80 transition-opacity">
@@ -312,6 +336,9 @@ const Navbar = () => {
                   <LogIn className="h-5 w-5" /> Login
                 </Link>
               </Button>
+              <Button variant="outline" onClick={handleOpenPlayerDialog} className="text-sm px-3 gap-1 border-primary/40 text-primary hover:bg-primary/5">
+                <UserSquare2 className="h-5 w-5" /> Register as Player
+              </Button>
               <Button variant="default" asChild className="bg-primary hover:bg-primary/90 text-sm px-3">
                 <Link href="/signup" className="flex items-center gap-1">
                   <UserPlus className="h-5 w-5" /> Sign Up
@@ -419,6 +446,9 @@ const Navbar = () => {
                         <LogIn className="h-5 w-5" /> Login
                       </Link>
                     </Button>
+                    <Button variant="outline" onClick={() => { setIsMobileMenuOpen(false); handleOpenPlayerDialog(); }} className="justify-start text-base py-3 gap-3 border-primary/40 text-primary hover:bg-primary/5">
+                      <UserSquare2 className="h-5 w-5" /> Register as Player
+                    </Button>
                     <Button variant="default" asChild className="justify-start bg-primary hover:bg-primary/90 text-base py-3">
                       <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3">
                         <UserPlus className="h-5 w-5" /> Sign Up
@@ -432,6 +462,49 @@ const Navbar = () => {
         </div>
       </div>
     </header>
+
+    {/* Player signup org picker dialog */}
+    <Dialog open={showPlayerDialog} onOpenChange={setShowPlayerDialog}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <UserSquare2 className="h-5 w-5 text-primary" /> Register as a Player
+          </DialogTitle>
+          <DialogDescription>
+            Select your organization to begin the player registration process.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 py-2 max-h-72 overflow-y-auto">
+          {orgsLoading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : orgs.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No active organizations found.</p>
+          ) : (
+            orgs.map(org => (
+              <Link
+                key={org.id}
+                href={`/register-player/${org.id}`}
+                onClick={() => setShowPlayerDialog(false)}
+                className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted hover:border-primary/50 transition-colors group"
+              >
+                <div className="h-9 w-9 rounded-md border bg-muted flex items-center justify-center shrink-0">
+                  {org.branding?.logoUrl ? (
+                    <img src={org.branding.logoUrl} alt={org.name} className="h-8 w-8 object-contain rounded" />
+                  ) : (
+                    <Building className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+                <span className="flex-1 text-sm font-medium">{org.name}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </Link>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 

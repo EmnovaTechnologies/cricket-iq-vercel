@@ -8,8 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { LogIn, Mail, Key, Loader2, Users, ChevronRight, Building } from 'lucide-react';
+import { LogIn, Mail, Key, Loader2, Users, ChevronRight, Building, Send, AlertTriangle } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,12 +45,16 @@ function LoginForm() {
     signInWithGoogle,
     isAuthLoading,
     userProfile,
-    sendPasswordReset
+    sendPasswordReset,
+    resendVerificationEmail,
+    currentUser,
   } = useAuth();
   const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [emailFormSubmitting, setEmailFormSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
 
   // Player signup dialog state
   const [showPlayerDialog, setShowPlayerDialog] = useState(false);
@@ -82,13 +88,22 @@ function LoginForm() {
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!email || !password) {
-      setError("Please enter both email and password.");
-      return;
-    }
+    setUnverifiedEmail(null);
+    if (!email || !password) { setError("Please enter both email and password."); return; }
     setEmailFormSubmitting(true);
     try {
       await signInWithEmail(email, password);
+      // onAuthStateChanged checks emailVerified — if not verified, currentUser will be set
+      // but userProfile won't be loaded. We check after a tick.
+      setTimeout(async () => {
+        const fbUser = auth.currentUser;
+        if (fbUser && !fbUser.emailVerified) {
+          // Sign them back out and show unverified message
+          await signOut(auth);
+          setUnverifiedEmail(email);
+          setEmailFormSubmitting(false);
+        }
+      }, 500);
     } catch (err: any) {
       let errorMessage = "Failed to login. Please check your credentials.";
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
@@ -98,8 +113,26 @@ function LoginForm() {
       }
       setError(errorMessage);
       toast({ title: 'Login Failed', description: errorMessage, variant: 'destructive' });
+      setEmailFormSubmitting(false);
     }
-    setEmailFormSubmitting(false);
+  };
+
+  const handleResendVerification = async () => {
+    setResending(true);
+    try {
+      // Sign in temporarily to get a user object for resending
+      await signInWithEmail(unverifiedEmail!, '');
+    } catch {}
+    try {
+      await resendVerificationEmail();
+      toast({ title: 'Email Sent', description: 'Verification email resent. Check your inbox.' });
+    } catch {
+      // If we can't resend, direct them to signup
+      toast({ title: 'Could not resend', description: 'Please try signing up again or contact support.', variant: 'destructive' });
+    } finally {
+      await signOut(auth).catch(() => {});
+      setResending(false);
+    }
   };
 
   const handleGoogleSignIn = async () => {
@@ -157,6 +190,24 @@ function LoginForm() {
         </CardHeader>
         <CardContent className="space-y-6">
           {error && <Alert variant="destructive"><AlertTitle>Login Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+          {unverifiedEmail && (
+            <Alert variant="default" className="border-amber-300 bg-amber-50">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertTitle className="text-amber-800">Email Not Verified</AlertTitle>
+              <AlertDescription className="text-amber-700 space-y-2">
+                <p>Please verify your email address before logging in. Check your inbox for <strong>{unverifiedEmail}</strong>.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResendVerification}
+                  disabled={resending}
+                  className="gap-2 border-amber-400 text-amber-800 hover:bg-amber-100 mt-1"
+                >
+                  {resending ? <><Loader2 className="h-3 w-3 animate-spin" /> Sending...</> : <><Send className="h-3 w-3" /> Resend Verification Email</>}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
           <form onSubmit={handleEmailSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
