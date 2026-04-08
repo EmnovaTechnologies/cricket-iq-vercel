@@ -83,7 +83,7 @@ export default function TeamsPage() {
 
 
             <Button asChild className="bg-primary hover:bg-primary/90" disabled={!activeOrganizationId}>
-              <Link href="/teams/add" className="flex items-center gap-2">
+              <Link href="/teams/add?from=teams" className="flex items-center gap-2">
                 <PlusCircle className="h-5 w-5" /> Add New Team
               </Link>
             </Button>

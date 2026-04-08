@@ -5,7 +5,8 @@ import { useAuth } from '@/contexts/auth-context';
 import { TeamForm } from '@/components/team-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ShieldAlert, Info } from 'lucide-react';
+import { Loader2, ShieldAlert, Info, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import { getPotentialTeamManagersForOrg } from '@/lib/actions/user-actions';
 import type { UserProfile, AgeCategory } from '@/types';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
@@ -19,6 +20,27 @@ function AddTeamForm() {
   const [dataLoading, setDataLoading] = useState(true);
   const seriesIdToLink = searchParams.get('seriesIdToLink');
   const seriesAgeCategoryToEnforce = searchParams.get('seriesAgeCategoryToEnforce') as AgeCategory | null;
+  const from = searchParams.get('from');
+
+  // Determine back navigation
+  const backHref = seriesIdToLink
+    ? `/series/${seriesIdToLink}/details`
+    : from === 'teams'
+    ? '/teams'
+    : '/teams';
+  const backLabel = seriesIdToLink
+    ? 'Series Details'
+    : 'Teams List';
+  const from = searchParams.get('from');
+
+  const backHref = seriesIdToLink
+    ? `/series/${seriesIdToLink}/details`
+    : from === 'teams'
+    ? '/teams'
+    : '/teams';
+  const backLabel = seriesIdToLink
+    ? 'Series Details'
+    : 'Teams List';
 
   useEffect(() => {
     if (authLoading) return;
@@ -63,6 +85,13 @@ function AddTeamForm() {
       }
     >
       <div className="max-w-2xl mx-auto">
+        <div className="mb-4">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={backHref}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to {backLabel}
+            </Link>
+          </Button>
+        </div>
         {!activeOrganizationId ? (
           <Alert variant="default" className="border-primary/50">
             <Info className="h-5 w-5 text-primary" />
