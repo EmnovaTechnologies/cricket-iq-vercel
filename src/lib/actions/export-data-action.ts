@@ -1,6 +1,7 @@
 'use server';
 
 import { adminDb } from '../firebase-admin';
+import type { Query, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { format, parseISO, isValid } from 'date-fns';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -156,7 +157,7 @@ export async function getExportScopeAction(uid: string): Promise<ExportScope> {
 
   if (isSuperAdmin || isOrgAdmin) {
     // All active series — scoped by org if org admin
-    let seriesQuery: FirebaseFirestore.Query = adminDb.collection('series').where('status', '==', 'active');
+    let seriesQuery: Query = adminDb.collection('series').where('status', '==', 'active');
     if (isOrgAdmin && !isSuperAdmin && orgs.length > 0) {
       seriesQuery = seriesQuery.where('organizationId', 'in', orgs.map(o => o.id));
     }
@@ -285,7 +286,7 @@ export async function exportRatingsAction(params: {
   const { seriesId, organizationId, ratingsFilter, seriesName, orgName } = params;
 
   // ── Fetch games ──────────────────────────────────────────────────────────
-  let gamesQuery: FirebaseFirestore.Query = adminDb.collection('games');
+  let gamesQuery: Query = adminDb.collection('games');
   if (seriesId) {
     gamesQuery = gamesQuery.where('seriesId', '==', seriesId);
   } else if (organizationId) {
@@ -341,7 +342,7 @@ export async function exportRatingsAction(params: {
 
   // ── Fetch all player ratings for these games ─────────────────────────────
   const gameIds = gamesSnap.docs.map(d => d.id);
-  const allRatingDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  const allRatingDocs: QueryDocumentSnapshot[] = [];
   for (let i = 0; i < gameIds.length; i += 30) {
     const chunk = gameIds.slice(i, i + 30);
     const snap = await adminDb.collection('playerRatings').where('gameId', 'in', chunk).get();

@@ -23,7 +23,6 @@ import {
   Download, FileSpreadsheet, FileText, Users, Star,
   ShieldAlert, Loader2, Building, Layers, Info
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 
 type RatingsFilter = 'all' | 'finalized' | 'not_finalized';
 
