@@ -303,7 +303,13 @@ function SignupForm() {
           {targetOrgDetails && (
             <CardDescription className="flex items-center justify-center gap-1 text-accent font-semibold">
               <Building className="h-4 w-4" /> Signing up for {targetOrgDetails.name}
-              <button onClick={() => setOrgPickerStep(true)} className="ml-1 text-xs text-muted-foreground underline underline-offset-2 font-normal hover:text-primary">
+              <button
+                onClick={() => {
+                  setOrgPickerStep(true);
+                  if (orgs.length === 0) loadOrgs();
+                }}
+                className="ml-1 text-xs text-muted-foreground underline underline-offset-2 font-normal hover:text-primary"
+              >
                 Change
               </button>
             </CardDescription>
