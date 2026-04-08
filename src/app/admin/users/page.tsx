@@ -3,8 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import type { UserProfile as UserProfileType, PermissionKey, UserRole } from '@/types';
+import type { UserProfile as UserProfileType, UserRole, Organization } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -12,8 +11,8 @@ import { UserRoleCell } from '@/components/admin/user-role-cell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import { getAllUsersFromDB, getUsersForOrgAdminViewFromDB } from '@/lib/db';
-import { Loader2, AlertCircle, ShieldAlert, Info, Filter, Search } from 'lucide-react';
+import { getAllUsersFromDB, getUsersForOrgAdminViewFromDB, getAllOrganizationsFromDB } from '@/lib/db';
+import { Loader2, AlertCircle, ShieldAlert, Info, Filter, Search, Building } from 'lucide-react';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -26,74 +25,78 @@ export default function AdminUserManagementPage() {
   const router = useRouter();
 
   const [users, setUsers] = useState<UserProfileType[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // New state for filters
+  // Filters
   const [nameFilter, setNameFilter] = useState('');
   const [emailFilter, setEmailFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+  const [orgFilter, setOrgFilter] = useState<string>('all'); // super admin only
 
-  // State to trigger re-fetch
-  const [refreshKey, setRefreshKey] = useState(0);
+  const isSuperAdmin = userProfile?.roles.includes('admin') ?? false;
 
-  const handleRolesUpdated = () => {
-    setRefreshKey(prev => prev + 1); // Increment key to trigger re-fetch
-  };
+  const handleRolesUpdated = () => setRefreshKey(prev => prev + 1);
 
   useEffect(() => {
-    if (isAuthLoading) {
-      setLoadingUsers(true);
-      return;
-    }
-    
-    if (!currentUser) {
-      router.push('/login?redirect=/admin/users');
-      return;
-    }
+    if (isAuthLoading) { setLoadingUsers(true); return; }
+    if (!currentUser) { router.push('/login?redirect=/admin/users'); return; }
 
-    const fetchUsers = async () => {
+    const fetchData = async () => {
       setLoadingUsers(true);
       setFetchError(null);
       setUsers([]);
-      
+
       try {
-        let fetchedUsersData: UserProfileType[] = [];
-        const isSuperAdmin = userProfile?.roles.includes('admin');
         const canViewOrgList = effectivePermissions[PERMISSIONS.USERS_VIEW_LIST_ASSIGNED_ORG];
-        
+
         if (isSuperAdmin) {
-          fetchedUsersData = await getAllUsersFromDB();
+          // Fetch all users and all orgs in parallel
+          const [fetchedUsers, fetchedOrgs] = await Promise.all([
+            getAllUsersFromDB(),
+            getAllOrganizationsFromDB(),
+          ]);
+          setUsers(fetchedUsers);
+          setOrganizations(fetchedOrgs);
         } else if (canViewOrgList) {
           if (activeOrganizationId) {
-            fetchedUsersData = await getUsersForOrgAdminViewFromDB(activeOrganizationId);
-          } else {
-            // Org Admin hasn't selected an org. This case is handled by the render logic below.
+            const fetchedUsers = await getUsersForOrgAdminViewFromDB(activeOrganizationId);
+            setUsers(fetchedUsers);
           }
         } else {
-          setFetchError("You do not have permission to view any user list.");
+          setFetchError('You do not have permission to view any user list.');
         }
-        setUsers(fetchedUsersData);
       } catch (err: any) {
-        console.error("Failed to fetch users:", err);
-        setFetchError(err.message || "An error occurred while fetching users.");
+        console.error('Failed to fetch users:', err);
+        setFetchError(err.message || 'An error occurred while fetching users.');
       } finally {
         setLoadingUsers(false);
       }
     };
 
-    fetchUsers();
-  }, [currentUser, isAuthLoading, effectivePermissions, activeOrganizationId, router, userProfile?.roles, refreshKey]);
+    fetchData();
+  }, [currentUser, isAuthLoading, effectivePermissions, activeOrganizationId, router, isSuperAdmin, refreshKey]);
 
-  // Memoized filtering logic
+  // Build org name lookup for super admin
+  const orgNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    organizations.forEach(o => { map[o.id] = o.name; });
+    return map;
+  }, [organizations]);
+
+  // Filtered users
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
       const nameMatch = !nameFilter || user.displayName?.toLowerCase().includes(nameFilter.toLowerCase());
       const emailMatch = !emailFilter || user.email?.toLowerCase().includes(emailFilter.toLowerCase());
       const roleMatch = roleFilter === 'all' || user.roles.includes(roleFilter as UserRole);
-      return nameMatch && emailMatch && roleMatch;
+      const orgMatch = !isSuperAdmin || orgFilter === 'all' ||
+        (user.assignedOrganizationIds || []).includes(orgFilter);
+      return nameMatch && emailMatch && roleMatch && orgMatch;
     });
-  }, [users, nameFilter, emailFilter, roleFilter]);
+  }, [users, nameFilter, emailFilter, roleFilter, orgFilter, isSuperAdmin]);
 
   const getInitials = (name?: string | null, email?: string | null) => {
     if (name) return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -110,7 +113,7 @@ export default function AdminUserManagementPage() {
         </div>
       );
     }
-    
+
     if (fetchError) {
       return (
         <Alert variant="destructive" className="mt-8">
@@ -121,23 +124,23 @@ export default function AdminUserManagementPage() {
       );
     }
 
-    if (effectivePermissions[PERMISSIONS.USERS_VIEW_LIST_ASSIGNED_ORG] && !activeOrganizationId && !userProfile?.roles.includes('admin')) {
+    if (effectivePermissions[PERMISSIONS.USERS_VIEW_LIST_ASSIGNED_ORG] && !activeOrganizationId && !isSuperAdmin) {
       return (
         <Alert variant="default" className="mt-8 border-primary/50">
-            <Info className="h-5 w-5 text-primary" />
-            <AlertTitle>Select an Organization</AlertTitle>
-            <AlertDescription>
-                Please select an organization from the dropdown in the navigation bar to view its users.
-            </AlertDescription>
+          <Info className="h-5 w-5 text-primary" />
+          <AlertTitle>Select an Organization</AlertTitle>
+          <AlertDescription>
+            Please select an organization from the dropdown in the navigation bar to view its users.
+          </AlertDescription>
         </Alert>
       );
     }
-    
+
     const canManageRoles = effectivePermissions[PERMISSIONS.USERS_MANAGE_ROLES_ANY] || effectivePermissions[PERMISSIONS.USERS_MANAGE_ROLES_ASSIGNED_ORG];
-    const isCallingUserSuperAdmin = userProfile?.roles.includes('admin') ?? false;
 
     return (
       <>
+        {/* Filters */}
         <Card>
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2 text-foreground">
@@ -145,53 +148,72 @@ export default function AdminUserManagementPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className={`grid gap-4 ${isSuperAdmin ? 'grid-cols-1 md:grid-cols-4' : 'grid-cols-1 md:grid-cols-3'}`}>
+
+              {/* Org filter — super admin only */}
+              {isSuperAdmin && (
+                <div>
+                  <label htmlFor="org-filter" className="block text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                    <Building className="h-3.5 w-3.5" /> Filter by Organization
+                  </label>
+                  <Select value={orgFilter} onValueChange={setOrgFilter}>
+                    <SelectTrigger id="org-filter">
+                      <SelectValue placeholder="All Organizations" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Organizations</SelectItem>
+                      {organizations.map(org => (
+                        <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Name filter */}
               <div className="relative">
                 <label htmlFor="name-filter" className="block text-sm font-medium text-muted-foreground mb-1">Filter by Name</label>
                 <Search className="absolute left-3 top-[calc(50%_+_6px)] -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  id="name-filter"
-                  placeholder="Filter by name..."
-                  value={nameFilter}
-                  onChange={(e) => setNameFilter(e.target.value)}
-                  className="pl-10"
-                />
+                <Input id="name-filter" placeholder="Filter by name..." value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)} className="pl-10" />
               </div>
+
+              {/* Email filter */}
               <div className="relative">
                 <label htmlFor="email-filter" className="block text-sm font-medium text-muted-foreground mb-1">Filter by Email</label>
                 <Search className="absolute left-3 top-[calc(50%_+_6px)] -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  id="email-filter"
-                  placeholder="Filter by email..."
-                  value={emailFilter}
-                  onChange={(e) => setEmailFilter(e.target.value)}
-                  className="pl-10"
-                />
+                <Input id="email-filter" placeholder="Filter by email..." value={emailFilter}
+                  onChange={(e) => setEmailFilter(e.target.value)} className="pl-10" />
               </div>
+
+              {/* Role filter */}
               <div>
                 <label htmlFor="role-filter" className="block text-sm font-medium text-muted-foreground mb-1">Filter by Role</label>
                 <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as UserRole | 'all')}>
-                    <SelectTrigger id="role-filter">
-                        <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Roles</SelectItem>
-                        {USER_ROLES.map(role => (
-                            <SelectItem key={role} value={role} className="capitalize">
-                                {role}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
+                  <SelectTrigger id="role-filter">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    {USER_ROLES.map(role => (
+                      <SelectItem key={role} value={role} className="capitalize">{role}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* User table */}
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl font-headline text-primary">User Management</CardTitle>
-            <CardDescription>View and manage user roles in the system. Your view is based on your permissions.</CardDescription>
+            <CardDescription>
+              {isSuperAdmin
+                ? `Showing ${filteredUsers.length} of ${users.length} users across all organizations.`
+                : 'View and manage user roles in the system. Your view is based on your permissions.'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {users.length === 0 ? (
@@ -207,6 +229,7 @@ export default function AdminUserManagementPage() {
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
+                      {isSuperAdmin && <TableHead>Organization(s)</TableHead>}
                       <TableHead>Roles</TableHead>
                       <TableHead>Last Login</TableHead>
                       <TableHead className="min-w-[280px]">Change Roles</TableHead>
@@ -224,6 +247,19 @@ export default function AdminUserManagementPage() {
                         <TableCell className="font-medium">{user.displayName || 'N/A'}</TableCell>
                         <TableCell>{user.email || 'N/A'}</TableCell>
                         <TableCell>{user.phoneNumber || 'N/A'}</TableCell>
+                        {isSuperAdmin && (
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {(user.assignedOrganizationIds || []).length > 0
+                                ? (user.assignedOrganizationIds || []).map(orgId => (
+                                    <Badge key={orgId} variant="outline" className="text-xs">
+                                      {orgNameById[orgId] || orgId}
+                                    </Badge>
+                                  ))
+                                : <span className="text-xs text-muted-foreground">None</span>}
+                            </div>
+                          </TableCell>
+                        )}
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {(user.roles || ['unassigned']).map(role => (
@@ -234,15 +270,15 @@ export default function AdminUserManagementPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {user.lastLogin ? 
-                            `${formatDistanceToNow(parseISO(user.lastLogin), { addSuffix: true })}` 
+                          {user.lastLogin
+                            ? formatDistanceToNow(parseISO(user.lastLogin), { addSuffix: true })
                             : 'Never'}
                         </TableCell>
                         <TableCell>
                           {canManageRoles ? (
                             <UserRoleCell
                               user={user}
-                              isCallingUserSuperAdmin={isCallingUserSuperAdmin}
+                              isCallingUserSuperAdmin={isSuperAdmin}
                               onRolesUpdated={handleRolesUpdated}
                             />
                           ) : (
@@ -260,7 +296,7 @@ export default function AdminUserManagementPage() {
       </>
     );
   };
-  
+
   return (
     <AuthProviderClientComponent
       requiredPermission={PERMISSIONS.PAGE_VIEW_ADMIN_USERS_LIST}
