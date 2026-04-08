@@ -292,12 +292,12 @@ export default function ExportPage() {
                     <Label htmlFor="org-select" className="flex items-center gap-1.5">
                       <Building className="h-4 w-4" /> Organization
                     </Label>
-                    <Select value={selectedOrgId} onValueChange={v => { setSelectedOrgId(v); setSelectedSeriesId(''); }}>
+                    <Select value={selectedOrgId || '__all__'} onValueChange={v => { setSelectedOrgId(v === '__all__' ? '' : v); setSelectedSeriesId(''); }}>
                       <SelectTrigger id="org-select">
                         <SelectValue placeholder="All organizations" />
                       </SelectTrigger>
                       <SelectContent>
-                        {canExportOrg && <SelectItem value="">All organizations</SelectItem>}
+                        {canExportOrg && <SelectItem value="__all__">All organizations</SelectItem>}
                         {scope.orgs.map(o => (
                           <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
                         ))}
@@ -315,7 +315,7 @@ export default function ExportPage() {
                       ? ' (optional — leave blank to export all org data)'
                       : ' (required)'}
                   </Label>
-                  <Select value={selectedSeriesId} onValueChange={setSelectedSeriesId}>
+                  <Select value={selectedSeriesId || '__all__'} onValueChange={v => setSelectedSeriesId(v === '__all__' ? '' : v)}>
                     <SelectTrigger id="series-select">
                       <SelectValue placeholder={
                         scope.isSeriesAdmin && !scope.isOrgAdmin && !scope.isSuperAdmin
@@ -325,7 +325,7 @@ export default function ExportPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {(canExportOrg) && (
-                        <SelectItem value="">All series in organization</SelectItem>
+                        <SelectItem value="__all__">All series in organization</SelectItem>
                       )}
                       {filteredSeries.map(s => (
                         <SelectItem key={s.id} value={s.id}>
