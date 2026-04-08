@@ -371,6 +371,21 @@ export async function getAllPotentialAdmins(): Promise<UserProfile[]> {
   }
 }
 
+export async function getPotentialSeriesAdminsForOrg(organizationId: string): Promise<UserProfile[]> {
+  try {
+    const allUsers = await getAllUsersFromDB();
+    return allUsers.filter(user =>
+      // Super admins always included
+      user.roles.includes('admin') ||
+      // Series Admins scoped to the organization
+      (user.roles.includes('Series Admin') && (user.assignedOrganizationIds || []).includes(organizationId))
+    );
+  } catch (error) {
+    console.error("Error fetching potential series admins for org:", error);
+    return [];
+  }
+}
+
 export async function getAllPotentialGameSelectors(): Promise<UserProfile[]> {
   try {
     const allUsers = await getAllUsersFromDB();

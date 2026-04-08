@@ -4,22 +4,27 @@ import { useEffect, useState } from 'react';
 import { SeriesForm } from '@/components/series-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { Loader2, ShieldAlert, ArrowLeft, Info } from 'lucide-react';
 import type { UserProfile } from '@/types';
-import { getAllPotentialAdmins } from '@/lib/actions/user-actions';
+import { getPotentialSeriesAdminsForOrg } from '@/lib/actions/user-actions';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
+import { useAuth } from '@/contexts/auth-context';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 export default function AddSeriesPage() {
+  const { activeOrganizationId, isAuthLoading } = useAuth();
   const [potentialSeriesAdmins, setPotentialSeriesAdmins] = useState<UserProfile[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
+    if (isAuthLoading) return;
+    if (!activeOrganizationId) { setDataLoading(false); return; }
+
     async function fetchAdmins() {
       try {
-        const admins = await getAllPotentialAdmins();
+        const admins = await getPotentialSeriesAdminsForOrg(activeOrganizationId!);
         setPotentialSeriesAdmins(admins);
       } catch (error) {
         console.error("Error fetching potential series admins:", error);
@@ -27,9 +32,9 @@ export default function AddSeriesPage() {
       } finally {
         setDataLoading(false);
       }
-    };
+    }
     fetchAdmins();
-  }, []);
+  }, [activeOrganizationId, isAuthLoading]);
 
   return (
     <AuthProviderClientComponent
@@ -60,7 +65,13 @@ export default function AddSeriesPage() {
             <CardDescription>Enter the details for the new series and optionally assign administrators.</CardDescription>
           </CardHeader>
           <CardContent>
-            {dataLoading ? (
+            {!activeOrganizationId && !isAuthLoading ? (
+              <Alert variant="default" className="border-primary/50">
+                <Info className="h-5 w-5 text-primary" />
+                <AlertTitle>No Organization Selected</AlertTitle>
+                <AlertDescription>Please select an active organization from the navbar before adding a series.</AlertDescription>
+              </Alert>
+            ) : dataLoading || isAuthLoading ? (
               <div className="flex justify-center items-center py-10">
                 <Loader2 className="h-8 w-8 animate-spin" />
                 <p className="ml-2 text-muted-foreground">Loading admin data...</p>

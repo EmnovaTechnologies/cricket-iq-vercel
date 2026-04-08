@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { addSeriesAction } from '@/lib/actions/series-actions';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { useState, useMemo, useEffect, type ChangeEvent } from 'react';
 import { CalendarIcon, Search, Loader2, AlertTriangle, Info, Activity } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -217,15 +218,21 @@ export function SeriesForm({ initialData, onSubmitSuccess, potentialSeriesAdmins
     }
   }, [watchedFitnessTestType, form]);
 
+  const lockedSuperAdmins = useMemo(() => {
+    return potentialSeriesAdmins.filter(user => user.roles.includes('admin'));
+  }, [potentialSeriesAdmins]);
+
+  const selectableAdmins = useMemo(() => {
+    return potentialSeriesAdmins.filter(user => !user.roles.includes('admin'));
+  }, [potentialSeriesAdmins]);
+
   const filteredPotentialSeriesAdmins = useMemo(() => {
-    if (!adminSearchQuery) {
-      return potentialSeriesAdmins;
-    }
-    return potentialSeriesAdmins.filter(user =>
+    if (!adminSearchQuery) return selectableAdmins;
+    return selectableAdmins.filter(user =>
       (user.displayName?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase()) ||
       (user.email?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase())
     );
-  }, [potentialSeriesAdmins, adminSearchQuery]);
+  }, [selectableAdmins, adminSearchQuery]);
 
   async function onSubmit(data: SeriesFormValues) {
     if (!activeOrganizationId) {
@@ -241,7 +248,12 @@ export function SeriesForm({ initialData, onSubmitSuccess, potentialSeriesAdmins
       const payload = {
         ...trimmedData,
         organizationId: activeOrganizationId,
-        seriesAdminUids: data.seriesAdminUids || [],
+        seriesAdminUids: [
+          ...new Set([
+            ...(data.seriesAdminUids || []),
+            ...lockedSuperAdmins.map(u => u.uid),
+          ])
+        ],
         maleCutoffDate: data.maleCutoffDate && isValid(data.maleCutoffDate) ? format(data.maleCutoffDate, 'yyyy-MM-dd') : null,
         femaleCutoffDate: data.femaleCutoffDate && isValid(data.femaleCutoffDate) ? format(data.femaleCutoffDate, 'yyyy-MM-dd') : null,
         fitnessTestType: data.fitnessTestType || undefined,
@@ -447,24 +459,39 @@ export function SeriesForm({ initialData, onSubmitSuccess, potentialSeriesAdmins
               <div className="mb-2">
                 <FormLabel className="text-base">Assign Series Administrators (Optional)</FormLabel>
                 <FormDescription>
-                  Select users with 'Series Admin' or 'admin' roles to manage this series.
+                  Select users with 'Series Admin' role in this organization. Super admins are always included.
                 </FormDescription>
               </div>
+
+              {/* Locked super admins */}
+              {lockedSuperAdmins.length > 0 && (
+                <div className="rounded-md border bg-muted/30 p-2 mb-2 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned)</p>
+                  {lockedSuperAdmins.map(user => (
+                    <div key={user.uid} className="flex items-center gap-2 px-2 py-1 rounded opacity-70">
+                      <Checkbox checked disabled />
+                      <span className="text-sm flex-grow">{user.displayName || user.email}</span>
+                      <Badge variant="default" className="text-xs">Super Admin</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="relative mb-2">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search administrators by name or email..."
+                  placeholder="Search Series Admins by name or email..."
                   value={adminSearchQuery}
                   onChange={(e) => setAdminSearchQuery(e.target.value)}
                   className="pl-8 h-9"
                   disabled={isSubmitting || !activeOrganizationId}
                 />
               </div>
-              {potentialSeriesAdmins.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No users found with 'Series Admin' or 'admin' role to assign.</p>
+              {selectableAdmins.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No users with 'Series Admin' role found for this organization.</p>
               ) : filteredPotentialSeriesAdmins.length === 0 && adminSearchQuery ? (
-                 <p className="text-sm text-muted-foreground">No administrators found matching your search.</p>
+                <p className="text-sm text-muted-foreground">No Series Admins found matching your search.</p>
               ) : (
                 <ScrollArea className="h-40 rounded-md border p-2">
                   <div className="space-y-1.5">
@@ -495,7 +522,8 @@ export function SeriesForm({ initialData, onSubmitSuccess, potentialSeriesAdmins
                               />
                             </FormControl>
                             <FormLabel className="font-normal text-sm cursor-pointer flex-grow">
-                              {adminUser.displayName || adminUser.email} ({adminUser.roles.join(', ')})
+                              {adminUser.displayName || adminUser.email}
+                              <span className="text-muted-foreground ml-1 text-xs">(Series Admin)</span>
                             </FormLabel>
                           </FormItem>
                         )
