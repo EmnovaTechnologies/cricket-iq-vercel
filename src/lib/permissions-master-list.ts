@@ -119,6 +119,11 @@ export const PERMISSIONS = {
 
   // AI Feature Permissions
   AI_USE_TEAM_COMPOSITION: 'ai:use_team_composition',
+
+  // Data Export Permissions
+  PAGE_VIEW_EXPORT: 'page:view:export',
+  DATA_EXPORT_ORG: 'data:export:org',       // Org Admin — export all data for their org
+  DATA_EXPORT_SERIES: 'data:export:series', // Series Admin — export data for assigned series only
 } as const;
 
 export type PermissionKey = typeof PERMISSIONS[keyof typeof PERMISSIONS];
@@ -133,6 +138,14 @@ export const PERMISSION_CATEGORIES = {
       PERMISSIONS.PAGE_VIEW_SIGNUP,
       PERMISSIONS.PAGE_VIEW_TEAM_COMPOSITION,
       PERMISSIONS.AI_USE_TEAM_COMPOSITION,
+    ]
+  },
+  DATA_EXPORT: {
+    label: 'Data Export',
+    permissions: [
+      PERMISSIONS.PAGE_VIEW_EXPORT,
+      PERMISSIONS.DATA_EXPORT_ORG,
+      PERMISSIONS.DATA_EXPORT_SERIES,
     ]
   },
   PLAYER_PERMISSIONS: {
@@ -377,4 +390,8 @@ export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
   [PERMISSIONS.USERS_MANAGE_ROLES_ASSIGNED_ORG]: "Assign/change roles for users within their assigned organization(s) (Org Admin)",
 
   [PERMISSIONS.AI_USE_TEAM_COMPOSITION]: "Use AI Team Composition tool",
+
+  [PERMISSIONS.PAGE_VIEW_EXPORT]: "View Data Export page",
+  [PERMISSIONS.DATA_EXPORT_ORG]: "Export all data (players, ratings) for their assigned organization",
+  [PERMISSIONS.DATA_EXPORT_SERIES]: "Export data (players, ratings) for their assigned series only",
 };
