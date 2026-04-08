@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import PlayerCard from '@/components/player-card';
 import { getPlayersWithDetailsFromDB, getAllTeamsFromDB } from '@/lib/db'; // Added getAllTeamsFromDB
 import type { PlayerWithRatings, Team } from '@/types'; // Added Team
-import { PlusCircle, Search as SearchIcon, Upload, Info, Loader2, ShieldAlert, AlertCircle, Filter as FilterIcon } from 'lucide-react'; // Added FilterIcon
+import { PlusCircle, Search as SearchIcon, Upload, Info, Loader2, ShieldAlert, AlertCircle, Filter as FilterIcon, UserSquare2 } from 'lucide-react'; // Added FilterIcon
 import { useState, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -168,7 +168,7 @@ export default function PlayersPage() {
     >
       <div className="space-y-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-3xl font-headline font-bold text-primary">Players</h1>
+          <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2"><UserSquare2 className="h-8 w-8" /> Players</h1>
           <div className="flex flex-col sm:flex-row gap-2">
             {canImportPlayers && (
               <Button asChild variant="secondary" disabled={!activeOrganizationId}>
