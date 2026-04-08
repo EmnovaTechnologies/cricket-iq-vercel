@@ -75,11 +75,13 @@ export default function TeamsPage() {
         )}
         {!isPermissionsLoading && canAddTeams && (
           <div className="flex gap-2">
-            <Button asChild variant="outline" disabled={!activeOrganizationId}>
+            <Button asChild variant="secondary" disabled={!activeOrganizationId}>
               <Link href="/teams/import" className="flex items-center gap-2">
                 <Upload className="h-5 w-5" /> Import Teams
               </Link>
             </Button>
+
+
             <Button asChild className="bg-primary hover:bg-primary/90" disabled={!activeOrganizationId}>
               <Link href="/teams/add" className="flex items-center gap-2">
                 <PlusCircle className="h-5 w-5" /> Add New Team
