@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { TeamForm } from '@/components/team-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { Loader2, ShieldAlert, Info, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { getPotentialTeamManagersForOrg } from '@/lib/actions/user-actions';
