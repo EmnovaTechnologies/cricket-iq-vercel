@@ -1,7 +1,6 @@
 'use server';
 
 import { adminDb } from '../firebase-admin';
-import type { Query, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { format, parseISO, isValid } from 'date-fns';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -45,7 +44,7 @@ export interface PlayerExportRow {
   PrimaryTeamName: string;
   GamesPlayed: number;
   SeriesName: string;
-  OrganizationId: string;
+  Organization: string;
 }
 
 export interface RatingSummaryRow {
@@ -157,7 +156,7 @@ export async function getExportScopeAction(uid: string): Promise<ExportScope> {
 
   if (isSuperAdmin || isOrgAdmin) {
     // All active series — scoped by org if org admin
-    let seriesQuery: Query = adminDb.collection('series').where('status', '==', 'active');
+    let seriesQuery: any = adminDb.collection('series').where('status', '==', 'active');
     if (isOrgAdmin && !isSuperAdmin && orgs.length > 0) {
       seriesQuery = seriesQuery.where('organizationId', 'in', orgs.map(o => o.id));
     }
@@ -238,33 +237,49 @@ export async function exportPlayersAction(params: {
     teamsSnap.docs.forEach(d => { teamNameById[d.id] = (d.data().name || '').trim(); });
   }
 
+  // Fetch org name for display
+  const orgNameMap: Record<string, string> = {};
+  const orgIds = new Set<string>();
+  // Collect org IDs after fetching players (done below in chunks)
+
   // Fetch player docs in chunks of 30
   const rows: PlayerExportRow[] = [];
+  const playerDocs: { id: string; data: any }[] = [];
   for (let i = 0; i < playerIds.length; i += 30) {
     const chunk = playerIds.slice(i, i + 30);
     const snap = await adminDb.collection('players').where('__name__', 'in', chunk).get();
     snap.docs.forEach(d => {
-      const p = d.data();
-      rows.push({
-        PlayerName: (p.name || '').trim(),
-        FirstName: (p.firstName || '').trim(),
-        LastName: (p.lastName || '').trim(),
-        CricClubsID: p.cricClubsId || '',
-        DateOfBirth: p.dateOfBirth || '',
-        Gender: p.gender || '',
-        PrimarySkill: p.primarySkill || '',
-        DominantHandBatting: p.dominantHandBatting || '',
-        BattingOrder: p.battingOrder || '',
-        DominantHandBowling: p.dominantHandBowling || '',
-        BowlingStyle: p.bowlingStyle || '',
-        ClubName: p.clubName || '',
-        PrimaryTeamName: p.primaryTeamId ? (teamNameById[p.primaryTeamId] || p.primaryTeamId) : '',
-        GamesPlayed: p.gamesPlayed || 0,
-        SeriesName: seriesName || '',
-        OrganizationId: p.organizationId || '',
-      });
+      playerDocs.push({ id: d.id, data: d.data() });
+      if (d.data().organizationId) orgIds.add(d.data().organizationId);
     });
   }
+
+  // Resolve org names
+  for (const oid of Array.from(orgIds)) {
+    const orgSnap = await adminDb.collection('organizations').doc(oid).get();
+    if (orgSnap.exists) orgNameMap[oid] = (orgSnap.data()!.name || '').trim();
+  }
+
+  playerDocs.forEach(({ data: p }) => {
+    rows.push({
+      PlayerName: (p.name || '').trim(),
+      FirstName: (p.firstName || '').trim(),
+      LastName: (p.lastName || '').trim(),
+      CricClubsID: p.cricClubsId || '',
+      DateOfBirth: p.dateOfBirth || '',
+      Gender: p.gender || '',
+      PrimarySkill: p.primarySkill || '',
+      DominantHandBatting: p.dominantHandBatting || '',
+      BattingOrder: p.battingOrder || '',
+      DominantHandBowling: p.dominantHandBowling || '',
+      BowlingStyle: p.bowlingStyle || '',
+      ClubName: p.clubName || '',
+      PrimaryTeamName: p.primaryTeamId ? (teamNameById[p.primaryTeamId] || p.primaryTeamId) : '',
+      GamesPlayed: p.gamesPlayed || 0,
+      SeriesName: seriesName || '',
+      Organization: p.organizationId ? (orgNameMap[p.organizationId] || p.organizationId) : '',
+    });
+  });
 
   rows.sort((a, b) => a.PlayerName.localeCompare(b.PlayerName));
 
@@ -286,7 +301,7 @@ export async function exportRatingsAction(params: {
   const { seriesId, organizationId, ratingsFilter, seriesName, orgName } = params;
 
   // ── Fetch games ──────────────────────────────────────────────────────────
-  let gamesQuery: Query = adminDb.collection('games');
+  let gamesQuery: any = adminDb.collection('games');
   if (seriesId) {
     gamesQuery = gamesQuery.where('seriesId', '==', seriesId);
   } else if (organizationId) {
@@ -342,7 +357,7 @@ export async function exportRatingsAction(params: {
 
   // ── Fetch all player ratings for these games ─────────────────────────────
   const gameIds = gamesSnap.docs.map(d => d.id);
-  const allRatingDocs: QueryDocumentSnapshot[] = [];
+  const allRatingDocs: any[] = [];
   for (let i = 0; i < gameIds.length; i += 30) {
     const chunk = gameIds.slice(i, i + 30);
     const snap = await adminDb.collection('playerRatings').where('gameId', 'in', chunk).get();
