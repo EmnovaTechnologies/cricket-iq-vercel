@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { importGamesAction } from '@/lib/actions/import-actions';
+import { importGamesAdminAction } from '@/lib/actions/import-games-admin-action';
 import { getGamesTemplateData } from '@/lib/actions/games-template-action';
 import type { CsvGameImportRow, GameImportResult } from '@/types';
 import { Loader2, Upload, AlertTriangle, CheckCircle, ListChecks, FileText, FileSpreadsheet, Download } from 'lucide-react';
@@ -140,7 +141,7 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
     setXlsxIsLoading(true); setXlsxImportResult(null); setXlsxProgress(0);
     try {
       const interval = setInterval(() => setXlsxProgress(p => p < 90 ? p + 10 : p), 200);
-      const result = await importGamesAction(xlsxParsedData);
+      const result = await importGamesAdminAction(xlsxParsedData);
       clearInterval(interval); setXlsxProgress(100); setXlsxImportResult(result);
       toast({ title: result.success ? 'Import Completed' : 'Import Failed', description: `${result.successfulImports} imported, ${result.failedImports} failed.`, variant: result.success ? 'default' : 'destructive' });
     } catch {
@@ -175,33 +176,40 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
       const seriesNames = data.series.map(s => s.name);
       const venueNames  = data.venues.map(v => v.name);
       const teamNames   = data.teams.map(t => t.name);
+      const selectorEmails = data.selectorEmails;
 
-      // Column A = series, B = venues, C = teams
-      const maxRows = Math.max(seriesNames.length, venueNames.length, teamNames.length);
+      // Column A = series, B = venues, C = teams, D = selector emails
+      const maxRows = Math.max(seriesNames.length, venueNames.length, teamNames.length, selectorEmails.length, 1);
       for (let i = 0; i < maxRows; i++) {
-        listsSheet.getCell(i + 1, 1).value = seriesNames[i] || null;
-        listsSheet.getCell(i + 1, 2).value = venueNames[i]  || null;
-        listsSheet.getCell(i + 1, 3).value = teamNames[i]   || null;
+        listsSheet.getCell(i + 1, 1).value = seriesNames[i]    || null;
+        listsSheet.getCell(i + 1, 2).value = venueNames[i]     || null;
+        listsSheet.getCell(i + 1, 3).value = teamNames[i]      || null;
+        listsSheet.getCell(i + 1, 4).value = selectorEmails[i] || null;
       }
 
       // Define named ranges for each list
-      const sLen = seriesNames.length || 1;
-      const vLen = venueNames.length  || 1;
-      const tLen = teamNames.length   || 1;
+      const sLen = seriesNames.length   || 1;
+      const vLen = venueNames.length    || 1;
+      const tLen = teamNames.length     || 1;
+      const eLen = selectorEmails.length || 1;
       wb.definedNames.add(`_Lists!$A$1:$A$${sLen}`, 'SeriesList');
       wb.definedNames.add(`_Lists!$B$1:$B$${vLen}`, 'VenueList');
       wb.definedNames.add(`_Lists!$C$1:$C$${tLen}`, 'TeamList');
+      if (selectorEmails.length > 0) {
+        wb.definedNames.add(`_Lists!$D$1:$D$${eLen}`, 'SelectorList');
+      }
 
       // ── Sheet 2: Games Import ─────────────────────────────────────────────
       const ws = wb.addWorksheet('Games Import');
       ws.views = [{ state: 'frozen', ySplit: 1 }];
 
       const headers = [
-        { key: 'GameDate',   label: 'GameDate',   width: 16, required: true,  color: '2E75B6' },
-        { key: 'SeriesName', label: 'SeriesName',  width: 36, required: true,  color: '2E75B6' },
-        { key: 'VenueName',  label: 'VenueName',   width: 28, required: true,  color: '2E75B6' },
-        { key: 'Team1Name',  label: 'Team1Name',   width: 28, required: true,  color: '2E75B6' },
-        { key: 'Team2Name',  label: 'Team2Name',   width: 28, required: true,  color: '2E75B6' },
+        { key: 'GameDate',          label: 'GameDate',          width: 16, required: true,  color: '2E75B6' },
+        { key: 'SeriesName',        label: 'SeriesName',        width: 36, required: true,  color: '2E75B6' },
+        { key: 'VenueName',         label: 'VenueName',         width: 28, required: true,  color: '2E75B6' },
+        { key: 'Team1Name',         label: 'Team1Name',         width: 28, required: true,  color: '2E75B6' },
+        { key: 'Team2Name',         label: 'Team2Name',         width: 28, required: true,  color: '2E75B6' },
+        { key: 'GameSelectorEmails',label: 'GameSelectorEmails',width: 40, required: false, color: navy   },
       ];
 
       // Header row
@@ -268,6 +276,14 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
           error: 'Please select from the dropdown list.',
           showDropDown: false,
         };
+        // GameSelectorEmails dropdown (col 6) — optional, allow free text too
+        if (selectorEmails.length > 0) {
+          ws.getCell(r, 6).dataValidation = {
+            type: 'list', allowBlank: true, showErrorMessage: false,
+            formulae: ['SelectorList'],
+            showDropDown: false,
+          };
+        }
       }
 
       // ── Sheet 3: Valid Values ─────────────────────────────────────────────
@@ -315,6 +331,12 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
           .sort((a, b) => a[0].localeCompare(b[0]))
       );
 
+      addSection('SELECTORS (Eligible for this organization)', ['Email'],
+        data.selectorEmails.length > 0
+          ? data.selectorEmails.map(e => [e])
+          : [['No eligible selectors found for this organization']]
+      );
+
       // ── Sheet 4: Instructions ─────────────────────────────────────────────
       const instrWs = wb.addWorksheet('Instructions');
       instrWs.getColumn(1).width = 22;
@@ -347,11 +369,12 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
       addInstrRow(['Column', 'Required', 'Rule'], true);
 
       const rules = [
-        ['GameDate',   'YES', 'Date of the game. Format: MM/DD/YYYY  e.g. 04/15/2026. Type as text — do not use Excel date format.'],
-        ['SeriesName', 'YES', 'Must match an active series in your organization. Select from the dropdown or refer to the Valid Values sheet.'],
-        ['VenueName',  'YES', 'Must match a venue already associated with the selected series. Select from dropdown or see Valid Values sheet.'],
-        ['Team1Name',  'YES', 'Must match a team already in the selected series. Select from dropdown or see Valid Values sheet.'],
-        ['Team2Name',  'YES', 'Must be a different team in the same series. Cannot be the same as Team1Name.'],
+        ['GameDate',          'YES',      'Date of the game. Format: MM/DD/YYYY  e.g. 04/15/2026. Type as text — do not use Excel date format.'],
+        ['SeriesName',        'YES',      'Must match an active series in your organization. Select from the dropdown or refer to the Valid Values sheet.'],
+        ['VenueName',         'YES',      'Must match a venue already associated with the selected series. Select from dropdown or see Valid Values sheet.'],
+        ['Team1Name',         'YES',      'Must match a team already in the selected series. Select from dropdown or see Valid Values sheet.'],
+        ['Team2Name',         'YES',      'Must be a different team in the same series. Cannot be the same as Team1Name.'],
+        ['GameSelectorEmails','Optional', 'Comma-separated emails of selectors/admins for this org. Select from dropdown or type manually. Selectors can also be assigned after import.'],
       ];
       rules.forEach(r => addInstrRow(r));
 
@@ -379,7 +402,7 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
 
       toast({
         title: 'Template downloaded!',
-        description: `Includes ${data.series.length} series, ${data.venues.length} venues, ${data.teams.length} teams as dropdown options.`,
+        description: `Includes ${data.series.length} series, ${data.venues.length} venues, ${data.teams.length} teams, ${data.selectorEmails.length} selectors.`,
       });
     } catch (e: any) {
       console.error('Template generation error:', e);
