@@ -12,11 +12,12 @@ import { USER_ROLES } from '@/lib/constants';
 import { PERMISSIONS } from '@/lib/permissions-master-list'; // Ensure PERMISSIONS is imported
 
 interface EditRolePermissionsPageProps {
-  params: { roleName: UserRole | string }; // roleName from URL
+  params: Promise<{ roleName: UserRole | string }>; // roleName from URL
 }
 
-export default function EditRolePermissionsPage({ params }: EditRolePermissionsPageProps) {
-  const decodedRoleName = decodeURIComponent(params.roleName);
+export default async function EditRolePermissionsPage({ params }: EditRolePermissionsPageProps) {
+  const { roleName } = await params;
+  const decodedRoleName = decodeURIComponent(roleName);
 
   // Validate if the roleName from URL is a known, manageable role
   const isValidRole = USER_ROLES.includes(decodedRoleName as UserRole) && decodedRoleName !== 'admin' && decodedRoleName !== 'unassigned';
