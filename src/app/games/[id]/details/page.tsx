@@ -279,12 +279,6 @@ export default function GameDetailsPage() {
     setIsLoadingGameSelectors(false);
   };
 
-  if (isLoadingPageData || isPermissionsLoading) { return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />Loading game data...</div>; }
-  if (!game) { return <p className="text-center text-muted-foreground">Game not found.</p>; }
-
-  const canManageRoster = !!effectivePermissions[PERMISSIONS.GAMES_MANAGE_ROSTER_ANY];
-  const canManageSelectors = !!effectivePermissions[PERMISSIONS.GAMES_MANAGE_SELECTORS_ANY];
-
   const lockedSuperAdmins = useMemo(() =>
     potentialGameSelectorsToAssign.filter(u => u.roles.includes('admin')),
     [potentialGameSelectorsToAssign]
@@ -293,6 +287,13 @@ export default function GameDetailsPage() {
     potentialGameSelectorsToAssign.filter(u => !u.roles.includes('admin')),
     [potentialGameSelectorsToAssign]
   );
+  if (isLoadingPageData || isPermissionsLoading) { return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />Loading game data...</div>; }
+
+  if (!game) { return <p className="text-center text-muted-foreground">Game not found.</p>; }
+
+  const canManageRoster = !!effectivePermissions[PERMISSIONS.GAMES_MANAGE_ROSTER_ANY];
+  const canManageSelectors = !!effectivePermissions[PERMISSIONS.GAMES_MANAGE_SELECTORS_ANY];
+
   const canRatePlayers = !isFutureGame && (
     !!effectivePermissions[PERMISSIONS.GAMES_RATE_ANY] || 
     (!!effectivePermissions[PERMISSIONS.GAMES_RATE_ASSIGNED] && !!game?.selectorUserIds?.includes(currentAuthProfile?.uid || ''))

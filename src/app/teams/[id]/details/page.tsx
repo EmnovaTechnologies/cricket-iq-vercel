@@ -9,6 +9,7 @@ import { linkPlayerToTeamAction, updateTeamManagersAction, searchGlobalPlayersAc
 import type { Team, Player, UserProfile, AgeCategory, GlobalPlayerSearchResult } from '@/types';
 import { ArrowLeft, Users, Tag, UserPlus, UserSquare2, Shield, Binary, UserCog, Save, Edit3, Search, Globe, Loader2, Check, ChevronsUpDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -22,7 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { differenceInYears, parseISO, isValid } from 'date-fns';
 import { useAuth } from '@/contexts/auth-context';
-import { getAllPotentialTeamManagers, getUserProfile } from '@/lib/actions/user-actions';
+import { getPotentialTeamManagersForOrg, getUserProfile } from '@/lib/actions/user-actions';
 import { CricketBatIcon, CricketBallIcon } from '@/components/custom-icons';
 
 
@@ -63,15 +64,23 @@ export default function TeamDetailsPage() {
   const [isLoadingGlobalSearch, setIsLoadingGlobalSearch] = useState(false);
 
 
+  const lockedSuperAdmins = useMemo(() =>
+    potentialTeamManagersToAssign.filter(u => u.roles.includes('admin')),
+    [potentialTeamManagersToAssign]
+  );
+  const selectableManagers = useMemo(() =>
+    potentialTeamManagersToAssign.filter(u => !u.roles.includes('admin')),
+    [potentialTeamManagersToAssign]
+  );
   const filteredPotentialTeamManagers = useMemo(() => {
     if (!managerSearchQuery) {
-      return potentialTeamManagersToAssign;
+      return selectableManagers;
     }
-    return potentialTeamManagersToAssign.filter(user =>
+    return selectableManagers.filter(user =>
       (user.displayName?.toLowerCase() || '').includes(managerSearchQuery.toLowerCase()) ||
       (user.email?.toLowerCase() || '').includes(managerSearchQuery.toLowerCase())
     );
-  }, [potentialTeamManagersToAssign, managerSearchQuery]);
+  }, [selectableManagers, managerSearchQuery]);
 
   const fetchData = async () => {
     if (teamId) {
@@ -128,7 +137,7 @@ export default function TeamDetailsPage() {
         }
         
         if (currentAuthProfile?.roles?.includes('admin') || currentAuthProfile?.roles?.includes('Series Admin')) {
-            const potentialManagers = await getAllPotentialTeamManagers();
+            const potentialManagers = await getPotentialTeamManagersForOrg(currentTeam.organizationId);
             setPotentialTeamManagersToAssign(potentialManagers);
         }
   
@@ -194,7 +203,8 @@ export default function TeamDetailsPage() {
   const handleSaveTeamManagers = async () => {
     if (!team) return;
     setIsSavingManagers(true);
-    const result = await updateTeamManagersAction(team.id, selectedManagerUidsForUpdate);
+    const finalUids = [...new Set([...selectedManagerUidsForUpdate, ...lockedSuperAdmins.map(u => u.uid)])];
+    const result = await updateTeamManagersAction(team.id, finalUids);
     if (result.success) {
       toast({ title: "Team Managers Updated", description: result.message });
       setIsEditingManagers(false); 
@@ -309,7 +319,7 @@ export default function TeamDetailsPage() {
             <Card className="mt-4 border-dashed">
                 <CardHeader className="pb-2">
                     <CardTitle className="text-md font-semibold">Manage Team Managers</CardTitle>
-                    <CardDescription className="text-xs">Assign or change managers for this team. Users with 'Team Manager', 'admin', or 'Series Admin' roles can be selected.</CardDescription>
+                    <CardDescription className="text-xs">Select users with 'Team Manager' or 'Series Admin' role in this organization. Super admins are always included.</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-2 space-y-2">
                     <div className="relative">
@@ -322,8 +332,20 @@ export default function TeamDetailsPage() {
                           className="pl-8 h-9"
                         />
                     </div>
-                    {potentialTeamManagersToAssign.length === 0 ? (
-                         <p className="text-sm text-muted-foreground">No users with 'Team Manager', 'admin', or 'Series Admin' role found to assign.</p>
+                    {lockedSuperAdmins.length > 0 && (
+                      <div className="rounded-md border bg-muted/30 p-2 space-y-1 mb-2">
+                        <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned)</p>
+                        {lockedSuperAdmins.map(user => (
+                          <div key={user.uid} className="flex items-center gap-2 px-2 py-1 rounded opacity-70">
+                            <Checkbox checked disabled />
+                            <span className="text-sm flex-grow">{user.displayName || user.email}</span>
+                            <Badge variant="default" className="text-xs">Super Admin</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {selectableManagers.length === 0 ? (
+                         <p className="text-sm text-muted-foreground">No users with 'Team Manager' or 'Series Admin' role found for this organization.</p>
                     ) : filteredPotentialTeamManagers.length === 0 && managerSearchQuery ? (
                          <p className="text-sm text-muted-foreground">No managers found matching your search.</p>
                     ) : (
@@ -347,7 +369,8 @@ export default function TeamDetailsPage() {
                                         htmlFor={`manager-${user.uid}`}
                                         className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                     >
-                                    {user.displayName || user.email} ({user.roles.join(', ')})
+                                    {user.displayName || user.email}
+                                    <span className="text-muted-foreground ml-1 text-xs">({user.roles.filter(r => r !== 'admin').join(', ')})</span>
                                     </label>
                                 </div>
                                 ))}
@@ -359,7 +382,7 @@ export default function TeamDetailsPage() {
                     <Button variant="ghost" onClick={() => { setIsEditingManagers(false); setManagerSearchQuery(''); setSelectedManagerUidsForUpdate(team?.teamManagerUids || []); }}>Cancel</Button>
                     <Button 
                         onClick={handleSaveTeamManagers} 
-                        disabled={isSavingManagers || potentialTeamManagersToAssign.length === 0}
+                        disabled={isSavingManagers}
                     >
                        {isSavingManagers ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Managers
                     </Button>
