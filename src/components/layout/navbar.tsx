@@ -317,8 +317,8 @@ const Navbar = () => {
                         ))}
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild disabled={!userProfile.playerId}>
-                      <Link href={userProfile.playerId ? `/players/${userProfile.playerId}` : '#'}>
+                    <DropdownMenuItem asChild>
+                      <Link href={userProfile.playerId ? `/players/${userProfile.playerId}` : '/profile'}>
                           <User className="mr-2 h-4 w-4" />Profile
                       </Link>
                     </DropdownMenuItem>
