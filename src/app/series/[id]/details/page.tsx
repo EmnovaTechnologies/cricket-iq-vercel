@@ -29,7 +29,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/auth-context';
-import { getAllPotentialAdmins } from '@/lib/actions/user-actions';
+import { getPotentialSeriesAdminsForOrg } from '@/lib/actions/user-actions';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
@@ -141,7 +141,7 @@ export default function SeriesDetailsPage() {
           }
 
           if (effectivePermissions[PERMISSIONS.SERIES_MANAGE_ADMINS_ANY]) {
-              const potentialAdmins = await getAllPotentialAdmins();
+              const potentialAdmins = await getPotentialSeriesAdminsForOrg(currentSeries.organizationId);
               setPotentialSeriesAdminsToAssign(potentialAdmins);
           }
         }
@@ -169,15 +169,23 @@ export default function SeriesDetailsPage() {
   }, [series, isEditingFitnessCriteria]);
 
 
+  const lockedSuperAdmins = useMemo(() =>
+    potentialSeriesAdminsToAssign.filter(u => u.roles.includes('admin')),
+    [potentialSeriesAdminsToAssign]
+  );
+
+  const selectableAdmins = useMemo(() =>
+    potentialSeriesAdminsToAssign.filter(u => !u.roles.includes('admin')),
+    [potentialSeriesAdminsToAssign]
+  );
+
   const filteredPotentialSeriesAdmins = useMemo(() => {
-    if (!adminSearchQuery) {
-      return potentialSeriesAdminsToAssign;
-    }
-    return potentialSeriesAdminsToAssign.filter(user =>
+    if (!adminSearchQuery) return selectableAdmins;
+    return selectableAdmins.filter(user =>
       (user.displayName?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase()) ||
       (user.email?.toLowerCase() || '').includes(adminSearchQuery.toLowerCase())
     );
-  }, [potentialSeriesAdminsToAssign, adminSearchQuery]);
+  }, [selectableAdmins, adminSearchQuery]);
 
 
   const handleAddTeamToSeries = async () => {
@@ -222,7 +230,11 @@ export default function SeriesDetailsPage() {
         return;
     }
     setIsLoadingSeriesAdmins(true);
-    const result = await updateSeriesAdminsAction(seriesId, selectedAdminUidsForUpdate);
+    const finalUids = [...new Set([
+      ...selectedAdminUidsForUpdate,
+      ...lockedSuperAdmins.map(u => u.uid),
+    ])];
+    const result = await updateSeriesAdminsAction(seriesId, finalUids);
     if (result.success) {
       toast({ title: "Series Admins Updated", description: result.message });
       setIsEditingAdmins(false);
@@ -541,23 +553,36 @@ export default function SeriesDetailsPage() {
         <Card>
             <CardHeader>
                 <CardTitle className="text-xl font-headline text-primary">Manage Series Administrators</CardTitle>
-                <CardDescription>Select users to administer this series. Users with 'Series Admin' or 'admin' roles can be assigned.</CardDescription>
+                <CardDescription>Select users with 'Series Admin' role in this organization. Super admins are always included.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-                 <div className="relative">
+                {/* Locked super admins */}
+                {lockedSuperAdmins.length > 0 && (
+                  <div className="rounded-md border bg-muted/30 p-2 space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned)</p>
+                    {lockedSuperAdmins.map(user => (
+                      <div key={user.uid} className="flex items-center gap-2 px-2 py-1 rounded opacity-70">
+                        <Checkbox checked disabled />
+                        <span className="text-sm flex-grow">{user.displayName || user.email}</span>
+                        <Badge variant="default" className="text-xs">Super Admin</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="relative">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="search"
-                      placeholder="Search administrators by name or email..."
+                      placeholder="Search Series Admins by name or email..."
                       value={adminSearchQuery}
                       onChange={(e) => setAdminSearchQuery(e.target.value)}
                       className="pl-8 h-9"
                     />
                 </div>
-                {potentialSeriesAdminsToAssign.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No users with 'Series Admin' or 'admin' role found to assign.</p>
+                {selectableAdmins.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No users with 'Series Admin' role found for this organization.</p>
                 ) : filteredPotentialSeriesAdmins.length === 0 && adminSearchQuery ? (
-                    <p className="text-sm text-muted-foreground">No administrators found matching your search.</p>
+                    <p className="text-sm text-muted-foreground">No Series Admins found matching your search.</p>
                 ) : (
                     <ScrollArea className="h-60 rounded-md border p-4">
                         <div className="space-y-2">
@@ -578,7 +603,8 @@ export default function SeriesDetailsPage() {
                                     htmlFor={`admin-${user.uid}`}
                                     className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                 >
-                                    {user.displayName || user.email} ({user.roles.join(', ')})
+                                    {user.displayName || user.email}
+                                    <span className="text-muted-foreground ml-1 text-xs">(Series Admin)</span>
                                 </label>
                             </div>
                         ))}
@@ -588,7 +614,7 @@ export default function SeriesDetailsPage() {
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => { setIsEditingAdmins(false); setSelectedAdminUidsForUpdate(series.seriesAdminUids || []); setAdminSearchQuery(''); }}>Cancel</Button>
-                <Button onClick={handleSaveSeriesAdmins} disabled={isLoadingSeriesAdmins || potentialSeriesAdminsToAssign.length === 0}>
+                <Button onClick={handleSaveSeriesAdmins} disabled={isLoadingSeriesAdmins}>
                     {isLoadingSeriesAdmins ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Administrators
                 </Button>
             </CardFooter>
