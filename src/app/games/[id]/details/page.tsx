@@ -11,6 +11,7 @@ import { format, parseISO, startOfDay } from 'date-fns';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -19,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/auth-context';
-import { getUsersByRole } from '@/lib/actions/user-actions';
+import { getPotentialSelectorsForOrg } from '@/lib/actions/user-actions';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; // Added Popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -203,13 +204,9 @@ export default function GameDetailsPage() {
           setSelectedSelectorUidsForUpdate(fetchedGame.selectorUserIds || []);
 
           const canManage = !!effectivePermissions[PERMISSIONS.GAMES_MANAGE_SELECTORS_ANY];
-          if (canManage) {
-            const adminUsers = await getUsersByRole('admin'); 
-            const seriesAdminUsers = await getUsersByRole('Series Admin'); 
-            const selectorUsers = await getUsersByRole('selector');
-            const combined = [...adminUsers, ...seriesAdminUsers, ...selectorUsers];
-            const uniqueCombined = Array.from(new Map(combined.map(u => [u.uid, u])).values()).sort((a,b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''));
-            setPotentialGameSelectorsToAssign(uniqueCombined);
+          if (canManage && currentSeries?.organizationId) {
+            const selectors = await getPotentialSelectorsForOrg(currentSeries.organizationId);
+            setPotentialGameSelectorsToAssign(selectors);
           }
       } else {
         setFormattedGameDate(null); setIsFutureGame(false); setSeries(undefined); setPotentialTeam1Players([]); setPotentialTeam2Players([]); setAvailablePlayersForGame([]); setGameSelectors([]); setSelectedSelectorUidsForUpdate([]);
@@ -272,7 +269,11 @@ export default function GameDetailsPage() {
 
   const handleSaveGameSelectors = async () => {
     if (!gameId) return; setIsLoadingGameSelectors(true);
-    const result = await updateGameSelectorsAction(gameId, selectedSelectorUidsForUpdate);
+    const finalUids = [...new Set([
+      ...selectedSelectorUidsForUpdate,
+      ...lockedSuperAdmins.map(u => u.uid),
+    ])];
+    const result = await updateGameSelectorsAction(gameId, finalUids);
     if (result.success) { toast({ title: "Game Selectors Updated", description: result.message }); setIsEditingSelectors(false); await refreshGameAndPlayerData(); }
     else { toast({ title: "Error", description: result.message, variant: "destructive" }); }
     setIsLoadingGameSelectors(false);
@@ -283,6 +284,15 @@ export default function GameDetailsPage() {
 
   const canManageRoster = !!effectivePermissions[PERMISSIONS.GAMES_MANAGE_ROSTER_ANY];
   const canManageSelectors = !!effectivePermissions[PERMISSIONS.GAMES_MANAGE_SELECTORS_ANY];
+
+  const lockedSuperAdmins = useMemo(() =>
+    potentialGameSelectorsToAssign.filter(u => u.roles.includes('admin')),
+    [potentialGameSelectorsToAssign]
+  );
+  const selectableSelectors = useMemo(() =>
+    potentialGameSelectorsToAssign.filter(u => !u.roles.includes('admin')),
+    [potentialGameSelectorsToAssign]
+  );
   const canRatePlayers = !isFutureGame && (
     !!effectivePermissions[PERMISSIONS.GAMES_RATE_ANY] || 
     (!!effectivePermissions[PERMISSIONS.GAMES_RATE_ASSIGNED] && !!game?.selectorUserIds?.includes(currentAuthProfile?.uid || ''))
@@ -382,18 +392,35 @@ export default function GameDetailsPage() {
       </Card>
 
       {isEditingSelectors && canManageSelectors && (<Card><CardHeader>
-            <CardTitle className="text-xl font-headline text-primary">Manage Game Selectors</CardTitle><CardDescription>Select users to act as selectors. Eligible roles: 'selector', 'Series Admin', 'admin'.</CardDescription>
-          </CardHeader><CardContent>
-            {potentialGameSelectorsToAssign.length === 0 ? (<p className="text-muted-foreground">No users with eligible roles found.</p>)
+            <CardTitle className="text-xl font-headline text-primary">Manage Game Selectors</CardTitle>
+            <CardDescription>Select users with 'selector' or 'Series Admin' role in this organization. Super admins are always included.</CardDescription>
+          </CardHeader><CardContent className="space-y-3">
+            {/* Locked super admins */}
+            {lockedSuperAdmins.length > 0 && (
+              <div className="rounded-md border bg-muted/30 p-2 space-y-1">
+                <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned)</p>
+                {lockedSuperAdmins.map(user => (
+                  <div key={user.uid} className="flex items-center gap-2 px-2 py-1 rounded opacity-70">
+                    <Checkbox checked disabled />
+                    <span className="text-sm flex-grow">{user.displayName || user.email}</span>
+                    <Badge variant="default" className="text-xs">Super Admin</Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+            {selectableSelectors.length === 0 ? (<p className="text-muted-foreground text-sm">No users with 'selector' or 'Series Admin' role found for this organization.</p>)
             : (<ScrollArea className="h-60 rounded-md border p-4"><div className="space-y-2">
-                {potentialGameSelectorsToAssign.map(user => (<div key={user.uid} className="flex items-center space-x-2">
+                {selectableSelectors.map(user => (<div key={user.uid} className="flex items-center space-x-2">
                     <Checkbox id={`selector-${user.uid}`} checked={selectedSelectorUidsForUpdate.includes(user.uid)}
                       onCheckedChange={(checked) => { setSelectedSelectorUidsForUpdate(prev => checked ? [...prev, user.uid] : prev.filter(uid => uid !== user.uid)); }} />
-                    <label htmlFor={`selector-${user.uid}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{user.displayName || user.email} ({user.roles.join(', ')})</label>
+                    <label htmlFor={`selector-${user.uid}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      {user.displayName || user.email}
+                      <span className="text-muted-foreground ml-1 text-xs">({user.roles.filter(r => r !== 'admin').join(', ')})</span>
+                    </label>
                 </div>))}</div></ScrollArea>)}
           </CardContent><CardFooter className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => { setIsEditingSelectors(false); setSelectedSelectorUidsForUpdate(game.selectorUserIds || []); }}>Cancel</Button>
-            <Button onClick={handleSaveGameSelectors} disabled={isLoadingGameSelectors || potentialGameSelectorsToAssign.length === 0}>{isLoadingGameSelectors ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Selectors</Button>
+            <Button onClick={handleSaveGameSelectors} disabled={isLoadingGameSelectors}>{isLoadingGameSelectors ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Selectors</Button>
           </CardFooter></Card>
       )}
 
