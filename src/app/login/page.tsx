@@ -10,8 +10,6 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { LogIn, Mail, Key, Loader2, Users, ChevronRight, Building, Send, AlertTriangle } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { auth } from '@/lib/firebase';
-import { signOut } from 'firebase/auth';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,6 +52,7 @@ function LoginForm() {
   const [emailFormSubmitting, setEmailFormSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [unverifiedPassword, setUnverifiedPassword] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
 
   // Player signup dialog state
@@ -89,21 +88,23 @@ function LoginForm() {
     e.preventDefault();
     setError(null);
     setUnverifiedEmail(null);
+    setUnverifiedPassword(null);
     if (!email || !password) { setError("Please enter both email and password."); return; }
     setEmailFormSubmitting(true);
     try {
       await signInWithEmail(email, password);
-      // onAuthStateChanged checks emailVerified — if not verified, currentUser will be set
-      // but userProfile won't be loaded. We check after a tick.
-      setTimeout(async () => {
-        const fbUser = auth.currentUser;
-        if (fbUser && !fbUser.emailVerified) {
-          // Sign them back out and show unverified message
-          await signOut(auth);
-          setUnverifiedEmail(email);
-          setEmailFormSubmitting(false);
-        }
-      }, 500);
+      // onAuthStateChanged blocks unverified users — check after sign-in
+      const { getAuth } = await import('firebase/auth');
+      const fbUser = getAuth().currentUser;
+      if (fbUser && !fbUser.emailVerified) {
+        const { signOut: fbSignOut } = await import('firebase/auth');
+        await fbSignOut(getAuth());
+        setUnverifiedEmail(email);
+        setUnverifiedPassword(password);
+        setEmailFormSubmitting(false);
+      } else {
+        setEmailFormSubmitting(false);
+      }
     } catch (err: any) {
       let errorMessage = "Failed to login. Please check your credentials.";
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
@@ -118,19 +119,22 @@ function LoginForm() {
   };
 
   const handleResendVerification = async () => {
+    if (!unverifiedEmail || !unverifiedPassword) {
+      toast({ title: 'Cannot resend', description: 'Please try logging in again first.', variant: 'destructive' });
+      return;
+    }
     setResending(true);
     try {
-      // Sign in temporarily to get a user object for resending
-      await signInWithEmail(unverifiedEmail!, '');
-    } catch {}
-    try {
+      // Sign in temporarily to get auth user object
+      await signInWithEmail(unverifiedEmail, unverifiedPassword);
       await resendVerificationEmail();
-      toast({ title: 'Email Sent', description: 'Verification email resent. Check your inbox.' });
+      toast({ title: 'Email Sent', description: 'Verification email resent. Check your inbox (and spam folder).' });
     } catch {
-      // If we can't resend, direct them to signup
       toast({ title: 'Could not resend', description: 'Please try signing up again or contact support.', variant: 'destructive' });
     } finally {
-      await signOut(auth).catch(() => {});
+      // Always sign back out
+      const { getAuth, signOut: fbSignOut } = await import('firebase/auth');
+      await fbSignOut(getAuth()).catch(() => {});
       setResending(false);
     }
   };
