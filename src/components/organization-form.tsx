@@ -21,8 +21,8 @@ import { Progress } from '@/components/ui/progress';
 import { storage, db } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Badge } from '@/components/ui/badge';
-import { getUserProfileFromDB } from '@/lib/db';
-import { doc, collection, writeBatch, arrayUnion, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, collection } from 'firebase/firestore';
+import { updateOrganizationAction, createOrganizationAction } from '@/lib/actions/update-organization-action';
 
 
 const organizationFormSchema = z.object({
@@ -288,58 +288,18 @@ export function OrganizationForm({ initialData, allUsersForAdminSelection, onSub
 
       if (isEditMode) {
         toast({ title: "Updating Organization...", description: "Submitting organization details." });
-        const orgDocRef = doc(db, 'organizations', orgId);
-        await updateDoc(orgDocRef, orgDataForFirestore);
-        
-        const oldAdminUids = initialData.organizationAdminUids || [];
-        const newAdminUids = data.organizationAdminUids || [];
-        const batch = writeBatch(db);
-        const adminsToAdd = newAdminUids.filter(uid => !oldAdminUids.includes(uid));
-        for (const uid of adminsToAdd) {
-          const userProfile = await getUserProfileFromDB(uid);
-          if (userProfile) {
-            const userRef = doc(db, 'users', uid);
-            let newRoles = userProfile.roles;
-            if (!newRoles.includes('admin') && !newRoles.includes('Organization Admin')) {
-              newRoles.push('Organization Admin');
-              if (newRoles.includes('unassigned') && newRoles.length > 1) {
-                newRoles = newRoles.filter(r => r !== 'unassigned');
-              }
-            }
-            batch.update(userRef, { assignedOrganizationIds: arrayUnion(initialData.id), roles: newRoles });
-          }
-        }
-        await batch.commit();
-
+        const result = await updateOrganizationAction(
+          orgId,
+          orgDataForFirestore,
+          initialData.organizationAdminUids || []
+        );
+        if (!result.success) throw new Error(result.error || 'Failed to update organization.');
         toast({ title: `Organization Updated`, description: `${data.name} has been successfully updated.` });
         router.push(`/admin/organizations/${orgId}/details`);
       } else {
         toast({ title: "Creating Organization...", description: "Submitting organization details." });
-        const newOrgRef = doc(db, 'organizations', orgId);
-        await setDoc(newOrgRef, {
-            ...orgDataForFirestore,
-            createdAt: serverTimestamp(),
-        });
-        
-        if (data.organizationAdminUids && data.organizationAdminUids.length > 0) {
-          const batch = writeBatch(db);
-          for (const uid of data.organizationAdminUids) {
-            const userProfile = await getUserProfileFromDB(uid);
-            if (userProfile) {
-              const userRef = doc(db, 'users', uid);
-              let newRoles = userProfile.roles;
-              if (!newRoles.includes('admin') && !newRoles.includes('Organization Admin')) {
-                newRoles.push('Organization Admin');
-                if (newRoles.includes('unassigned') && newRoles.length > 1) {
-                  newRoles = newRoles.filter(r => r !== 'unassigned');
-                }
-              }
-              batch.update(userRef, { assignedOrganizationIds: arrayUnion(orgId), roles: newRoles });
-            }
-          }
-          await batch.commit();
-        }
-        
+        const result = await createOrganizationAction(orgId, orgDataForFirestore);
+        if (!result.success) throw new Error(result.error || 'Failed to create organization.');
         toast({ title: `Organization Created`, description: `${data.name} has been successfully created.` });
         router.push('/admin/organizations');
       }

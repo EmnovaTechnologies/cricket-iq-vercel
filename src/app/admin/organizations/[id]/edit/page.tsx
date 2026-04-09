@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { OrganizationForm } from '@/components/organization-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getOrganizationByIdFromDB, getAllUsersFromDB } from '@/lib/db';
+import { getOrganizationByIdFromDB } from '@/lib/db';
+import { getEligibleOrgAdminsAction } from '@/lib/actions/get-eligible-org-admins-action';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ShieldAlert, ArrowLeft, Loader2 } from 'lucide-react';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
@@ -33,7 +34,7 @@ export default function EditOrganizationPage() {
       try {
         const [orgData, usersData] = await Promise.all([
           getOrganizationByIdFromDB(orgId),
-          getAllUsersFromDB(),
+          getEligibleOrgAdminsAction(orgId),
         ]);
 
         if (!orgData) {
