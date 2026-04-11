@@ -18,14 +18,17 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/auth-context';
 import { VENUE_STATUSES } from '@/lib/constants';
 
+import { checkVenueDeletableAction } from '@/lib/actions/venue-admin-actions';
+
 export default function VenuesPage() {
   const [allVenues, setAllVenues] = useState<Venue[]>([]);
+  const [venueDeletable, setVenueDeletable] = useState<Record<string, boolean>>({});
   const [searchName, setSearchName] = useState('');
   const [searchAddress, setSearchAddress] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<VenueStatus | 'all'>('active');
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const { effectivePermissions, isPermissionsLoading, loading: authLoading, activeOrganizationId } = useAuth();
+  const { effectivePermissions, isPermissionsLoading, loading: authLoading, activeOrganizationId, userProfile } = useAuth();
 
   const fetchVenues = useCallback(async () => {
     if (authLoading) {
@@ -39,15 +42,27 @@ export default function VenuesPage() {
     }
     setIsLoading(true);
     try {
-      // Pass selectedStatus to getAllVenuesFromDB
       const venuesFromDB = await getAllVenuesFromDB(activeOrganizationId, selectedStatus);
       setAllVenues(venuesFromDB);
+
+      // Pre-check deletability for all venues in parallel
+      const isSuperAdmin = userProfile?.roles?.includes('admin') ?? false;
+      const isOrgAdmin = userProfile?.roles?.includes('Organization Admin') ?? false;
+      const canDelete = effectivePermissions[PERMISSIONS.VENUES_DELETE_ANY] || isOrgAdmin || isSuperAdmin;
+      if (canDelete) {
+        const checks = await Promise.all(
+          venuesFromDB.map(v => checkVenueDeletableAction(v.id, v.name, v.organizationId))
+        );
+        const deletableMap: Record<string, boolean> = {};
+        venuesFromDB.forEach((v, i) => { deletableMap[v.id] = checks[i].canDelete; });
+        setVenueDeletable(deletableMap);
+      }
     } catch (error) {
       console.error("Failed to fetch venues:", error);
       toast({ title: "Error", description: "Could not fetch venues list.", variant: "destructive" });
     }
     setIsLoading(false);
-  }, [toast, authLoading, activeOrganizationId, selectedStatus]); // Added selectedStatus as dependency
+  }, [toast, authLoading, activeOrganizationId, selectedStatus, effectivePermissions, userProfile]); // Added selectedStatus as dependency
 
   useEffect(() => {
     fetchVenues();
@@ -187,7 +202,7 @@ export default function VenuesPage() {
             ) : canViewPage ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredVenues.map((venueItem) => (
-                  <VenueCard key={venueItem.id} venue={venueItem} onStatusChange={fetchVenues} />
+                  <VenueCard key={venueItem.id} venue={venueItem} onStatusChange={fetchVenues} canDelete={venueDeletable[venueItem.id] ?? null} />
                 ))}
               </div>
             ) : null}

@@ -33,14 +33,15 @@ import Link from 'next/link';
 interface VenueCardProps {
   venue: Venue;
   onStatusChange?: () => void;
+  canDelete?: boolean | null; // pre-fetched from parent to avoid flash
 }
 
-const VenueCard: React.FC<VenueCardProps> = ({ venue, onStatusChange }) => {
+const VenueCard: React.FC<VenueCardProps> = ({ venue, onStatusChange, canDelete: canDeleteProp }) => {
   const { toast } = useToast();
   const router = useRouter();
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
-  const [canDelete, setCanDelete] = React.useState<boolean | null>(null); // null = not checked yet
+  const [canDelete, setCanDelete] = React.useState<boolean | null>(canDeleteProp ?? null);
   const { effectivePermissions, userProfile, activeOrganizationId } = useAuth();
 
   const hasCoordinates = venue.latitude !== undefined && venue.longitude !== undefined;
@@ -50,19 +51,19 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onStatusChange }) => {
   const canManageStatus = effectivePermissions[PERMISSIONS.VENUES_ARCHIVE_ANY];
   const canEdit = effectivePermissions[PERMISSIONS.VENUES_EDIT_ANY];
 
-  // Org Admin can delete venues in their active org; Super Admin can delete any
   const isSuperAdmin = userProfile?.roles?.includes('admin') ?? false;
   const isOrgAdmin = userProfile?.roles?.includes('Organization Admin') ?? false;
   const canDeletePermission = effectivePermissions[PERMISSIONS.VENUES_DELETE_ANY] ||
     (isOrgAdmin && venue.organizationId === activeOrganizationId);
 
-  // Check deletability when card mounts (only if user has delete permission)
+  // Only fetch internally if not provided by parent
   React.useEffect(() => {
+    if (canDeleteProp !== undefined) { setCanDelete(canDeleteProp); return; }
     if (!canDeletePermission) { setCanDelete(false); return; }
     checkVenueDeletableAction(venue.id, venue.name, venue.organizationId)
       .then(result => setCanDelete(result.canDelete))
       .catch(() => setCanDelete(false));
-  }, [venue.id, venue.name, venue.organizationId, canDeletePermission]);
+  }, [venue.id, venue.name, venue.organizationId, canDeletePermission, canDeleteProp]);
 
   const handleDeleteVenue = async () => {
     if (!canDeletePermission) return;
@@ -183,7 +184,7 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onStatusChange }) => {
             </a>
           </Button>
         ) : (
-          <Button variant="outline" className="flex-1 border-primary text-primary hover:bg-primary/10 text-sm" disabled>
+          <Button variant="outline" size="sm" className="flex-1 border-primary text-primary hover:bg-primary/10 text-sm" disabled>
             <Map className="h-4 w-4" /> Map Unavailable
           </Button>
         )}
