@@ -243,6 +243,17 @@ export default function TeamDetailsPage() {
     }
   };
 
+  const isOrgAdmin = currentAuthProfile?.roles?.includes('Organization Admin') ?? false;
+  const canDeletePermission = effectivePermissions[PERMISSIONS.TEAMS_DELETE_ANY] ||
+    (isOrgAdmin && team?.organizationId === activeOrganizationId);
+
+  useEffect(() => {
+    if (!team || !canDeletePermission) { setCanDelete(false); return; }
+    checkTeamDeletableAction(team.id, team.playerIds || [])
+      .then(r => setCanDelete(r.canDelete))
+      .catch(() => setCanDelete(false));
+  }, [team?.id, team?.playerIds, canDeletePermission]);
+
   if (isLoadingData) {
      return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />Loading team details...</div>;
   }
@@ -261,17 +272,6 @@ export default function TeamDetailsPage() {
   const isCurrentUserAManager = team.teamManagerUids?.includes(currentAuthProfile?.uid || '') || false;
   const canAddPlayersToTeam = canManageTeamOverall || isCurrentUserAManager;
 
-  const isOrgAdmin = currentAuthProfile?.roles?.includes('Organization Admin') ?? false;
-  const canDeletePermission = effectivePermissions[PERMISSIONS.TEAMS_DELETE_ANY] ||
-    (isOrgAdmin && team.organizationId === activeOrganizationId);
-
-  // Check deletability when team loads
-  useEffect(() => {
-    if (!team || !canDeletePermission) { setCanDelete(false); return; }
-    checkTeamDeletableAction(team.id, team.playerIds || [])
-      .then(r => setCanDelete(r.canDelete))
-      .catch(() => setCanDelete(false));
-  }, [team?.id, team?.playerIds, canDeletePermission]);
 
   const handleDeleteTeam = async () => {
     if (!team || !canDeletePermission) return;

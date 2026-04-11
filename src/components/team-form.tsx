@@ -12,7 +12,7 @@ import type { Team, AgeCategory, UserProfile } from '@/types';
 import { AGE_CATEGORIES } from '@/lib/constants';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { addTeamAction } from '@/lib/actions/team-actions';
+import { createTeamAdminAction } from '@/lib/actions/create-team-admin-action';
 import { addTeamToSeriesAction } from '@/lib/actions/series-actions';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -123,11 +123,14 @@ export function TeamForm({
       let mainToastMessage = '';
 
       if (initialData) {
-        console.warn("TeamForm used with initialData, update functionality might not be fully implemented here for multiple managers.");
-        newOrUpdatedTeam = await addTeamAction(teamDataForAction); 
+        const result = await createTeamAdminAction(teamDataForAction);
+        if (!result.success || !result.team) throw new Error(result.error || 'Failed to update team.');
+        newOrUpdatedTeam = result.team;
         mainToastMessage = `Details for ${trimmedData.name} updated.`;
       } else {
-        newOrUpdatedTeam = await addTeamAction(teamDataForAction);
+        const result = await createTeamAdminAction(teamDataForAction);
+        if (!result.success || !result.team) throw new Error(result.error || 'Failed to add team.');
+        newOrUpdatedTeam = result.team;
         mainToastMessage = `${trimmedData.name} has been added.`;
       }
 
@@ -147,13 +150,13 @@ export function TeamForm({
       if (onSubmitSuccess) {
         onSubmitSuccess(newOrUpdatedTeam, preselectedSeriesIdToLink);
       } else {
+        router.refresh();
         if (!initialData && preselectedSeriesIdToLink && newOrUpdatedTeam.ageCategory === preselectedSeriesAgeCategoryToEnforce) {
           router.push(`/series/${preselectedSeriesIdToLink}/details`);
         } else {
           router.push('/teams');
         }
-      }
-      router.refresh(); 
+      } 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Could not save team details.';
       toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
