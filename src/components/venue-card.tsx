@@ -6,7 +6,7 @@ import type { Venue } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Globe, Map, CheckCircle, XCircle, Archive, ArchiveRestore, Loader2, Info, Edit } from 'lucide-react';
+import { MapPin, Globe, Map, CheckCircle, XCircle, Archive, ArchiveRestore, Loader2, Info, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import {
@@ -26,6 +26,7 @@ import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { getAllGamesFromDB } from '@/lib/db';
+import { checkVenueDeletableAction, deleteVenueAdminAction } from '@/lib/actions/venue-admin-actions';
 import { parseISO, isFuture, format } from 'date-fns';
 import Link from 'next/link';
 
@@ -38,7 +39,9 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onStatusChange }) => {
   const { toast } = useToast();
   const router = useRouter();
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
-  const { effectivePermissions } = useAuth();
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [canDelete, setCanDelete] = React.useState<boolean | null>(null); // null = not checked yet
+  const { effectivePermissions, userProfile, activeOrganizationId } = useAuth();
 
   const hasCoordinates = venue.latitude !== undefined && venue.longitude !== undefined;
   const status = venue.status || 'active';
@@ -46,6 +49,39 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onStatusChange }) => {
 
   const canManageStatus = effectivePermissions[PERMISSIONS.VENUES_ARCHIVE_ANY];
   const canEdit = effectivePermissions[PERMISSIONS.VENUES_EDIT_ANY];
+
+  // Org Admin can delete venues in their active org; Super Admin can delete any
+  const isSuperAdmin = userProfile?.roles?.includes('admin') ?? false;
+  const isOrgAdmin = userProfile?.roles?.includes('Organization Admin') ?? false;
+  const canDeletePermission = effectivePermissions[PERMISSIONS.VENUES_DELETE_ANY] ||
+    (isOrgAdmin && venue.organizationId === activeOrganizationId);
+
+  // Check deletability when card mounts (only if user has delete permission)
+  React.useEffect(() => {
+    if (!canDeletePermission) { setCanDelete(false); return; }
+    checkVenueDeletableAction(venue.id, venue.name, venue.organizationId)
+      .then(result => setCanDelete(result.canDelete))
+      .catch(() => setCanDelete(false));
+  }, [venue.id, venue.name, venue.organizationId, canDeletePermission]);
+
+  const handleDeleteVenue = async () => {
+    if (!canDeletePermission) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteVenueAdminAction(venue.id, venue.name, venue.organizationId);
+      if (result.success) {
+        toast({ title: 'Venue Deleted', description: `"${venue.name}" has been permanently deleted.` });
+        if (onStatusChange) onStatusChange();
+        else router.refresh();
+      } else {
+        toast({ title: 'Deletion Failed', description: result.error, variant: 'destructive', duration: 9000 });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'An unexpected error occurred.', variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleToggleArchive = async () => {
     if (!canManageStatus) {
@@ -151,14 +187,49 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onStatusChange }) => {
             <Map className="h-4 w-4" /> Map Unavailable
           </Button>
         )}
-        {canManageStatus && (
+        {/* Show Delete if venue is deletable, Archive/Unarchive otherwise */}
+        {canDelete === true && canDeletePermission ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 text-sm border-destructive text-destructive hover:bg-destructive/10"
+                disabled={isDeleting}
+              >
+                {isDeleting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Venue</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to permanently delete "{venue.name}"? This action cannot be undone.
+                  This venue has no rated games so it is safe to delete.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteVenue}
+                  disabled={isDeleting}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
+                  {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Confirm Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : canManageStatus ? (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
                 variant={isArchived ? "default" : "outline"}
                 size="sm"
                 className={cn(
-                  "flex-1 text-sm", 
+                  "flex-1 text-sm",
                   isArchived ? 'bg-primary hover:bg-primary/90' : 'border-destructive text-destructive hover:bg-destructive/10'
                 )}
                 disabled={isUpdatingStatus}
@@ -172,7 +243,7 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onStatusChange }) => {
                 <AlertDialogTitle>Confirm Status Change</AlertDialogTitle>
                 <AlertDialogDescription>
                   Are you sure you want to {isArchived ? 'unarchive' : 'archive'} the venue "{venue.name}"?
-                  {isArchived ? ' Unarchiving will make it active again and available for selection in series.' : ' Archiving will hide it from selection in new series but preserve existing associations.'}
+                  {isArchived ? ' Unarchiving will make it active again.' : ' This venue has rated games and cannot be deleted — archiving will hide it from new series.'}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -184,7 +255,7 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onStatusChange }) => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        )}
+        ) : null}
       </CardFooter>
     </Card>
   );
