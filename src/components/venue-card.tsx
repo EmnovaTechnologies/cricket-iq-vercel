@@ -172,7 +172,7 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onStatusChange }) => {
             </Button>
         )}
         {hasCoordinates ? (
-          <Button asChild variant="outline" className="flex-1 border-primary text-primary hover:bg-primary/10 text-sm">
+          <Button asChild variant="outline" size="sm" className="flex-1 border-primary text-primary hover:bg-primary/10 text-sm">
             <a
               href={`https://www.google.com/maps/search/?api=1&query=${venue.latitude},${venue.longitude}`}
               target="_blank"
@@ -192,9 +192,9 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onStatusChange }) => {
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
-                variant="outline"
+                variant="destructive"
                 size="sm"
-                className="flex-1 text-sm border-destructive text-destructive hover:bg-destructive/10"
+                className="flex-1 text-sm"
                 disabled={isDeleting}
               >
                 {isDeleting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
