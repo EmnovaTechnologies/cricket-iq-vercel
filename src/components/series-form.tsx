@@ -13,7 +13,7 @@ import type { Series, AgeCategory, UserProfile, FitnessTestType } from '@/types'
 import { AGE_CATEGORIES, FITNESS_TEST_TYPES } from '@/lib/constants';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { addSeriesAction } from '@/lib/actions/series-actions';
+import { createSeriesAdminAction } from '@/lib/actions/create-series-admin-action';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -261,25 +261,26 @@ export function SeriesForm({ initialData, onSubmitSuccess, potentialSeriesAdmins
       };
 
       if (initialData) {
-        // This logic is flawed, but the user is not asking to fix it. I will leave it as is.
-        const updatedSeries = await addSeriesAction(payload);
-        toast({ title: 'Series Updated (Conceptual)', description: `Details for ${trimmedData.name} conceptually updated.` });
-         if (onSubmitSuccess) {
-            onSubmitSuccess(updatedSeries);
+        const result = await createSeriesAdminAction(payload);
+        if (!result.success || !result.series) throw new Error(result.error || 'Failed to update series.');
+        toast({ title: 'Series Updated', description: `Details for ${trimmedData.name} updated.` });
+        if (onSubmitSuccess) {
+          onSubmitSuccess(result.series);
         } else {
-            router.push(`/series/${updatedSeries.id}/details`);
+          router.refresh();
+          router.push(`/series/${result.series.id}/details`);
         }
       } else {
-        const newSeries = await addSeriesAction(payload);
+        const result = await createSeriesAdminAction(payload);
+        if (!result.success || !result.series) throw new Error(result.error || 'Failed to add series.');
         toast({ title: 'Series Added', description: `${trimmedData.name} has been added to the active organization.` });
         if (onSubmitSuccess) {
-          onSubmitSuccess(newSeries);
+          onSubmitSuccess(result.series);
         } else {
-          router.push(`/series/${newSeries.id}/details`);
+          router.refresh();
+          router.push('/series');
         }
       }
-      
-      router.refresh();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Could not save series details.';
       toast({ title: 'Error', description: errorMessage, variant: 'destructive' });

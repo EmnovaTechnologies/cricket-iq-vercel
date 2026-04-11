@@ -187,7 +187,8 @@ export function SeriesImportForm({ mode = 'csv' }: SeriesImportFormProps) {
     setXlsxIsLoading(true); setXlsxImportResult(null); setXlsxProgress(0);
     try {
       const interval = setInterval(() => setXlsxProgress(p => p < 90 ? p + 10 : p), 200);
-      const result = await importSeriesAdminAction(xlsxParsedData, activeOrganizationId);
+      const sanitizedRows = xlsxParsedData.map(row => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v instanceof Date ? (v.toLocaleDateString("en-US", {month:"2-digit",day:"2-digit",year:"numeric"})) : String(v ?? "")]))) as CsvSeriesImportRow[];
+      const result = await importSeriesAdminAction(sanitizedRows, activeOrganizationId);
       clearInterval(interval); setXlsxProgress(100); setXlsxImportResult(result);
       toast({ title: result.success ? 'Import Completed' : 'Import Failed', description: `${result.successfulImports} imported, ${result.failedImports} failed.`, variant: result.success ? 'default' : 'destructive' });
     } catch {

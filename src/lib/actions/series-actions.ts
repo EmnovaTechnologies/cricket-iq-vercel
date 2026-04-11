@@ -53,7 +53,8 @@ type AddSeriesActionParams = Omit<Series, 'id' | 'participatingTeams' | 'venueId
 
 export async function addSeriesAction(seriesData: AddSeriesActionParams): Promise<Series> {
   try {
-    const newSeries = await addSeriesToDB({
+    const { createSeriesAdminAction } = await import('./create-series-admin-action');
+    const result = await createSeriesAdminAction({
       name: seriesData.name,
       ageCategory: seriesData.ageCategory,
       year: seriesData.year,
@@ -61,23 +62,16 @@ export async function addSeriesAction(seriesData: AddSeriesActionParams): Promis
       seriesAdminUids: seriesData.seriesAdminUids || [],
       maleCutoffDate: seriesData.maleCutoffDate || null,
       femaleCutoffDate: seriesData.femaleCutoffDate || null,
-      fitnessTestType: seriesData.fitnessTestType || undefined, 
-      fitnessTestPassingScore: seriesData.fitnessTestPassingScore || undefined, 
+      fitnessTestType: seriesData.fitnessTestType,
+      fitnessTestPassingScore: seriesData.fitnessTestPassingScore,
     });
 
-    if (newSeries.seriesAdminUids && newSeries.seriesAdminUids.length > 0) {
-      const batch = writeBatch(db);
-      newSeries.seriesAdminUids.forEach(adminUid => {
-        const userRef = doc(db, 'users', adminUid);
-        batch.update(userRef, { 
-            assignedSeriesIds: arrayUnion(newSeries.id),
-            assignedOrganizationIds: arrayUnion(newSeries.organizationId) 
-        });
-      });
-      await batch.commit();
+    if (!result.success || !result.seriesId || !result.series) {
+      throw new Error(result.error || 'Failed to create series.');
     }
 
-    return newSeries;
+    return result.series;
+
   } catch (error: any) {
     console.error("Error in addSeriesAction:", error);
     let message = "Failed to add series to the database.";
@@ -108,25 +102,24 @@ export async function updateSeriesAdminsAction(seriesId: string, newSeriesAdminU
 
     const oldSeriesAdminUids = currentSeriesData.seriesAdminUids || [];
 
+    // Update series doc with new admin UIDs
     const batch = writeBatch(db);
     batch.update(seriesRef, { seriesAdminUids: newSeriesAdminUids });
+    await batch.commit();
+
+    // Update user docs via Admin SDK server actions
+    const { assignSeriesAdminsAction, removeSeriesAdminsAction } = await import('./assign-series-admins-action');
 
     const adminsToAdd = newSeriesAdminUids.filter(uid => !oldSeriesAdminUids.includes(uid));
-    adminsToAdd.forEach(uid => {
-      const userRef = doc(db, 'users', uid);
-      batch.update(userRef, { 
-        assignedSeriesIds: arrayUnion(seriesId),
-        assignedOrganizationIds: arrayUnion(currentSeriesData.organizationId) 
-      });
-    });
+    if (adminsToAdd.length > 0) {
+      await assignSeriesAdminsAction(seriesId, currentSeriesData.organizationId, adminsToAdd);
+    }
 
     const adminsToRemove = oldSeriesAdminUids.filter(uid => !newSeriesAdminUids.includes(uid));
-    adminsToRemove.forEach(uid => {
-      const userRef = doc(db, 'users', uid);
-      batch.update(userRef, { assignedSeriesIds: arrayRemove(seriesId) });
-    });
+    if (adminsToRemove.length > 0) {
+      await removeSeriesAdminsAction(seriesId, adminsToRemove);
+    }
 
-    await batch.commit();
     return { success: true, message: "Series administrators updated successfully." };
   } catch (error) {
     console.error("Error updating series administrators:", error);
