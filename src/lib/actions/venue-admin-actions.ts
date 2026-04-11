@@ -58,27 +58,29 @@ export async function deleteVenueAdminAction(
   organizationId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Check 1: Series association
-    const seriesSnap = await adminDb.collection('series')
-      .where('venueIds', 'array-contains', venueId)
-      .limit(1)
-      .get();
-
-    if (!seriesSnap.empty) {
-      const seriesName = seriesSnap.docs[0].data().name;
-      return {
-        success: false,
-        error: `Cannot delete: Venue is assigned to series "${seriesName}". Remove it from the series first.`,
-      };
-    }
-
-    // Check 2: Games with player ratings
+    // Only check: no games with player ratings
     const deletable = await checkVenueDeletableAction(venueId, venueName, organizationId);
     if (!deletable.canDelete) {
       return { success: false, error: deletable.reason };
     }
 
-    // All checks passed — delete the venue
+    // Remove venue from any series venueIds arrays before deleting
+    const seriesSnap = await adminDb.collection('series')
+      .where('venueIds', 'array-contains', venueId)
+      .get();
+
+    if (!seriesSnap.empty) {
+      const batch = adminDb.batch();
+      seriesSnap.docs.forEach(d => {
+        const currentVenueIds: string[] = d.data().venueIds || [];
+        batch.update(d.ref, {
+          venueIds: currentVenueIds.filter(id => id !== venueId),
+        });
+      });
+      await batch.commit();
+    }
+
+    // Delete the venue
     await adminDb.collection('venues').doc(venueId).delete();
 
     return { success: true };
