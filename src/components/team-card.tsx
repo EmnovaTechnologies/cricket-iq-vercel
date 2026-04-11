@@ -79,38 +79,44 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, onDeleted, canDelete: canDele
       <CardContent className="flex-grow space-y-2">
         <p className="text-sm text-muted-foreground">Manage team roster and view series participation.</p>
       </CardContent>
-      <CardFooter className="flex gap-2">
-        {canDelete === true && canDeletePermission && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm" className="flex-none" disabled={isDeleting}>
-                {isDeleting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Team</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to permanently delete "{team.name}"? This cannot be undone.
-                  The team has no players or associated games so it is safe to delete.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                  {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Confirm Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-        <Button asChild variant="outline" size="sm" className="flex-1 border-primary text-primary hover:bg-primary/10">
-          <Link href={`/teams/${team.id}/details`} className="flex items-center justify-center gap-2">
+      <CardFooter className="flex flex-col sm:flex-row gap-1.5 p-3 pt-2">
+        <Button asChild variant="outline" size="sm" className="w-full flex-1 border-primary text-primary hover:bg-primary/10 text-sm">
+          <Link href={`/teams/${team.id}/details`} className="flex items-center justify-center gap-1.5">
             View Details <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
+        {canDeletePermission && (
+          canDelete === true ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" className="w-full flex-1 text-sm" disabled={isDeleting}>
+                  {isDeleting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
+                  {isDeleting ? 'Deleting...' : 'Delete'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Team</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to permanently delete "{team.name}"? This cannot be undone.
+                    The team has no players or associated games so it is safe to delete.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Confirm Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : (
+            <Button variant="destructive" size="sm" className="w-full flex-1 text-sm opacity-50" disabled>
+              <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+            </Button>
+          )
+        )}
       </CardFooter>
     </Card>
   );
