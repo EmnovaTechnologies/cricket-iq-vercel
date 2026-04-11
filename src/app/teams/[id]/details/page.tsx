@@ -7,13 +7,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { getTeamByIdFromDB, getPlayersForTeamFromDB, getAllPlayersFromDB, isPlayerAgeEligibleForTeamCategory, getAllTeamsFromDB, getOrganizationByIdFromDB } from '@/lib/db';
 import { linkPlayerToTeamAction, updateTeamManagersAction, searchGlobalPlayersAction } from '@/lib/actions/team-actions';
 import type { Team, Player, UserProfile, AgeCategory, GlobalPlayerSearchResult } from '@/types';
-import { ArrowLeft, Users, Tag, UserPlus, UserSquare2, Shield, Binary, UserCog, Save, Edit3, Search, Globe, Loader2, Check, ChevronsUpDown } from 'lucide-react';
+import { ArrowLeft, Users, Tag, UserPlus, UserSquare2, Shield, Binary, UserCog, Save, Edit3, Search, Globe, Loader2, Check, ChevronsUpDown, Trash2 } from 'lucide-react';
+import { checkTeamDeletableAction, deleteTeamAdminAction } from '@/lib/actions/team-admin-actions';
+import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
@@ -39,7 +42,7 @@ export default function TeamDetailsPage() {
   const teamId = params.id;
   const { toast } = useToast();
   const router = useRouter();
-  const { userProfile: currentAuthProfile, activeOrganizationId } = useAuth();
+  const { userProfile: currentAuthProfile, activeOrganizationId, effectivePermissions } = useAuth();
 
   const [team, setTeam] = useState<Team | undefined>(undefined);
   const [organizationName, setOrganizationName] = useState<string>('');
@@ -54,6 +57,8 @@ export default function TeamDetailsPage() {
   const [isEditingManagers, setIsEditingManagers] = useState(false);
   const [isSavingManagers, setIsSavingManagers] = useState(false);
   const [managerSearchQuery, setManagerSearchQuery] = useState('');
+  const [canDelete, setCanDelete] = useState<boolean | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [selectedPlayerIdForOrgAdd, setSelectedPlayerIdForOrgAdd] = useState<string>('');
   const [isPlayerAddOrgPopoverOpen, setIsPlayerAddOrgPopoverOpen] = useState(false);
@@ -256,6 +261,36 @@ export default function TeamDetailsPage() {
   const isCurrentUserAManager = team.teamManagerUids?.includes(currentAuthProfile?.uid || '') || false;
   const canAddPlayersToTeam = canManageTeamOverall || isCurrentUserAManager;
 
+  const isOrgAdmin = currentAuthProfile?.roles?.includes('Organization Admin') ?? false;
+  const canDeletePermission = effectivePermissions[PERMISSIONS.TEAMS_DELETE_ANY] ||
+    (isOrgAdmin && team.organizationId === activeOrganizationId);
+
+  // Check deletability when team loads
+  useEffect(() => {
+    if (!team || !canDeletePermission) { setCanDelete(false); return; }
+    checkTeamDeletableAction(team.id, team.playerIds || [])
+      .then(r => setCanDelete(r.canDelete))
+      .catch(() => setCanDelete(false));
+  }, [team?.id, team?.playerIds, canDeletePermission]);
+
+  const handleDeleteTeam = async () => {
+    if (!team || !canDeletePermission) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteTeamAdminAction(team.id, team.playerIds || []);
+      if (result.success) {
+        toast({ title: 'Team Deleted', description: `"${team.name}" has been permanently deleted.` });
+        router.push('/teams');
+      } else {
+        toast({ title: 'Deletion Failed', description: result.error, variant: 'destructive', duration: 9000 });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'An unexpected error occurred.', variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -268,7 +303,35 @@ export default function TeamDetailsPage() {
               </CardTitle>
               <CardDescription>Team Details and Roster for Organization: {organizationName || 'N/A'}</CardDescription>
             </div>
-            <Button asChild variant="outline" size="sm"><Link href="/teams"><ArrowLeft className="mr-2 h-4 w-4" />Back</Link></Button>
+            <div className="flex items-center gap-2">
+              {canDelete && canDeletePermission && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={isDeleting}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {isDeleting ? 'Deleting...' : 'Delete Team'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Team</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to permanently delete "{team.name}"? This cannot be undone.
+                        The team has no players or associated games so it is safe to delete.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteTeam} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                        {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Confirm Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              <Button asChild variant="outline" size="sm"><Link href="/teams"><ArrowLeft className="mr-2 h-4 w-4" />Back</Link></Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">

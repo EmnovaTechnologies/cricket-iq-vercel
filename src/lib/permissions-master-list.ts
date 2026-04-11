@@ -51,7 +51,8 @@ export const PERMISSIONS = {
 
   // Team Management Permissions
   TEAMS_ADD: 'teams:add',
-  TEAMS_EDIT_ANY: 'teams:edit_any', // General edit, not manager/roster specific yet
+  TEAMS_EDIT_ANY: 'teams:edit_any',
+  TEAMS_DELETE_ANY: 'teams:delete_any',
   TEAMS_MANAGE_MANAGERS_ANY: 'teams:manage_managers_any',
   TEAMS_MANAGE_ROSTER_ANY: 'teams:manage_roster_any',
   TEAMS_MANAGE_MANAGERS_ASSIGNED: 'teams:manage_managers_assigned', // Contextual
@@ -177,6 +178,7 @@ export const PERMISSION_CATEGORIES = {
       PERMISSIONS.PAGE_VIEW_TEAM_ADD,
       PERMISSIONS.TEAMS_ADD,
       PERMISSIONS.TEAMS_EDIT_ANY,
+      PERMISSIONS.TEAMS_DELETE_ANY,
       PERMISSIONS.TEAMS_MANAGE_MANAGERS_ANY,
       PERMISSIONS.TEAMS_MANAGE_ROSTER_ANY,
       PERMISSIONS.TEAMS_MANAGE_MANAGERS_ASSIGNED,
@@ -329,6 +331,7 @@ export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
 
   [PERMISSIONS.TEAMS_ADD]: "Add new teams",
   [PERMISSIONS.TEAMS_EDIT_ANY]: "Edit any team's information",
+  [PERMISSIONS.TEAMS_DELETE_ANY]: "Delete a team (only if no games or players associated)",
   [PERMISSIONS.TEAMS_MANAGE_MANAGERS_ANY]: "Assign/remove managers for any team",
   [PERMISSIONS.TEAMS_MANAGE_ROSTER_ANY]: "Manage player roster for any team",
   [PERMISSIONS.TEAMS_MANAGE_MANAGERS_ASSIGNED]: "Assign/remove managers for their assigned teams (Contextual)",
