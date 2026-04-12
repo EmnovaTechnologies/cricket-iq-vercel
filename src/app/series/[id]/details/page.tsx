@@ -14,8 +14,9 @@ import {
 } from '@/lib/db';
 
 import { addTeamToSeriesAction, addVenueToSeriesAction, updateSeriesAdminsAction, archiveSeriesAction, unarchiveSeriesAction, updateSeriesFitnessCriteriaAction } from '@/lib/actions/series-actions';
+import { checkSeriesDeletableAction, deleteSeriesAdminAction } from '@/lib/actions/series-admin-actions';
 import type { Series, Team, Venue, Game, UserProfile, FitnessTestType, FitnessTestHeader } from '@/types'; // Added FitnessTestHeader
-import { Layers, Tag, CalendarFold, ArrowLeft, Users, PlusCircle, MapPin, Gamepad2, Map as MapIconLucide, UserCog, Edit3, Save, Archive, ArchiveRestore, Info, Search, CalendarDays, Activity, Dumbbell, ShieldCheck, ListChecks, FileText, Target } from 'lucide-react'; // Added Target
+import { Layers, Tag, CalendarFold, ArrowLeft, Users, PlusCircle, MapPin, Gamepad2, Map as MapIconLucide, UserCog, Edit3, Save, Archive, ArchiveRestore, Info, Search, CalendarDays, Activity, Dumbbell, ShieldCheck, ListChecks, FileText, Target, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -60,6 +61,8 @@ export default function SeriesDetailsPage() {
   const { userProfile: currentAuthProfile, effectivePermissions, isPermissionsLoading } = useAuth();
 
   const [series, setSeries] = useState<Series | undefined>(undefined);
+  const [canDelete, setCanDelete] = useState<boolean | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [participatingTeams, setParticipatingTeams] = useState<Team[]>([]);
   const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
   const [selectedTeamToAdd, setSelectedTeamToAdd] = useState<string>('');
@@ -311,7 +314,38 @@ export default function SeriesDetailsPage() {
   );
   
   const showArchiveButton = canArchive || canUnarchive;
-  
+
+  const isOrgAdmin = currentAuthProfile?.roles?.includes('Organization Admin') ?? false;
+  const isSeriesAdminForThis = isUserASeriesAdminForThisSeries ?? false;
+  const canDeletePermission = effectivePermissions[PERMISSIONS.SERIES_DELETE_ANY] ||
+    (isOrgAdmin && series?.organizationId === activeOrganizationId) ||
+    isSeriesAdminForThis;
+
+  useEffect(() => {
+    if (!series || !canDeletePermission) { setCanDelete(false); return; }
+    checkSeriesDeletableAction(series.id)
+      .then(r => setCanDelete(r.canDelete))
+      .catch(() => setCanDelete(false));
+  }, [series?.id, canDeletePermission]);
+
+  const handleDeleteSeries = async () => {
+    if (!series || !canDeletePermission) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteSeriesAdminAction(series.id);
+      if (result.success) {
+        toast({ title: 'Series Deleted', description: `"${series.name}" has been permanently deleted.` });
+        router.push('/series');
+      } else {
+        toast({ title: 'Deletion Failed', description: result.error, variant: 'destructive', duration: 9000 });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'An unexpected error occurred.', variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const canAddGame = (
     !!effectivePermissions[PERMISSIONS.GAMES_ADD_TO_ANY_SERIES] ||
     (!!effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] && isUserASeriesAdminForThisSeries)
@@ -354,6 +388,32 @@ export default function SeriesDetailsPage() {
           </Link>
         </Button>
         <div className="flex flex-wrap gap-2 justify-end">
+          {canDelete && canDeletePermission && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={isDeleting}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {isDeleting ? 'Deleting...' : 'Delete Series'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Series</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to permanently delete "{series?.name}"? This cannot be undone.
+                    The series has no games so it is safe to delete.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteSeries} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Confirm Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
           {canViewSavedTeam && series.savedAiTeam && series.savedAiTeam.length > 0 && !isSeriesArchived && (
             <Button asChild size="sm" variant="secondary">
               <Link href={`/series/${seriesId}/saved-team`}>

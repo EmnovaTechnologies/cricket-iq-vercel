@@ -61,6 +61,7 @@ export const PERMISSIONS = {
   // Series Management Permissions
   SERIES_ADD: 'series:add',
   SERIES_EDIT_ANY: 'series:edit_any',
+  SERIES_DELETE_ANY: 'series:delete_any',
   SERIES_ARCHIVE_ANY: 'series:archive_any',
   SERIES_UNARCHIVE_ANY: 'series:unarchive_any',
   SERIES_MANAGE_ADMINS_ANY: 'series:manage_admins_any',
@@ -194,6 +195,7 @@ export const PERMISSION_CATEGORIES = {
       PERMISSIONS.PAGE_VIEW_SERIES_IMPORT_CSV,
       PERMISSIONS.SERIES_ADD,
       PERMISSIONS.SERIES_EDIT_ANY,
+      PERMISSIONS.SERIES_DELETE_ANY,
       PERMISSIONS.SERIES_ARCHIVE_ANY,
       PERMISSIONS.SERIES_UNARCHIVE_ANY,
       PERMISSIONS.SERIES_MANAGE_ADMINS_ANY,
@@ -339,6 +341,7 @@ export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
 
   [PERMISSIONS.SERIES_ADD]: "Add new series",
   [PERMISSIONS.SERIES_EDIT_ANY]: "Edit any series information",
+  [PERMISSIONS.SERIES_DELETE_ANY]: "Delete a series (only if no games associated)",
   [PERMISSIONS.SERIES_ARCHIVE_ANY]: "Archive any series",
   [PERMISSIONS.SERIES_UNARCHIVE_ANY]: "Unarchive any series",
   [PERMISSIONS.SERIES_MANAGE_ADMINS_ANY]: "Manage administrators for any series",

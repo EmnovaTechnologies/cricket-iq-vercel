@@ -7,9 +7,10 @@ import SeriesCard from '@/components/series-card';
 import { getAllSeriesFromDB, getGamesByIdsFromDB, getTeamByIdFromDB } from '@/lib/db';
 import type { Series } from '@/types';
 import { PlusCircle, Layers, Filter, Upload, AlertTriangle, Info, Loader2 } from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { archiveSeriesAction, unarchiveSeriesAction } from '@/lib/actions/series-actions';
+import { checkSeriesDeletableAction } from '@/lib/actions/series-admin-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -18,6 +19,7 @@ import { PERMISSIONS } from '@/lib/permissions-master-list';
 export default function SeriesPage() {
   const { userProfile, activeOrganizationId, loading: authLoading, effectivePermissions, isPermissionsLoading } = useAuth();
   const [allSeries, setAllSeries] = useState<Series[]>([]);
+  const [seriesDeletable, setSeriesDeletable] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -26,13 +28,11 @@ export default function SeriesPage() {
   const [selectedStatus, setSelectedStatus] = useState<Series['status'] | 'all'>('active');
 
 
-  const fetchSeries = async () => {
+  const fetchSeries = useCallback(async () => {
     if (authLoading || !userProfile) {
         setIsLoading(true);
         return;
     }
-    
-    // Enforce organization selection for all users for consistency
     if (!activeOrganizationId) {
         setAllSeries([]);
         setIsLoading(false);
@@ -42,60 +42,60 @@ export default function SeriesPage() {
     setIsLoading(true);
     try {
       const orgSeries = await getAllSeriesFromDB('all', activeOrganizationId);
-      
       let visibleSeriesIds = new Set<string>();
-      
-      // For Admins and Org Admins, they see all series within the selected organization
+
       if(userProfile.roles.includes('admin') || userProfile.roles.includes('Organization Admin')) {
         orgSeries.forEach(s => visibleSeriesIds.add(s.id));
-      } else { // For other roles, filter based on their specific assignments
+      } else {
         if(userProfile.roles.includes('Series Admin') && userProfile.assignedSeriesIds && userProfile.assignedSeriesIds.length > 0) {
           userProfile.assignedSeriesIds.forEach(id => {
-            if (orgSeries.some(s => s.id === id)) {
-               visibleSeriesIds.add(id);
-            }
+            if (orgSeries.some(s => s.id === id)) visibleSeriesIds.add(id);
           });
         }
-        
         if(userProfile.roles.includes('Team Manager') && userProfile.assignedTeamIds && userProfile.assignedTeamIds.length > 0) {
-           const managedTeamDetails = (await Promise.all(userProfile.assignedTeamIds.map(teamId => getTeamByIdFromDB(teamId))))
+          const managedTeamDetails = (await Promise.all(userProfile.assignedTeamIds.map(teamId => getTeamByIdFromDB(teamId))))
             .filter(team => team && team.organizationId === activeOrganizationId);
           const managedTeamIdsInActiveOrg = managedTeamDetails.map(team => team!.id);
-
           if(managedTeamIdsInActiveOrg.length > 0) {
             orgSeries.forEach(series => {
-              if(series.participatingTeams.some(ptId => managedTeamIdsInActiveOrg.includes(ptId))) {
+              if(series.participatingTeams.some(ptId => managedTeamIdsInActiveOrg.includes(ptId)))
                 visibleSeriesIds.add(series.id);
-              }
             });
           }
         }
-        
         if (userProfile.roles.includes('selector') && userProfile.assignedGameIds) {
-            const assignedGames = await getGamesByIdsFromDB(userProfile.assignedGameIds);
-            const relevantGamesInActiveOrg = assignedGames.filter(game => 
-              game.organizationId === activeOrganizationId
-            );
-            relevantGamesInActiveOrg.forEach(game => {
-              if (game.seriesId) visibleSeriesIds.add(game.seriesId);
-            });
+          const assignedGames = await getGamesByIdsFromDB(userProfile.assignedGameIds);
+          assignedGames.filter(game => game.organizationId === activeOrganizationId)
+            .forEach(game => { if (game.seriesId) visibleSeriesIds.add(game.seriesId); });
         }
       }
-      
+
       const finalVisibleSeries = orgSeries.filter(s => visibleSeriesIds.has(s.id));
       setAllSeries(finalVisibleSeries);
 
+      // Pre-fetch deletability for all visible series
+      const isSuperAdmin = userProfile.roles.includes('admin');
+      const isOrgAdmin = userProfile.roles.includes('Organization Admin');
+      const isSeriesAdmin = userProfile.roles.includes('Series Admin');
+      const canDeleteAny = effectivePermissions[PERMISSIONS.SERIES_DELETE_ANY] || isSuperAdmin || isOrgAdmin || isSeriesAdmin;
+
+      if (canDeleteAny && finalVisibleSeries.length > 0) {
+        const checks = await Promise.all(finalVisibleSeries.map(s => checkSeriesDeletableAction(s.id)));
+        const deletableMap: Record<string, boolean> = {};
+        finalVisibleSeries.forEach((s, i) => { deletableMap[s.id] = checks[i].canDelete; });
+        setSeriesDeletable(deletableMap);
+      }
     } catch (error) {
       console.error("[SeriesPage] CRITICAL ERROR fetching series in try/catch:", error);
       toast({ title: "Error", description: "Could not fetch series list.", variant: "destructive" });
       setAllSeries([]);
     }
     setIsLoading(false);
-  };
+  }, [activeOrganizationId, authLoading, userProfile, toast, effectivePermissions]);
 
   useEffect(() => {
     fetchSeries();
-  }, [activeOrganizationId, authLoading, userProfile, toast]);
+  }, [fetchSeries]);
 
   const uniqueYears = useMemo(() => {
     const yearsSet = new Set(allSeries.map(s => s.year.toString()));
@@ -233,6 +233,8 @@ export default function SeriesPage() {
                   canArchive={canArchiveAnySeries}
                   canUnarchive={canUnarchiveAnySeries}
                   isPermissionsLoading={isPermissionsLoading}
+                  canDelete={seriesDeletable[seriesItem.id] ?? null}
+                  onDeleted={fetchSeries}
                 />
               ))}
             </div>
