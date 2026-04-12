@@ -12,11 +12,11 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, ShieldAlert, Info, ListChecks, User, CalendarDays, MapPin, ShieldCheck, Activity, CheckCircle, Edit3, Save, XCircle, UserPlus, Trash2, ChevronsUpDown, Check, CalendarIcon, UserX } from 'lucide-react';
+import { Loader2, ArrowLeft, ShieldAlert, Info, ListChecks, User, CalendarDays, MapPin, ShieldCheck, Activity, CheckCircle, Edit3, Save, XCircle, UserPlus, Trash2, ChevronsUpDown, Check, UserX } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { DatePickerField } from '@/components/date-picker-field';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Label } from '@/components/ui/label';
@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import type { FitnessTestHeader, FitnessTestResult, UserProfile, Series, Player } from '@/types';
 import { getFitnessTestHeaderByIdFromDB, getFitnessTestResultsForHeaderFromDB, getSeriesByIdFromDB, getPlayerByIdFromDB, getPlayersForTeamFromDB, getTeamsForSeriesFromDB } from '@/lib/db';
 import { useAuth } from '@/contexts/auth-context';
-import { format, parse, isValid, parseISO } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { certifyFitnessTestAction, updateFitnessTestAndResultsAction } from '@/lib/actions/fitness-actions';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -67,92 +67,6 @@ const InfoItem: React.FC<{icon: React.ReactNode, label: string, value: string | 
     </div>
   </div>
 );
-
-const DateInputWithCalendar: React.FC<{
-    field: ControllerRenderProps<FitnessTestDetailsFormValues, 'testDate'>;
-    label: string;
-    description?: string;
-    disabled?: boolean;
-  }> = ({ field, label, description, disabled }) => {
-    const [inputValue, setReactInputValue] = React.useState( // Renamed to avoid conflict with Input component
-      field.value && isValid(field.value) ? format(field.value, 'yyyy-MM-dd') : ''
-    );
-    const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
-    const currentYear = new Date().getFullYear();
-
-    useEffect(() => {
-      if (field.value && isValid(field.value)) {
-        setReactInputValue(format(field.value, 'yyyy-MM-dd'));
-      } else {
-        setReactInputValue('');
-      }
-    }, [field.value]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setReactInputValue(e.target.value);
-    };
-
-    const handleInputBlur = () => {
-      if (inputValue === "") { field.onChange(null); return; }
-      const formatsToTry = ['MM/dd/yyyy', 'MM-dd-yyyy', 'yyyy-MM-dd'];
-      let parsedDateFromInput: Date | null = null;
-      for (const fmt of formatsToTry) {
-        try {
-          const date = parse(inputValue, fmt, new Date());
-          if (isValid(date)) { parsedDateFromInput = date; break; }
-        } catch (e) { /* ignore */ }
-      }
-      if (parsedDateFromInput && isValid(parsedDateFromInput)) {
-        const year = parsedDateFromInput.getFullYear();
-        if (year >= currentYear - 5 && year <= currentYear + 5) { field.onChange(parsedDateFromInput); }
-        else { field.onChange(null); }
-      } else { field.onChange(null); }
-    };
-
-    const handleCalendarSelect = (date: Date | undefined) => {
-      field.onChange(date || null); setIsCalendarOpen(false);
-    };
-
-    return (
-      <FormItem className="flex flex-col">
-        <FormLabel>{label} <span className="text-destructive">*</span></FormLabel>
-        <div className="relative">
-          <FormControl>
-            <Input
-              placeholder="MM/DD/YYYY" value={inputValue} onChange={handleInputChange}
-              onFocus={() => setIsCalendarOpen(true)} onBlur={handleInputBlur}
-              className={cn('pr-10', disabled && 'cursor-not-allowed opacity-50')} disabled={disabled}
-            />
-          </FormControl>
-          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                onClick={(e) => { e.preventDefault(); setIsCalendarOpen((prev) => !prev);}}
-                disabled={disabled} type="button" aria-label="Open calendar">
-                <CalendarIcon className="h-4 w-4 opacity-80" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                classNames={{ caption_label: 'hidden' }}
-                selected={field.value && isValid(field.value) ? field.value : undefined}
-                onSelect={handleCalendarSelect}
-                disabled={(date) => date > new Date() || date < new Date('2000-01-01') || !!disabled}
-                initialFocus
-                captionLayout="dropdown-buttons"
-                fromYear={currentYear - 5}
-                toYear={currentYear}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-        {description && <FormDescription>{description}</FormDescription>}
-        <FormMessage />
-      </FormItem>
-    );
-};
-
 
 export default function FitnessTestDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -449,16 +363,24 @@ export default function FitnessTestDetailsPage() {
                         control={form.control}
                         name="testDate"
                         render={({ field }) => (
-                            <DateInputWithCalendar field={field} label="Test Date" disabled={!isEditing || isFormDisabled} />
+                            <DatePickerField
+                              field={field}
+                              label="Test Date"
+                              required
+                              fromYear={new Date().getFullYear() - 5}
+                              toYear={new Date().getFullYear()}
+                              disabled={!isEditing || isFormDisabled}
+                            />
                         )}
                     />
                     <FormField
                         control={form.control}
                         name="location"
                         render={({ field }) => (
-                            <FormItem>
+                            <FormItem className="flex flex-col">
                             <FormLabel>Location</FormLabel>
-                            <FormControl><Input {...field} disabled={!isEditing || isFormDisabled} /></FormControl>
+                            <FormControl><Input {...field} disabled={!isEditing || isFormDisabled} className="mt-auto" /></FormControl>
+                            <FormDescription>Where the fitness test was conducted.</FormDescription>
                             <FormMessage />
                             </FormItem>
                         )}
@@ -467,9 +389,10 @@ export default function FitnessTestDetailsPage() {
                         control={form.control}
                         name="administratorName"
                         render={({ field }) => (
-                            <FormItem>
+                            <FormItem className="flex flex-col">
                             <FormLabel>Administrator</FormLabel>
-                            <FormControl><Input {...field} disabled={!isEditing || isFormDisabled} /></FormControl>
+                            <FormControl><Input {...field} disabled={!isEditing || isFormDisabled} className="mt-auto" /></FormControl>
+                            <FormDescription>Name of the test administrator.</FormDescription>
                             <FormMessage />
                             </FormItem>
                         )}
