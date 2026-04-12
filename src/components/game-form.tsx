@@ -2,23 +2,22 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, type ControllerRenderProps, type FieldValues } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { DatePickerField } from '@/components/date-picker-field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarIcon, Info, UserCheck } from 'lucide-react';
+import { Info, UserCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, isValid, parse } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import type { Game, Series, Team, UserProfile, Venue } from '@/types';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { addGameAction } from '@/lib/actions/game-actions';
 import { getTeamsForSeriesAction, getVenuesForSeriesAction } from '@/lib/actions/series-actions';
-import React, { useEffect, useState, useMemo, type ChangeEvent } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -51,117 +50,6 @@ interface GameFormProps {
   potentialSelectors?: UserProfile[];
 }
 
-const DateInputWithCalendar: React.FC<{
-    field: ControllerRenderProps<GameFormValues, 'date'>;
-    label: string;
-    description?: string;
-    disabled?: boolean;
-  }> = ({ field, label, description, disabled }) => {
-    const [inputValue, setInputValue] = React.useState(
-      field.value && isValid(field.value) ? format(field.value, 'yyyy-MM-dd') : ''
-    );
-    const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
-    const inputRef = React.useRef<HTMLInputElement>(null);
-    const currentYear = new Date().getFullYear();
-
-    useEffect(() => {
-      if (field.value && isValid(field.value)) {
-        setInputValue(format(field.value, 'yyyy-MM-dd'));
-      } else {
-        setInputValue('');
-      }
-    }, [field.value]);
-
-
-    const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-      setInputValue(e.target.value);
-    };
-
-    const handleInputBlur = () => {
-      if (inputValue === "") {
-        field.onChange(null);
-        return;
-      }
-      const formatsToTry = ['MM/dd/yyyy', 'MM-dd-yyyy', 'yyyy-MM-dd'];
-      let parsedDateFromInput: Date | null = null;
-
-      for (const fmt of formatsToTry) {
-        try {
-          const date = parse(inputValue, fmt, new Date());
-          if (isValid(date)) {
-            parsedDateFromInput = date;
-            break;
-          }
-        } catch (e) { /* ignore */ }
-      }
-
-      if (parsedDateFromInput && isValid(parsedDateFromInput)) {
-         const year = parsedDateFromInput.getFullYear();
-         if (year >= currentYear - 5 && year <= currentYear + 5) {
-            field.onChange(parsedDateFromInput);
-         } else {
-            field.onChange(null);
-         }
-      } else {
-        field.onChange(null);
-      }
-    };
-
-    const handleCalendarSelect = (date: Date | undefined) => {
-      field.onChange(date || null);
-      setIsCalendarOpen(false);
-    };
-
-    return (
-      <FormItem className="flex flex-col">
-        <FormLabel>{label} <span className="text-destructive">*</span></FormLabel>
-        <div className="relative">
-          <FormControl>
-            <Input
-              ref={inputRef}
-              placeholder="MM/DD/YYYY"
-              value={inputValue}
-              onChange={handleInputChange}
-              onFocus={() => setIsCalendarOpen(true)}
-              onBlur={handleInputBlur}
-              className={cn('pr-10', disabled && 'cursor-not-allowed opacity-50')}
-              disabled={disabled}
-            />
-          </FormControl>
-          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                onClick={(e) => { e.preventDefault(); setIsCalendarOpen((prev) => !prev);}}
-                disabled={disabled}
-                type="button"
-                aria-label="Open calendar"
-              >
-                <CalendarIcon className="h-4 w-4 opacity-80" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                classNames={{ caption_label: 'hidden' }}
-                selected={field.value instanceof Date && isValid(field.value) ? field.value : undefined}
-                onSelect={handleCalendarSelect}
-                disabled={(date) => date < new Date('1900-01-01') || !!disabled}
-                initialFocus
-                captionLayout="dropdown-buttons"
-                fromYear={currentYear - 2}
-                toYear={currentYear + 3}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-        {description && <FormDescription>{description}</FormDescription>}
-        <FormMessage />
-      </FormItem>
-    );
-  };
 
 export function GameForm({ initialData, onSubmitSuccess, allSeriesForForm, preselectedSeriesId, potentialSelectors = [] }: GameFormProps) {
   const router = useRouter();
@@ -274,13 +162,13 @@ export function GameForm({ initialData, onSubmitSuccess, allSeriesForForm, prese
       if (onSubmitSuccess) {
         onSubmitSuccess(newOrUpdatedGame);
       } else {
+        router.refresh();
         if (preselectedSeriesId) {
             router.push(`/series/${preselectedSeriesId}/details`);
         } else {
             router.push('/games');
         }
       }
-      router.refresh();
     } catch (error) {
       let errorMessage = 'Could not save game details.';
       if (error instanceof Error) {
@@ -361,11 +249,13 @@ export function GameForm({ initialData, onSubmitSuccess, allSeriesForForm, prese
           control={form.control}
           name="date"
           render={({ field }) => (
-            <DateInputWithCalendar
+            <DatePickerField
                 field={field}
                 label="Game Date"
-                description="Accepted typed formats: MM/DD/YYYY, YYYY-MM-DD."
+                required
                 disabled={isCurrentSeriesArchived}
+                fromYear={new Date().getFullYear() - 2}
+                toYear={new Date().getFullYear() + 3}
             />
           )}
         />

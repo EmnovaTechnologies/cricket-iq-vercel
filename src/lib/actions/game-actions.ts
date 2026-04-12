@@ -101,22 +101,24 @@ export async function addGameAction(gameData: GameFormValuesType & { selectorUse
     selectorUserIds: gameData.selectorUserIds || [],
   };
 
-  const newGame = await addGameToDB(gameToSave); // addGameToDB will handle status and createdAt
-
-  // If selectors are assigned, update their profiles
-  if (newGame.selectorUserIds && newGame.selectorUserIds.length > 0 && newGame.organizationId) {
-    const batch = writeBatch(db);
-    newGame.selectorUserIds.forEach(selectorUid => {
-      const userRef = doc(db, 'users', selectorUid);
-      batch.update(userRef, {
-        assignedGameIds: arrayUnion(newGame.id),
-        assignedOrganizationIds: arrayUnion(newGame.organizationId) // Also assign to organization
-      });
+  const newGame = await (async () => {
+    const { createGameAdminAction } = await import('./create-game-admin-action');
+    const result = await createGameAdminAction({
+      seriesId: gameToSave.seriesId,
+      organizationId: gameToSave.organizationId,
+      date: normalizedDateString,
+      venue: gameToSave.venue,
+      team1: gameToSave.team1,
+      team2: gameToSave.team2,
+      team1Players: team1EligiblePlayerIds,
+      team2Players: team2EligiblePlayerIds,
+      selectorUserIds: gameData.selectorUserIds || [],
     });
-    await batch.commit();
-  }
+    if (!result.success || !result.game) throw new Error(result.error || 'Failed to create game.');
+    return result.game;
+  })();
 
-  return { ...newGame, seriesName: currentSeries.name }; // Add seriesName for immediate use if needed
+  return { ...newGame, seriesName: currentSeries.name };
 }
 
 export async function updatePlayerGameInclusionAction(

@@ -4,18 +4,18 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, useFieldArray, ControllerRenderProps } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { DatePickerField } from '@/components/date-picker-field';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { CalendarIcon, Info, Loader2, Users, Save, Activity, UserPlus, Trash2, UserX, Check, ChevronsUpDown } from 'lucide-react';
+import { Info, Loader2, Users, Save, Activity, UserPlus, Trash2, UserX, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, parse, isValid } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import type { Series, Player, FitnessTestType } from '@/types';
 import { createFitnessTestAndResultsAction } from '@/lib/actions/fitness-actions';
 import { useToast } from '@/hooks/use-toast';
@@ -52,92 +52,6 @@ interface FitnessTestFormProps {
   series: Series;
   playersInSeries: Player[];
 }
-
-const DateInputWithCalendar: React.FC<{
-    field: ControllerRenderProps<FitnessTestFormValues, 'testDate'>;
-    label: string;
-    description?: string;
-    disabled?: boolean;
-  }> = ({ field, label, description, disabled }) => {
-    const [inputValue, setInputValue] = React.useState(
-      field.value && isValid(field.value) ? format(field.value, 'yyyy-MM-dd') : ''
-    );
-    const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
-    const currentYear = new Date().getFullYear();
-
-    useEffect(() => {
-      if (field.value && isValid(field.value)) {
-        setInputValue(format(field.value, 'yyyy-MM-dd'));
-      } else {
-        setInputValue('');
-      }
-    }, [field.value]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setInputValue(e.target.value);
-    };
-
-    const handleInputBlur = () => {
-      if (inputValue === "") { field.onChange(null); return; }
-      const formatsToTry = ['MM/dd/yyyy', 'MM-dd-yyyy', 'yyyy-MM-dd'];
-      let parsedDateFromInput: Date | null = null;
-      for (const fmt of formatsToTry) {
-        try {
-          const date = parse(inputValue, fmt, new Date());
-          if (isValid(date)) { parsedDateFromInput = date; break; }
-        } catch (e) { /* ignore */ }
-      }
-      if (parsedDateFromInput && isValid(parsedDateFromInput)) {
-        const year = parsedDateFromInput.getFullYear();
-        if (year >= currentYear - 5 && year <= currentYear + 5) { field.onChange(parsedDateFromInput); }
-        else { field.onChange(null); }
-      } else { field.onChange(null); }
-    };
-
-    const handleCalendarSelect = (date: Date | undefined) => {
-      field.onChange(date || null); setIsCalendarOpen(false);
-    };
-
-    return (
-      <FormItem className="flex flex-col">
-        <FormLabel>{label} <span className="text-destructive">*</span></FormLabel>
-        <div className="relative">
-          <FormControl>
-            <Input
-              placeholder="MM/DD/YYYY" value={inputValue} onChange={handleInputChange}
-              onFocus={() => setIsCalendarOpen(true)} onBlur={handleInputBlur}
-              className={cn('pr-10', disabled && 'cursor-not-allowed opacity-50')} disabled={disabled}
-            />
-          </FormControl>
-          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                onClick={(e) => { e.preventDefault(); setIsCalendarOpen((prev) => !prev);}}
-                disabled={disabled} type="button" aria-label="Open calendar">
-                <CalendarIcon className="h-4 w-4 opacity-80" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                classNames={{ caption_label: 'hidden' }}
-                selected={field.value && isValid(field.value) ? field.value : undefined}
-                onSelect={handleCalendarSelect}
-                disabled={(date) => date > new Date() || date < new Date('2000-01-01') || !!disabled}
-                initialFocus
-                captionLayout="dropdown-buttons"
-                fromYear={currentYear - 5}
-                toYear={currentYear}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-        {description && <FormDescription>{description}</FormDescription>}
-        <FormMessage />
-      </FormItem>
-    );
-};
-
 
 export function FitnessTestForm({ series, playersInSeries }: FitnessTestFormProps) {
   const { toast } = useToast();
@@ -265,16 +179,24 @@ export function FitnessTestForm({ series, playersInSeries }: FitnessTestFormProp
               control={form.control}
               name="testDate"
               render={({ field }) => (
-                <DateInputWithCalendar field={field} label="Test Date" description="Date the fitness test was conducted."/>
+                <DatePickerField
+                  field={field}
+                  label="Test Date"
+                  description="Date the fitness test was conducted."
+                  required
+                  fromYear={new Date().getFullYear() - 5}
+                  toYear={new Date().getFullYear()}
+                />
               )}
             />
             <FormField
               control={form.control}
               name="location"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel>Location <span className="text-destructive">*</span></FormLabel>
                   <FormControl><Input placeholder="e.g., Club Training Grounds" {...field} disabled={isSubmitting}/></FormControl>
+                  <FormDescription>Where the fitness test was conducted.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

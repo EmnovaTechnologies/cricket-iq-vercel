@@ -3,7 +3,7 @@
 
 import type { Organization, Team } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, ControllerRenderProps } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -15,11 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { GENDERS } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import { registerPlayerAction } from '@/lib/actions/player-registration-actions';
-import { Loader2, CalendarIcon, AlertTriangle } from 'lucide-react';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
-import { format, parse, isValid } from 'date-fns';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { DatePickerField } from '@/components/date-picker-field';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -37,84 +34,6 @@ const playerRegistrationSchema = z.object({
 });
 
 type PlayerRegistrationFormValues = z.infer<typeof playerRegistrationSchema>;
-
-const DatePickerField: React.FC<{
-    field: ControllerRenderProps<PlayerRegistrationFormValues, 'dateOfBirth'>;
-    label: string;
-    disabled?: boolean;
-}> = ({ field, label, disabled }) => {
-    const [inputValue, setInputValue] = React.useState(
-        field.value && isValid(field.value) ? format(field.value, 'yyyy-MM-dd') : ''
-    );
-    const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
-
-    useEffect(() => {
-        if (field.value && isValid(field.value)) {
-            setInputValue(format(field.value, 'yyyy-MM-dd'));
-        } else {
-            setInputValue('');
-        }
-    }, [field.value]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setInputValue(e.target.value);
-    };
-
-    const handleInputBlur = () => {
-        if (inputValue === "") { field.onChange(null); return; }
-        const formatsToTry = ['MM/dd/yyyy', 'MM-dd-yyyy', 'yyyy-MM-dd'];
-        let parsedDate: Date | null = null;
-        for (const fmt of formatsToTry) {
-            const date = parse(inputValue, fmt, new Date());
-            if (isValid(date)) { parsedDate = date; break; }
-        }
-        field.onChange(parsedDate);
-    };
-
-    const handleCalendarSelect = (date: Date | undefined) => {
-        field.onChange(date || null);
-        setIsCalendarOpen(false);
-    };
-
-    return (
-        <FormItem className="flex flex-col">
-            <FormLabel>{label} <span className="text-destructive">*</span></FormLabel>
-            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                <PopoverTrigger asChild>
-                    <FormControl>
-                        <div className="relative">
-                             <Input
-                                placeholder="MM/DD/YYYY" value={inputValue} onChange={handleInputChange}
-                                onFocus={() => setIsCalendarOpen(true)} onBlur={handleInputBlur}
-                                className={cn('pr-10', disabled && 'cursor-not-allowed opacity-50')} disabled={disabled}
-                            />
-                            <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                onClick={(e) => { e.preventDefault(); setIsCalendarOpen((prev) => !prev); }}
-                                disabled={disabled} type="button" aria-label="Open calendar">
-                                <CalendarIcon className="h-4 w-4 opacity-80" />
-                            </Button>
-                        </div>
-                    </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                        mode="single"
-                        classNames={{ caption_label: 'hidden' }}
-                        captionLayout="dropdown-buttons"
-                        fromYear={1950}
-                        toYear={new Date().getFullYear()}
-                        selected={field.value}
-                        onSelect={handleCalendarSelect}
-                        disabled={(date) => date > new Date() || date < new Date('1920-01-01')}
-                        initialFocus
-                    />
-                </PopoverContent>
-            </Popover>
-            <FormMessage />
-        </FormItem>
-    );
-};
-
 
 interface PlayerRegistrationFormProps {
     organization: Organization;
@@ -197,15 +116,23 @@ export function PlayerRegistrationForm({ organization, teams }: PlayerRegistrati
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
-                        <DatePickerField field={field} label="Date of Birth" disabled={isLoading} />
+                        <DatePickerField
+                          field={field}
+                          label="Date of Birth"
+                          required
+                          fromYear={1950}
+                          toYear={new Date().getFullYear()}
+                          disabled={isLoading}
+                        />
                     )}/>
                     <FormField control={form.control} name="gender" render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex flex-col">
                             <FormLabel>Gender</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger></FormControl>
+                                <FormControl><SelectTrigger className="mt-auto"><SelectValue placeholder="Select gender" /></SelectTrigger></FormControl>
                                 <SelectContent>{GENDERS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
                             </Select>
+                            <FormDescription>Select your gender.</FormDescription>
                             <FormMessage />
                         </FormItem>
                     )}/>

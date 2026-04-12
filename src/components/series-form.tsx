@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, type ControllerRenderProps, type FieldValues } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
@@ -17,12 +17,11 @@ import { createSeriesAdminAction } from '@/lib/actions/create-series-admin-actio
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { useState, useMemo, useEffect, type ChangeEvent } from 'react';
-import { CalendarIcon, Search, Loader2, AlertTriangle, Info, Activity } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { useState, useMemo, useEffect } from 'react';
+import { Search, Loader2, AlertTriangle, Info, Activity } from 'lucide-react';
+import { DatePickerField } from '@/components/date-picker-field';
 import { cn } from '@/lib/utils';
-import { format, parseISO, isValid, parse } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { useAuth } from '@/contexts/auth-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -67,119 +66,6 @@ interface SeriesFormProps {
   onSubmitSuccess?: (series: Series) => void;
   potentialSeriesAdmins: UserProfile[];
 }
-
-const DateInputWithCalendar: React.FC<{
-    field: ControllerRenderProps<FieldValues, string>;
-    label: string;
-    description: string;
-  }> = ({ field, label, description }) => {
-    const [inputValue, setInputValue] = React.useState(
-      field.value && isValid(field.value) ? format(field.value, 'yyyy-MM-dd') : ''
-    );
-    const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
-    const inputRef = React.useRef<HTMLInputElement>(null);
-    const currentYear = new Date().getFullYear();
-
-    useEffect(() => {
-      if (field.value && isValid(field.value)) {
-        if (inputValue !== format(field.value, 'yyyy-MM-dd')) {
-            setInputValue(format(field.value, 'yyyy-MM-dd'));
-        }
-      } else if (field.value === null && inputValue !== "") {
-      } else if (field.value === null && inputValue === "") {
-      } else if (!field.value && inputValue !== "") {
-      }
-    }, [field.value, inputValue]);
-
-    const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-      setInputValue(e.target.value);
-    };
-
-    const handleInputBlur = () => {
-      if (inputValue === "") {
-        if (field.value !== null) field.onChange(null);
-        return;
-      }
-      const formatsToTry = ['MM/dd/yyyy', 'MM-dd-yyyy', 'yyyy-MM-dd'];
-      let parsedDateFromInput: Date | null = null;
-
-      for (const fmt of formatsToTry) {
-        try {
-          const date = parse(inputValue, fmt, new Date());
-          if (isValid(date)) {
-            parsedDateFromInput = date;
-            break;
-          }
-        } catch (e) { /* ignore */ }
-      }
-
-      if (parsedDateFromInput && isValid(parsedDateFromInput)) {
-         const year = parsedDateFromInput.getFullYear();
-         if (year >= 1950 && year <= (new Date().getFullYear() + 100)) {
-            if (!field.value || field.value.getTime() !== parsedDateFromInput.getTime()) {
-              field.onChange(parsedDateFromInput);
-            }
-         } else {
-            if (field.value !== null) field.onChange(null);
-         }
-      } else {
-        if (field.value !== null) field.onChange(null);
-      }
-    };
-
-    const handleCalendarSelect = (date: Date | undefined) => {
-      field.onChange(date || null);
-      setIsCalendarOpen(false);
-    };
-
-    return (
-      <FormItem className="flex flex-col">
-        <FormLabel>{label} <span className="text-destructive">*</span></FormLabel>
-        <div className="relative">
-          <FormControl>
-            <Input
-              ref={inputRef}
-              placeholder="MM/DD/YYYY"
-              value={inputValue}
-              onChange={handleInputChange}
-              onFocus={() => setIsCalendarOpen(true)}
-              onBlur={handleInputBlur}
-              className={cn('pr-10')}
-            />
-          </FormControl>
-          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                onClick={(e) => { e.preventDefault(); setIsCalendarOpen((prev) => !prev);}}
-                type="button"
-                aria-label="Open calendar"
-              >
-                <CalendarIcon className="h-4 w-4 opacity-80" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                classNames={{ caption_label: 'hidden' }}
-                captionLayout="dropdown-buttons"
-                fromYear={1950}
-                toYear={new Date().getFullYear() + 5}
-                selected={field.value instanceof Date && isValid(field.value) ? field.value : undefined}
-                onSelect={handleCalendarSelect}
-                disabled={(date) => date > new Date('2100-01-01') || date < new Date('1950-01-01') }
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-        <FormDescription>{description}</FormDescription>
-        <FormMessage />
-      </FormItem>
-    );
-  };
 
 export function SeriesForm({ initialData, onSubmitSuccess, potentialSeriesAdmins }: SeriesFormProps) {
   const router = useRouter();
@@ -367,10 +253,13 @@ export function SeriesForm({ initialData, onSubmitSuccess, potentialSeriesAdmins
             control={form.control}
             name="maleCutoffDate"
             render={({ field }) => (
-              <DateInputWithCalendar
-                field={field as ControllerRenderProps<FieldValues, string>}
+              <DatePickerField
+                field={field}
                 label="Male Cutoff Date"
                 description="Player's Date of Birth must be on or after this date (for Males)."
+                required
+                fromYear={1950}
+                toYear={new Date().getFullYear() + 5}
               />
             )}
           />
@@ -378,18 +267,17 @@ export function SeriesForm({ initialData, onSubmitSuccess, potentialSeriesAdmins
             control={form.control}
             name="femaleCutoffDate"
             render={({ field }) => (
-              <DateInputWithCalendar
-                field={field as ControllerRenderProps<FieldValues, string>}
+              <DatePickerField
+                field={field}
                 label="Female Cutoff Date"
                 description="Player's Date of Birth must be on or after this date (for Females)."
+                required
+                fromYear={1950}
+                toYear={new Date().getFullYear() + 5}
               />
             )}
           />
         </div>
-        <FormDescription>
-            Cutoff dates are mandatory. Player eligibility for this series will be based on these dates. Accepted typed formats: MM/DD/YYYY, YYYY-MM-DD.
-        </FormDescription>
-
         <fieldset className="space-y-6 p-4 border rounded-md">
           <legend className="text-md font-medium px-1 text-foreground -ml-1 flex items-center gap-2">
             <Activity className="h-5 w-5 text-primary" />
