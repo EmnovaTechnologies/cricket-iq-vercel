@@ -10,7 +10,7 @@ import { PlusCircle, Layers, Filter, Upload, AlertTriangle, Info, Loader2 } from
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { archiveSeriesAction, unarchiveSeriesAction } from '@/lib/actions/series-actions';
-import { checkSeriesDeletableAction } from '@/lib/actions/series-admin-actions';
+import { checkSeriesBulkDeletableAction } from '@/lib/actions/series-admin-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -78,9 +78,10 @@ export default function SeriesPage() {
         userProfile.roles.includes('Series Admin');
 
       if (canDeleteAny && finalVisibleSeries.length > 0) {
-        const checks = await Promise.all(finalVisibleSeries.map(s => checkSeriesDeletableAction(s.id)));
-        const deletableMap: Record<string, boolean> = {};
-        finalVisibleSeries.forEach((s, i) => { deletableMap[s.id] = checks[i].canDelete; });
+        const deletableMap = await checkSeriesBulkDeletableAction(
+          finalVisibleSeries.map(s => s.id),
+          activeOrganizationId
+        );
         setSeriesDeletable(deletableMap);
       }
     } catch (error) {

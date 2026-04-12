@@ -3,8 +3,7 @@
 import { adminDb } from '../firebase-admin';
 
 /**
- * Checks if a series can be deleted.
- * A series can only be deleted if it has no games.
+ * Checks if a single series can be deleted.
  */
 export async function checkSeriesDeletableAction(
   seriesId: string
@@ -31,8 +30,40 @@ export async function checkSeriesDeletableAction(
 }
 
 /**
+ * Bulk check deletability for multiple series in ONE query.
+ * Returns a map of seriesId -> canDelete.
+ */
+export async function checkSeriesBulkDeletableAction(
+  seriesIds: string[],
+  organizationId: string
+): Promise<Record<string, boolean>> {
+  if (!seriesIds.length) return {};
+
+  try {
+    // One query: get all games for this org — find which series have games
+    const gamesSnap = await adminDb.collection('games')
+      .where('organizationId', '==', organizationId)
+      .get();
+
+    const seriesWithGames = new Set<string>();
+    gamesSnap.docs.forEach(d => {
+      const sid = d.data().seriesId;
+      if (sid) seriesWithGames.add(sid);
+    });
+
+    const result: Record<string, boolean> = {};
+    seriesIds.forEach(id => { result[id] = !seriesWithGames.has(id); });
+    return result;
+  } catch (error: any) {
+    console.error('[checkSeriesBulkDeletableAction] Error:', error);
+    const result: Record<string, boolean> = {};
+    seriesIds.forEach(id => { result[id] = false; });
+    return result;
+  }
+}
+
+/**
  * Deletes a series after safety check.
- * Only deletes the series doc — no cascade.
  */
 export async function deleteSeriesAdminAction(
   seriesId: string
