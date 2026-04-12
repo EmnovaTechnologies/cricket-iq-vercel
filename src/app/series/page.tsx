@@ -73,11 +73,9 @@ export default function SeriesPage() {
       const finalVisibleSeries = orgSeries.filter(s => visibleSeriesIds.has(s.id));
       setAllSeries(finalVisibleSeries);
 
-      // Pre-fetch deletability for all visible series
-      const isSuperAdmin = userProfile.roles.includes('admin');
-      const isOrgAdmin = userProfile.roles.includes('Organization Admin');
-      const isSeriesAdmin = userProfile.roles.includes('Series Admin');
-      const canDeleteAny = effectivePermissions[PERMISSIONS.SERIES_DELETE_ANY] || isSuperAdmin || isOrgAdmin || isSeriesAdmin;
+      const canDeleteAny = userProfile.roles.includes('admin') ||
+        userProfile.roles.includes('Organization Admin') ||
+        userProfile.roles.includes('Series Admin');
 
       if (canDeleteAny && finalVisibleSeries.length > 0) {
         const checks = await Promise.all(finalVisibleSeries.map(s => checkSeriesDeletableAction(s.id)));
@@ -91,7 +89,7 @@ export default function SeriesPage() {
       setAllSeries([]);
     }
     setIsLoading(false);
-  }, [activeOrganizationId, authLoading, userProfile, toast, effectivePermissions]);
+  }, [activeOrganizationId, authLoading, userProfile?.uid, userProfile?.roles?.join(','), toast]);
 
   useEffect(() => {
     fetchSeries();
@@ -133,7 +131,7 @@ export default function SeriesPage() {
   const canArchiveAnySeries = effectivePermissions[PERMISSIONS.SERIES_ARCHIVE_ANY];
   const canUnarchiveAnySeries = effectivePermissions[PERMISSIONS.SERIES_UNARCHIVE_ANY];
 
-  const isPageLoading = authLoading || isPermissionsLoading || isLoading;
+  const isPageLoading = authLoading || isPermissionsLoading || (isLoading && !!activeOrganizationId);
 
   if (isPageLoading) {
     return (
@@ -215,7 +213,7 @@ export default function SeriesPage() {
             </div>
           </div>
 
-          {isLoading ? ( 
+          {isLoading ? (
             <p className="text-muted-foreground text-center py-6">Loading series...</p>
           ) : filteredSeries.length === 0 ? (
             <p className="text-muted-foreground text-center py-6">
