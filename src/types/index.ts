@@ -388,3 +388,173 @@ export interface RegistrationResult {
     message?: string;
     error?: string;
 }
+
+// ─── Scorecard Types ──────────────────────────────────────────────────────────
+
+export interface ScorecardBatter {
+  name: string;
+  runs: number;
+  balls: number;
+  fours: number;
+  sixes: number;
+  strikeRate: number;
+  dismissal: string;
+  scorecardPlayerId?: string;
+  linkedPlayerId?: string;
+}
+
+export interface ScorecardBowler {
+  name: string;
+  overs: number;
+  maidens: number;
+  runs: number;
+  wickets: number;
+  economy: number;
+  wides: number;
+  noballs: number;
+  dots: number;
+  scorecardPlayerId?: string;
+  linkedPlayerId?: string;
+}
+
+export interface ScorecardFielder {
+  name: string;
+  catches: number;         // from "c Name b ..." dismissals
+  runOuts: number;         // from "run out (Name/...)" dismissals
+  stumpings: number;       // from "st Name b ..." (keeper)
+  keeperCatches: number;   // from "c †Name b ..." (keeper catch, † symbol)
+  byesConceded?: number;   // keeper only — from extras byes
+}
+
+export interface ScorecardExtras {
+  byes: number;
+  legByes: number;
+  wides: number;
+  noballs: number;
+  total: number;
+}
+
+export interface ScorecardInnings {
+  inningsNumber: 1 | 2;
+  battingTeam: string;
+  totalRuns: number;
+  wickets: number;
+  overs: string;
+  extras: ScorecardExtras;
+  batting: ScorecardBatter[];
+  bowling: ScorecardBowler[];
+  fielding: ScorecardFielder[];  // derived from dismissal text
+  fallOfWickets: string[];
+  didNotBat: string[];
+}
+
+export interface MatchScorecard {
+  id: string;
+  organizationId: string;
+  importedBy: string;
+  importedAt: string;
+  // CricClubs source info
+  cricClubsUrl?: string;
+  cricClubsMatchId?: string;
+  cricClubsClubId?: string;
+  cricClubsLeague?: string;
+  // Match info
+  team1: string;
+  team2: string;
+  date: string;
+  venue?: string;
+  result?: string;
+  // Optional link to Cricket IQ game
+  linkedGameId?: string;
+  // Innings data
+  innings: ScorecardInnings[];
+}
+
+export interface ScorecardPlayer {
+  id: string;
+  organizationId: string;
+  name: string;
+  cricClubsId?: string;
+  cricClubsLeague?: string;
+  linkedPlayerId?: string; // linked Cricket IQ Player doc ID
+  firstSeenAt: string;
+  lastSeenAt: string;
+  gamesAppeared: number;
+}
+
+// ─── Scorecard Scoring Config ─────────────────────────────────────────────────
+
+export interface ScorecardScoringConfig {
+  id?: string;
+  organizationId: string;
+  updatedAt?: string;
+  // Batting weights
+  batting: {
+    runsMultiplier: number;        // default 1
+    srBonus200: number;            // SR > 200: default +10
+    srBonus150: number;            // SR > 150: default +7.5
+    srBonus100: number;            // SR > 100: default +5
+    srPenaltySub50: number;        // SR < 50: default -5
+    foursMultiplier: number;       // default 2
+    sixesMultiplier: number;       // default 4
+  };
+  // Bowling weights
+  bowling: {
+    wicketsMultiplier: number;     // default 20
+    econBonus4: number;            // Econ < 4: default +10
+    econBonus6: number;            // Econ < 6: default +5
+    econPenalty8: number;          // Econ > 8: default -5
+    dotsMultiplier: number;        // default 1
+    widesMultiplier: number;       // default -1
+    noballsMultiplier: number;     // default -2
+  };
+  // Fielding weights
+  fielding: {
+    catchesMultiplier: number;     // default 10
+    runOutsMultiplier: number;     // default 10
+    stumpingsMultiplier: number;   // default 10
+    keeperCatchesMultiplier: number; // default 10
+    byesMultiplier: number;        // default -2
+  };
+}
+
+export const DEFAULT_SCORING_CONFIG: Omit<ScorecardScoringConfig, 'id' | 'organizationId' | 'updatedAt'> = {
+  batting: {
+    runsMultiplier: 1,
+    srBonus200: 10,
+    srBonus150: 7.5,
+    srBonus100: 5,
+    srPenaltySub50: -5,
+    foursMultiplier: 2,
+    sixesMultiplier: 4,
+  },
+  bowling: {
+    wicketsMultiplier: 20,
+    econBonus4: 10,
+    econBonus6: 5,
+    econPenalty8: -5,
+    dotsMultiplier: 1,
+    widesMultiplier: -1,
+    noballsMultiplier: -2,
+  },
+  fielding: {
+    catchesMultiplier: 10,
+    runOutsMultiplier: 10,
+    stumpingsMultiplier: 10,
+    keeperCatchesMultiplier: 10,
+    byesMultiplier: -2,
+  },
+};
+
+export interface PlayerScore {
+  name: string;
+  team: string;
+  battingScore: number;
+  bowlingScore: number;
+  fieldingScore: number;
+  totalScore: number;
+  // breakdown for display
+  batting?: { runs: number; balls: number; strikeRate: number; fours: number; sixes: number; dismissal: string };
+  bowling?: { overs: number; wickets: number; runs: number; economy: number; dots: number; wides: number; noballs: number };
+  fielding?: { catches: number; runOuts: number; stumpings: number; keeperCatches: number; byesConceded?: number };
+}

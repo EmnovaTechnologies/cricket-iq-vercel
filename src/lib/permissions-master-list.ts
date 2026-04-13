@@ -61,7 +61,6 @@ export const PERMISSIONS = {
   // Series Management Permissions
   SERIES_ADD: 'series:add',
   SERIES_EDIT_ANY: 'series:edit_any',
-  SERIES_DELETE_ANY: 'series:delete_any',
   SERIES_ARCHIVE_ANY: 'series:archive_any',
   SERIES_UNARCHIVE_ANY: 'series:unarchive_any',
   SERIES_MANAGE_ADMINS_ANY: 'series:manage_admins_any',
@@ -126,6 +125,10 @@ export const PERMISSIONS = {
   PAGE_VIEW_EXPORT: 'page:view:export',
   DATA_EXPORT_ORG: 'data:export:org',       // Org Admin — export all data for their org
   DATA_EXPORT_SERIES: 'data:export:series', // Series Admin — export data for assigned series only
+
+  // Scorecard Permissions
+  PAGE_VIEW_SCORECARDS: 'page:view:scorecards',
+  SCORECARDS_IMPORT: 'scorecards:import',
 } as const;
 
 export type PermissionKey = typeof PERMISSIONS[keyof typeof PERMISSIONS];
@@ -148,6 +151,13 @@ export const PERMISSION_CATEGORIES = {
       PERMISSIONS.PAGE_VIEW_EXPORT,
       PERMISSIONS.DATA_EXPORT_ORG,
       PERMISSIONS.DATA_EXPORT_SERIES,
+    ]
+  },
+  SCORECARDS: {
+    label: 'Scorecards',
+    permissions: [
+      PERMISSIONS.PAGE_VIEW_SCORECARDS,
+      PERMISSIONS.SCORECARDS_IMPORT,
     ]
   },
   PLAYER_PERMISSIONS: {
@@ -195,7 +205,6 @@ export const PERMISSION_CATEGORIES = {
       PERMISSIONS.PAGE_VIEW_SERIES_IMPORT_CSV,
       PERMISSIONS.SERIES_ADD,
       PERMISSIONS.SERIES_EDIT_ANY,
-      PERMISSIONS.SERIES_DELETE_ANY,
       PERMISSIONS.SERIES_ARCHIVE_ANY,
       PERMISSIONS.SERIES_UNARCHIVE_ANY,
       PERMISSIONS.SERIES_MANAGE_ADMINS_ANY,
@@ -341,7 +350,6 @@ export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
 
   [PERMISSIONS.SERIES_ADD]: "Add new series",
   [PERMISSIONS.SERIES_EDIT_ANY]: "Edit any series information",
-  [PERMISSIONS.SERIES_DELETE_ANY]: "Delete a series (only if no games associated)",
   [PERMISSIONS.SERIES_ARCHIVE_ANY]: "Archive any series",
   [PERMISSIONS.SERIES_UNARCHIVE_ANY]: "Unarchive any series",
   [PERMISSIONS.SERIES_MANAGE_ADMINS_ANY]: "Manage administrators for any series",
@@ -400,4 +408,7 @@ export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
   [PERMISSIONS.PAGE_VIEW_EXPORT]: "View Data Export page",
   [PERMISSIONS.DATA_EXPORT_ORG]: "Export all data (players, ratings) for their assigned organization",
   [PERMISSIONS.DATA_EXPORT_SERIES]: "Export data (players, ratings) for their assigned series only",
+
+  [PERMISSIONS.PAGE_VIEW_SCORECARDS]: "View scorecards list page",
+  [PERMISSIONS.SCORECARDS_IMPORT]: "Import scorecards from CricClubs images",
 };

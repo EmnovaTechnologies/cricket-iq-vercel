@@ -1,0 +1,139 @@
+'use server';
+
+import { adminDb } from '../firebase-admin';
+import * as admin from 'firebase-admin';
+import type { MatchScorecard, ScorecardPlayer, ScorecardInnings } from '@/types';
+
+// ─── Save Scorecard ────────────────────────────────────────────────────────────
+
+export async function saveScorecardAction(
+  scorecard: Omit<MatchScorecard, 'id' | 'importedAt'>,
+  importedBy: string
+): Promise<{ success: boolean; scorecardId?: string; error?: string }> {
+  try {
+    const data = {
+      ...scorecard,
+      importedBy,
+      importedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const ref = await adminDb.collection('matchScorecards').add(data);
+
+    // Upsert ScorecardPlayers for all players in all innings
+    await upsertScorecardPlayers(scorecard.innings, scorecard.organizationId, ref.id);
+
+    return { success: true, scorecardId: ref.id };
+  } catch (error: any) {
+    console.error('[saveScorecardAction] Error:', error);
+    return { success: false, error: error.message || 'Failed to save scorecard.' };
+  }
+}
+
+// ─── Upsert ScorecardPlayers ──────────────────────────────────────────────────
+
+async function upsertScorecardPlayers(
+  innings: ScorecardInnings[],
+  organizationId: string,
+  scorecardId: string
+): Promise<void> {
+  const playerNames = new Set<string>();
+
+  innings.forEach(inn => {
+    inn.batting.forEach(b => playerNames.add(b.name));
+    inn.bowling.forEach(b => playerNames.add(b.name));
+    inn.didNotBat.forEach(name => playerNames.add(name));
+  });
+
+  const batch = adminDb.batch();
+  const now = new Date().toISOString();
+
+  for (const name of playerNames) {
+    // Check if player already exists for this org
+    const existing = await adminDb.collection('scorecardPlayers')
+      .where('organizationId', '==', organizationId)
+      .where('name', '==', name)
+      .limit(1)
+      .get();
+
+    if (existing.empty) {
+      const newRef = adminDb.collection('scorecardPlayers').doc();
+      batch.set(newRef, {
+        organizationId,
+        name,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        gamesAppeared: 1,
+      });
+    } else {
+      batch.update(existing.docs[0].ref, {
+        lastSeenAt: now,
+        gamesAppeared: admin.firestore.FieldValue.increment(1),
+      });
+    }
+  }
+
+  await batch.commit();
+}
+
+// ─── Get Scorecards for Org ────────────────────────────────────────────────────
+
+export async function getScorecardsForOrgAction(
+  organizationId: string
+): Promise<{ success: boolean; scorecards?: MatchScorecard[]; error?: string }> {
+  try {
+    const snap = await adminDb.collection('matchScorecards')
+      .where('organizationId', '==', organizationId)
+      .orderBy('importedAt', 'desc')
+      .limit(50)
+      .get();
+
+    const scorecards: MatchScorecard[] = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      importedAt: d.data().importedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+    })) as MatchScorecard[];
+
+    return { success: true, scorecards };
+  } catch (error: any) {
+    console.error('[getScorecardsForOrgAction] Error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── Get Single Scorecard ──────────────────────────────────────────────────────
+
+export async function getScorecardByIdAction(
+  scorecardId: string
+): Promise<{ success: boolean; scorecard?: MatchScorecard; error?: string }> {
+  try {
+    const doc = await adminDb.collection('matchScorecards').doc(scorecardId).get();
+    if (!doc.exists) return { success: false, error: 'Scorecard not found.' };
+
+    const scorecard = {
+      id: doc.id,
+      ...doc.data(),
+      importedAt: doc.data()?.importedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+    } as MatchScorecard;
+
+    return { success: true, scorecard };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── Get ScorecardPlayers for Org ─────────────────────────────────────────────
+
+export async function getScorecardPlayersAction(
+  organizationId: string
+): Promise<ScorecardPlayer[]> {
+  try {
+    const snap = await adminDb.collection('scorecardPlayers')
+      .where('organizationId', '==', organizationId)
+      .orderBy('name')
+      .get();
+
+    return snap.docs.map(d => ({ id: d.id, ...d.data() })) as ScorecardPlayer[];
+  } catch {
+    return [];
+  }
+}
