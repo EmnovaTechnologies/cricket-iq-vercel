@@ -28,7 +28,7 @@ const medalColors = ['text-yellow-500', 'text-gray-400', 'text-amber-600'];
 const medalLabels = ['1st', '2nd', '3rd'];
 
 // ─── Player Score Card ────────────────────────────────────────────────────────
-function PlayerScoreCard({ player, rank }: { player: PlayerScore; rank: number }) {
+function PlayerScoreCard({ player, rank, scoreType = 'total' }: { player: PlayerScore; rank: number; scoreType?: 'total' | 'batting' | 'bowling' | 'fielding' }) {
   return (
     <div className={cn(
       "flex items-start gap-3 p-3 rounded-lg border",
@@ -42,7 +42,7 @@ function PlayerScoreCard({ player, rank }: { player: PlayerScore; rank: number }
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
           <p className="font-semibold text-sm truncate">{player.name}</p>
-          <Badge variant="outline" className="shrink-0 font-bold">{player.totalScore} pts</Badge>
+          <Badge variant="outline" className="shrink-0 font-bold">{scoreType === 'batting' ? player.battingScore : scoreType === 'bowling' ? player.bowlingScore : scoreType === 'fielding' ? player.fieldingScore : player.totalScore} pts</Badge>
         </div>
         <p className="text-xs text-muted-foreground mb-1.5">{player.team}</p>
         <div className="flex flex-wrap gap-1.5">
@@ -70,7 +70,7 @@ function PlayerScoreCard({ player, rank }: { player: PlayerScore; rank: number }
 }
 
 // ─── Top 3 Section ────────────────────────────────────────────────────────────
-function TopThreeSection({ title, players }: { title: string; players: PlayerScore[] }) {
+function TopThreeSection({ title, players, scoreType = 'total' }: { title: string; players: PlayerScore[]; scoreType?: 'total' | 'batting' | 'bowling' | 'fielding' }) {
   if (!players.length) return null;
   return (
     <div className="space-y-2">
@@ -78,7 +78,7 @@ function TopThreeSection({ title, players }: { title: string; players: PlayerSco
         <Trophy className="h-3.5 w-3.5" /> {title}
       </h4>
       <div className="space-y-2">
-        {players.map((p, i) => <PlayerScoreCard key={p.name} player={p} rank={i} />)}
+        {players.map((p, i) => <PlayerScoreCard key={p.name} player={p} rank={i} scoreType={scoreType} />)}
       </div>
     </div>
   );
@@ -252,9 +252,9 @@ export function ScorecardPerformanceTab({ innings, team1, team2 }: PerformanceTa
         <TabsContent value="combined" className="mt-4 space-y-6">
           <TopThreeSection title="Top Players" players={top.overall} />
           <div className="grid md:grid-cols-3 gap-6">
-            <TopThreeSection title="Top Batters" players={top.batters} />
-            <TopThreeSection title="Top Bowlers" players={top.bowlers} />
-            <TopThreeSection title="Top Fielders" players={top.fielders} />
+            <TopThreeSection title="Top Batters" players={top.batters} scoreType="batting" />
+            <TopThreeSection title="Top Bowlers" players={top.bowlers} scoreType="bowling" />
+            <TopThreeSection title="Top Fielders" players={top.fielders} scoreType="fielding" />
           </div>
 
           {/* Full scores table */}
@@ -294,9 +294,9 @@ export function ScorecardPerformanceTab({ innings, team1, team2 }: PerformanceTa
           <TabsContent key={team} value={team} className="mt-4 space-y-6">
             <TopThreeSection title={`Top Players — ${team}`} players={overall} />
             <div className="grid md:grid-cols-3 gap-6">
-              <TopThreeSection title="Top Batters" players={batters} />
-              <TopThreeSection title="Top Bowlers" players={bowlers} />
-              <TopThreeSection title="Top Fielders" players={fielders} />
+              <TopThreeSection title="Top Batters" players={batters} scoreType="batting" />
+              <TopThreeSection title="Top Bowlers" players={bowlers} scoreType="bowling" />
+              <TopThreeSection title="Top Fielders" players={fielders} scoreType="fielding" />
             </div>
           </TabsContent>
         ))}
