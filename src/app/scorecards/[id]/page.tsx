@@ -7,6 +7,7 @@ import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { getScorecardByIdAction, deleteScorecardAction } from '@/lib/actions/scorecard-actions';
 import type { MatchScorecard, ScorecardInnings } from '@/types';
 import { ScorecardPerformanceTab } from '@/components/scorecards/scorecard-performance-tab';
+import { MatchReportTab } from '@/components/match-report-tab';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +17,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import { ArrowLeft, Loader2, ShieldAlert, Table, CalendarFold, MapPin, ExternalLink, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, ShieldAlert, Table, CalendarFold, MapPin, ExternalLink, Trash2, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
@@ -143,10 +144,28 @@ function InningsView({ innings }: { innings: ScorecardInnings }) {
 }
 
 
+// Build player name lists by team from scorecard innings
+function buildPlayersByTeam(scorecard: MatchScorecard): Record<string, string[]> {
+  const byTeam: Record<string, Set<string>> = {};
+  for (const inn of scorecard.innings) {
+    const team = inn.battingTeam;
+    if (!byTeam[team]) byTeam[team] = new Set();
+    inn.batting.forEach(b => byTeam[team].add(b.name));
+    inn.didNotBat?.forEach(n => byTeam[team].add(n));
+    // Bowling team is the other team
+    const bowlingTeam = team === scorecard.team1 ? scorecard.team2 : scorecard.team1;
+    if (!byTeam[bowlingTeam]) byTeam[bowlingTeam] = new Set();
+    inn.bowling.forEach(b => byTeam[bowlingTeam].add(b.name));
+  }
+  return Object.fromEntries(
+    Object.entries(byTeam).map(([t, s]) => [t, Array.from(s).sort()])
+  );
+}
+
 export default function ScorecardDetailsPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { effectivePermissions, activeOrganizationId } = useAuth();
+  const { effectivePermissions, activeOrganizationId, currentUser, userProfile } = useAuth();
   const { toast } = useToast();
 
   const [scorecard, setScorecard] = useState<MatchScorecard | null>(null);
@@ -292,12 +311,27 @@ export default function ScorecardDetailsPage() {
           <TabsList className="w-full">
             <TabsTrigger value="innings1" className="flex-1">{scorecard.innings[0].battingTeam} innings</TabsTrigger>
             <TabsTrigger value="performance" className="flex-1">Performance</TabsTrigger>
+            <TabsTrigger value="report" className="flex-1 flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5" /> Match Report
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="innings1" className="mt-4">
             <InningsView innings={scorecard.innings[0]} />
           </TabsContent>
           <TabsContent value="performance" className="mt-4">
             <ScorecardPerformanceTab innings={scorecard.innings} team1={scorecard.team1} team2={scorecard.team2} seriesId={scorecard.seriesId} />
+          </TabsContent>
+          <TabsContent value="report" className="mt-4">
+            <MatchReportTab
+              gameId={scorecard.linkedGameId || scorecard.id}
+              scorecardId={scorecard.id}
+              organizationId={scorecard.organizationId}
+              seriesId={scorecard.seriesId}
+              team1={scorecard.team1}
+              team2={scorecard.team2}
+              playersByTeam={buildPlayersByTeam(scorecard)}
+              isAssignedSelector={false}
+            />
           </TabsContent>
         </Tabs>
       ) : (
@@ -309,6 +343,9 @@ export default function ScorecardDetailsPage() {
               </TabsTrigger>
             ))}
             <TabsTrigger value="performance" className="flex-1">Performance</TabsTrigger>
+            <TabsTrigger value="report" className="flex-1 flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5" /> Match Report
+            </TabsTrigger>
           </TabsList>
           {scorecard.innings.map((inn, i) => (
             <TabsContent key={i} value={`innings${i + 1}`} className="mt-4">
@@ -317,6 +354,18 @@ export default function ScorecardDetailsPage() {
           ))}
           <TabsContent value="performance" className="mt-4">
             <ScorecardPerformanceTab innings={scorecard.innings} team1={scorecard.team1} team2={scorecard.team2} seriesId={scorecard.seriesId} />
+          </TabsContent>
+          <TabsContent value="report" className="mt-4">
+            <MatchReportTab
+              gameId={scorecard.linkedGameId || scorecard.id}
+              scorecardId={scorecard.id}
+              organizationId={scorecard.organizationId}
+              seriesId={scorecard.seriesId}
+              team1={scorecard.team1}
+              team2={scorecard.team2}
+              playersByTeam={buildPlayersByTeam(scorecard)}
+              isAssignedSelector={false}
+            />
           </TabsContent>
         </Tabs>
       )}
