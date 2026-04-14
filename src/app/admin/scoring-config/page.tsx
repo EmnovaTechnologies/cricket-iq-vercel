@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { getScoringConfigAction, saveScoringConfigAction } from '@/lib/actions/scoring-config-actions';
+import { getOrgScoringConfigAction, saveScoringConfigAction } from '@/lib/actions/scoring-config-actions';
 import { getAllOrganizationsFromDB } from '@/lib/db';
 import type { ScorecardScoringConfig, Organization } from '@/types';
 import { DEFAULT_SCORING_CONFIG } from '@/types';
@@ -48,7 +48,7 @@ export default function ScoringConfigPage() {
   useEffect(() => {
     if (!selectedOrgId) return;
     setIsLoading(true);
-    getScoringConfigAction(selectedOrgId).then(cfg => {
+    getOrgScoringConfigAction(selectedOrgId).then(cfg => {
       setConfig(cfg);
       setIsLoading(false);
     });

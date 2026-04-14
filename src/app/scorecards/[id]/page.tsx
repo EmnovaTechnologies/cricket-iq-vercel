@@ -297,7 +297,7 @@ export default function ScorecardDetailsPage() {
             <InningsView innings={scorecard.innings[0]} />
           </TabsContent>
           <TabsContent value="performance" className="mt-4">
-            <ScorecardPerformanceTab innings={scorecard.innings} team1={scorecard.team1} team2={scorecard.team2} />
+            <ScorecardPerformanceTab innings={scorecard.innings} team1={scorecard.team1} team2={scorecard.team2} seriesId={scorecard.seriesId} />
           </TabsContent>
         </Tabs>
       ) : (
@@ -316,7 +316,7 @@ export default function ScorecardDetailsPage() {
             </TabsContent>
           ))}
           <TabsContent value="performance" className="mt-4">
-            <ScorecardPerformanceTab innings={scorecard.innings} team1={scorecard.team1} team2={scorecard.team2} />
+            <ScorecardPerformanceTab innings={scorecard.innings} team1={scorecard.team1} team2={scorecard.team2} seriesId={scorecard.seriesId} />
           </TabsContent>
         </Tabs>
       )}

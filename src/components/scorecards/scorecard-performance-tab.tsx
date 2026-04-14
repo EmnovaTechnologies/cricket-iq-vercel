@@ -18,6 +18,7 @@ interface PerformanceTabProps {
   innings: ScorecardInnings[];
   team1: string;
   team2: string;
+  seriesId?: string;
 }
 
 // ─── Medal colors ─────────────────────────────────────────────────────────────
@@ -82,7 +83,7 @@ function TopThreeSection({ title, players, scoreType = 'total' }: { title: strin
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function ScorecardPerformanceTab({ innings, team1, team2 }: PerformanceTabProps) {
+export function ScorecardPerformanceTab({ innings, team1, team2, seriesId }: PerformanceTabProps) {
   const { activeOrganizationId } = useAuth();
 
   const [config, setConfig] = useState<ScorecardScoringConfig | null>(null);
@@ -91,11 +92,11 @@ export function ScorecardPerformanceTab({ innings, team1, team2 }: PerformanceTa
 
   useEffect(() => {
     if (!activeOrganizationId) return;
-    getScoringConfigAction(activeOrganizationId).then(cfg => {
+    getScoringConfigAction(activeOrganizationId, seriesId).then(cfg => {
       setConfig(cfg);
       setIsLoadingConfig(false);
     });
-  }, [activeOrganizationId]);
+  }, [activeOrganizationId, seriesId]);
 
   if (isLoadingConfig) {
     return <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -120,6 +121,9 @@ export function ScorecardPerformanceTab({ innings, team1, team2 }: PerformanceTa
         >
           <Settings className="h-3.5 w-3.5" />
           {showFormula ? 'Hide scoring formula' : 'View scoring formula'}
+          {config?.seriesId && (
+            <span className="ml-1 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">Series model</span>
+          )}
         </button>
         <Link href="/admin/scoring-config">
           <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7 px-2">

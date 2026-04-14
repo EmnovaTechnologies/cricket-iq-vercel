@@ -16,8 +16,7 @@ import {
 import { addTeamToSeriesAction, addVenueToSeriesAction, updateSeriesAdminsAction, archiveSeriesAction, unarchiveSeriesAction, updateSeriesFitnessCriteriaAction } from '@/lib/actions/series-actions';
 import { checkSeriesDeletableAction, deleteSeriesAdminAction } from '@/lib/actions/series-admin-actions';
 import type { Series, Team, Venue, Game, UserProfile, FitnessTestType, FitnessTestHeader } from '@/types'; // Added FitnessTestHeader
-import { Layers, Tag, CalendarFold, ArrowLeft, Users, PlusCircle, MapPin, Gamepad2, Map as MapIconLucide, UserCog, Edit3, Save, Archive, ArchiveRestore, Info, Search, CalendarDays, Activity, Dumbbell, ShieldCheck, ListChecks, FileText, Target, Trash2, Loader2 } from 'lucide-react';
-import Link from 'next/link';
+import { Layers, Tag, CalendarFold, ArrowLeft, Users, PlusCircle, MapPin, Gamepad2, Map as MapIconLucide, UserCog, Edit3, Save, Archive, ArchiveRestore, Info, Search, CalendarDays, Activity, Dumbbell, ShieldCheck, ListChecks, FileText, Target, Trash2, Loader2, BarChart3 } from 'lucide-react';import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import GameCard from '@/components/game-card';
@@ -44,7 +43,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { SeriesScoringModel } from '@/components/scorecards/series-scoring-model';
 import { format, parseISO } from 'date-fns';
 import { FITNESS_TEST_TYPES } from '@/lib/constants';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'; // Added Table components
@@ -937,6 +936,33 @@ export default function SeriesDetailsPage() {
         </CardFooter>
         )}
       </Card>
+
+      {/* Series Scoring Model */}
+      {series && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl font-headline text-primary flex items-center gap-2">
+              <BarChart3 className="h-6 w-6" /> Series Scoring Model
+            </CardTitle>
+            <CardDescription>
+              Performance scoring weights used for scorecards and AI selection in this series.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SeriesScoringModel
+              seriesId={series.id}
+              organizationId={series.organizationId}
+              seriesAdminUids={series.seriesAdminUids}
+              canEdit={
+                !!currentAuthProfile?.roles?.includes('admin') ||
+                (isOrgAdmin && series.organizationId === activeOrganizationId) ||
+                (isUserASeriesAdminForThisSeries ?? false)
+              }
+            />
+          </CardContent>
+        </Card>
+      )}
+
     </div>
   );
 }
