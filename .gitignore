@@ -54,3 +54,15 @@ pnpm-debug.log*
 # Genkit files
 .genkit/
 .genkit-cache.json
+*-old.tsx
+*-old.ts
+*-old1.tsx
+*working copy*
+*Working Copy*
+*workingcopy*
+*-1.tsx
+*-2.tsx
+*-3.tsx
+scorecard.html
+scorecard-rendered.html
+scrape-scorecard.mjs
