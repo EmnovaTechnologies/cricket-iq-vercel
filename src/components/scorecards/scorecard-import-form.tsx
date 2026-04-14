@@ -10,38 +10,21 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle, ArrowRight, ArrowLeft, ImageIcon, Info, Table, X } from 'lucide-react';
-import { parseBattingImageAction, parseBowlingImageAction } from '@/lib/actions/parse-scorecard-action';
+import { Loader2, CheckCircle, ArrowRight, ArrowLeft, ImageIcon, Info, Table, X, Sparkles } from 'lucide-react';
+import { parseAllScorecardImagesAction, type ImageInput } from '@/lib/actions/parse-scorecard-action';
 import { saveScorecardAction } from '@/lib/actions/scorecard-actions';
 import { parseCricClubsUrl } from '@/lib/utils/cricclubs-utils';
-import { deriveFieldingStats } from '@/lib/utils/scorecard-fielding-utils';
-import type { ScorecardInnings, ScorecardBatter, ScorecardBowler } from '@/types';
+import type { ScorecardInnings } from '@/types';
 import { cn } from '@/lib/utils';
 
 type Step = 'details' | 'uploads' | 'review';
 
-interface InningsData {
-  battingTeam?: string;
-  totalRuns?: number;
-  wickets?: number;
-  overs?: string;
-  extras?: { byes: number; legByes: number; wides: number; noballs: number; total: number };
-  batting?: ScorecardBatter[];
-  bowling?: ScorecardBowler[];
-  fallOfWickets?: string[];
-  didNotBat?: string[];
-}
-
 interface ImageSlot {
   key: string;
   label: string;
-  innings: 1 | 2;
-  type: 'batting' | 'bowling';
   preview: string | null;
   base64: string | null;
   mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
-  parsed: boolean;
-  loading: boolean;
 }
 
 export function ScorecardImportForm() {
@@ -51,6 +34,7 @@ export function ScorecardImportForm() {
 
   const [step, setStep] = useState<Step>('details');
   const [isSaving, setIsSaving] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
 
   const [url, setUrl] = useState('');
   const [team1, setTeam1] = useState('');
@@ -59,14 +43,13 @@ export function ScorecardImportForm() {
   const [venue, setVenue] = useState('');
   const [result, setResult] = useState('');
 
-  const [innings1, setInnings1] = useState<InningsData>({});
-  const [innings2, setInnings2] = useState<InningsData>({});
+  const [parsedInnings, setParsedInnings] = useState<ScorecardInnings[]>([]);
 
   const [slots, setSlots] = useState<ImageSlot[]>([
-    { key: 'inn1batting', label: 'Innings 1 — Batting', innings: 1, type: 'batting', preview: null, base64: null, mediaType: 'image/png', parsed: false, loading: false },
-    { key: 'inn1bowling', label: 'Innings 1 — Bowling', innings: 1, type: 'bowling', preview: null, base64: null, mediaType: 'image/png', parsed: false, loading: false },
-    { key: 'inn2batting', label: 'Innings 2 — Batting', innings: 2, type: 'batting', preview: null, base64: null, mediaType: 'image/png', parsed: false, loading: false },
-    { key: 'inn2bowling', label: 'Innings 2 — Bowling', innings: 2, type: 'bowling', preview: null, base64: null, mediaType: 'image/png', parsed: false, loading: false },
+    { key: 'inn1batting', label: 'Innings 1 — Batting', preview: null, base64: null, mediaType: 'image/png' },
+    { key: 'inn1bowling', label: 'Innings 1 — Bowling', preview: null, base64: null, mediaType: 'image/png' },
+    { key: 'inn2batting', label: 'Innings 2 — Batting', preview: null, base64: null, mediaType: 'image/png' },
+    { key: 'inn2bowling', label: 'Innings 2 — Bowling', preview: null, base64: null, mediaType: 'image/png' },
   ]);
 
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -81,100 +64,47 @@ export function ScorecardImportForm() {
     const reader = new FileReader();
     reader.onload = ev => {
       const dataUrl = ev.target?.result as string;
-      updateSlot(key, { preview: dataUrl, base64: dataUrl.split(',')[1], mediaType, parsed: false });
+      updateSlot(key, { preview: dataUrl, base64: dataUrl.split(',')[1], mediaType });
+      setParsedInnings([]); // reset if images change
     };
     reader.readAsDataURL(file);
   };
 
-  const handleParse = async (slot: ImageSlot) => {
-    if (!slot.base64) return;
-    updateSlot(slot.key, { loading: true });
+  const uploadedSlots = slots.filter(s => s.base64);
+  const hasExtracted = parsedInnings.length > 0;
+
+  const handleExtractAll = async () => {
+    if (!uploadedSlots.length) return;
+    setIsExtracting(true);
     try {
-      const setter = slot.innings === 1 ? setInnings1 : setInnings2;
-      if (slot.type === 'batting') {
-        const res = await parseBattingImageAction(slot.base64, slot.mediaType, slot.innings);
-        if (res.success && res.data) {
-          setter(prev => ({ ...prev, ...res.data }));
-          updateSlot(slot.key, { parsed: true, loading: false });
-          toast({ title: `Innings ${slot.innings} batting extracted`, description: `${res.data.batting?.length || 0} batters found.` });
-        } else {
-          toast({ title: 'Parse Failed', description: res.error, variant: 'destructive' });
-          updateSlot(slot.key, { loading: false });
-        }
+      const images: ImageInput[] = uploadedSlots.map(s => ({
+        base64: s.base64!,
+        mediaType: s.mediaType,
+        label: s.label,
+      }));
+
+      const res = await parseAllScorecardImagesAction(images, team1, team2);
+      if (res.success && res.innings?.length) {
+        setParsedInnings(res.innings);
+        toast({
+          title: 'Scorecard extracted',
+          description: `${res.innings.length} innings from ${images.length} image(s). Full names resolved across all screenshots.`,
+        });
       } else {
-        const res = await parseBowlingImageAction(slot.base64, slot.mediaType, slot.innings);
-        if (res.success && res.data) {
-          setter(prev => ({ ...prev, ...res.data }));
-          updateSlot(slot.key, { parsed: true, loading: false });
-          toast({ title: `Innings ${slot.innings} bowling extracted`, description: `${res.data.bowling?.length || 0} bowlers found.` });
-        } else {
-          toast({ title: 'Parse Failed', description: res.error, variant: 'destructive' });
-          updateSlot(slot.key, { loading: false });
-        }
+        toast({ title: 'Extraction failed', description: res.error, variant: 'destructive' });
       }
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
-      updateSlot(slot.key, { loading: false });
+    } finally {
+      setIsExtracting(false);
     }
   };
 
-  /**
-   * Team 1 full roster = Inn1 batting + Inn1 didNotBat + Inn2 bowling
-   * Team 2 full roster = Inn2 batting + Inn2 didNotBat + Inn1 bowling
-   */
-  const buildRosters = () => {
-    const team1Names = new Set<string>();
-    const team2Names = new Set<string>();
-    innings1.batting?.forEach(b => team1Names.add(b.name));
-    innings1.didNotBat?.forEach(n => team1Names.add(n));
-    innings2.bowling?.forEach(b => team1Names.add(b.name));
-    innings2.batting?.forEach(b => team2Names.add(b.name));
-    innings2.didNotBat?.forEach(n => team2Names.add(n));
-    innings1.bowling?.forEach(b => team2Names.add(b.name));
-    return {
-      team1: Array.from(team1Names).filter(Boolean),
-      team2: Array.from(team2Names).filter(Boolean),
-    };
-  };
-
-  const buildInnings = (data: InningsData, num: 1 | 2, fieldingTeamNames: string[]): ScorecardInnings => {
-    const batting = data.batting || [];
-    const bowling = data.bowling || [];
-    const extras = data.extras || { byes: 0, legByes: 0, wides: 0, noballs: 0, total: 0 };
-    // Build mock bowler list from fielding team names for name resolution in deriveFieldingStats
-    const fieldingTeamBowlers = fieldingTeamNames.map(name => ({
-      name, overs: 0, maidens: 0, runs: 0, wickets: 0, economy: 0, wides: 0, noballs: 0, dots: 0,
-    }));
-    return {
-      inningsNumber: num,
-      battingTeam: data.battingTeam || (num === 1 ? team1 : team2),
-      totalRuns: data.totalRuns || 0,
-      wickets: data.wickets || 0,
-      overs: data.overs || '0',
-      extras,
-      batting,
-      bowling,
-      fielding: deriveFieldingStats(batting, extras.byes, fieldingTeamBowlers, data.didNotBat || []),
-      fallOfWickets: data.fallOfWickets || [],
-      didNotBat: data.didNotBat || [],
-    };
-  };
-
-  const hasAnyData = slots.some(s => s.parsed);
-  const hasInnings1 = !!(innings1.batting?.length || innings1.bowling?.length);
-  const hasInnings2 = !!(innings2.batting?.length || innings2.bowling?.length);
-
   const handleSave = async () => {
-    if (!currentUser || !activeOrganizationId) return;
+    if (!currentUser || !activeOrganizationId || !parsedInnings.length) return;
     setIsSaving(true);
     try {
       const parsed = parseCricClubsUrl(url);
-      const rosters = buildRosters();
-      const innings: ScorecardInnings[] = [];
-      // Inn1 fielding = team2 fielding → pass team2 names for name resolution
-      if (hasInnings1) innings.push(buildInnings(innings1, 1, rosters.team2));
-      // Inn2 fielding = team1 fielding → pass team1 names for name resolution
-      if (hasInnings2) innings.push(buildInnings(innings2, 2, rosters.team1));
 
       const res = await saveScorecardAction({
         organizationId: activeOrganizationId,
@@ -188,7 +118,7 @@ export function ScorecardImportForm() {
         date,
         venue: venue.trim() || undefined,
         result: result.trim() || undefined,
-        innings,
+        innings: parsedInnings,
       }, currentUser.uid);
 
       if (res.success) {
@@ -210,6 +140,7 @@ export function ScorecardImportForm() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      {/* Progress */}
       <div className="flex gap-1">
         {stepKeys.map((s, i) => (
           <div key={s} className={cn("h-1.5 rounded-full flex-1 transition-colors",
@@ -225,13 +156,15 @@ export function ScorecardImportForm() {
           <CardTitle className="flex items-center gap-2 text-primary">
             <Table className="h-5 w-5" /> Import CricClubs Scorecard
           </CardTitle>
-          <CardDescription>Upload separate screenshots for batting and bowling — up to 4 images total.</CardDescription>
+          <CardDescription>Upload screenshots — Claude reads all images together for accurate name resolution.</CardDescription>
         </CardHeader>
         <CardContent>
+
+          {/* ── Step: Details ─────────────────────────────────────────── */}
           {step === 'details' && (
             <div className="space-y-5">
               <div className="space-y-2">
-                <Label>CricClubs Scorecard URL <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Label>CricClubs URL <span className="text-muted-foreground text-xs">(optional)</span></Label>
                 <Input placeholder="https://cricclubs.com/SCCAY/viewScorecard.do?matchId=99&clubId=5273" value={url} onChange={e => setUrl(e.target.value)} />
                 {parseCricClubsUrl(url).valid && (
                   <p className="text-xs text-green-600 flex items-center gap-1">
@@ -269,6 +202,7 @@ export function ScorecardImportForm() {
             </div>
           )}
 
+          {/* ── Step: Uploads ─────────────────────────────────────────── */}
           {step === 'uploads' && (
             <div className="space-y-6">
               <div className="space-y-4">
@@ -276,61 +210,41 @@ export function ScorecardImportForm() {
                   <Info className="h-4 w-4 text-blue-600" />
                   <AlertTitle className="text-blue-700">How to capture screenshots</AlertTitle>
                   <AlertDescription className="text-blue-600 text-sm">
-                    On CricClubs, open the scorecard and click <strong>Full Scorecard</strong> tab.
-                    Select an innings, then take <strong>two separate screenshots</strong> — one for the batting table
-                    (including extras, total, did not bat) and one for the bowling table (including fall of wickets).
-                    Repeat for the second innings. Upload what you have — all 4 are optional.
+                    On CricClubs, click <strong>Full Scorecard</strong> tab. Upload separate screenshots for batting
+                    and bowling for each innings. All 4 are optional — Claude will process all uploaded images
+                    together for the best name accuracy.
                   </AlertDescription>
                 </Alert>
 
+                {/* Sample images help */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sample: Batting screenshot</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sample: Batting</p>
                     <div className="border rounded-lg overflow-hidden bg-muted/20">
-                      <img
-                        src="/images/sample-batting.png"
-                        alt="Sample batting scorecard"
-                        className="w-full object-contain max-h-48"
-                        onError={e => {
-                          (e.target as HTMLImageElement).parentElement!.innerHTML =
-                            '<div class="p-4 text-xs text-muted-foreground text-center">Add public/images/sample-batting.png</div>';
-                        }}
-                      />
+                      <img src="/images/sample-batting.png" alt="Sample batting scorecard" className="w-full object-contain max-h-40"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                     </div>
-                    <p className="text-xs text-muted-foreground">Capture the full batting table including extras, total and did not bat rows.</p>
                   </div>
                   <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sample: Bowling screenshot</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sample: Bowling</p>
                     <div className="border rounded-lg overflow-hidden bg-muted/20">
-                      <img
-                        src="/images/sample-bowling.png"
-                        alt="Sample bowling scorecard"
-                        className="w-full object-contain max-h-48"
-                        onError={e => {
-                          (e.target as HTMLImageElement).parentElement!.innerHTML =
-                            '<div class="p-4 text-xs text-muted-foreground text-center">Add public/images/sample-bowling.png</div>';
-                        }}
-                      />
+                      <img src="/images/sample-bowling.png" alt="Sample bowling scorecard" className="w-full object-contain max-h-40"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                     </div>
-                    <p className="text-xs text-muted-foreground">Capture the bowling table and fall of wickets section below it.</p>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {/* Upload slots */}
+              <div className="grid grid-cols-2 gap-4">
                 {slots.map(slot => (
                   <div key={slot.key} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium">{slot.label}</Label>
-                      {slot.parsed && <Badge className="bg-green-100 text-green-800 border-green-200 text-xs"><CheckCircle className="h-3 w-3 mr-1" />Done</Badge>}
-                    </div>
+                    <Label className="text-sm font-medium">{slot.label}</Label>
                     <div
-                      onClick={() => !slot.loading && fileRefs.current[slot.key]?.click()}
+                      onClick={() => fileRefs.current[slot.key]?.click()}
                       className={cn(
-                        "border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors min-h-[110px] flex flex-col items-center justify-center gap-1.5",
-                        slot.parsed ? "border-green-300 bg-green-50" :
-                        slot.preview ? "border-primary/40 bg-primary/5" :
-                        "border-muted-foreground/25 hover:border-primary/40"
+                        "border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors min-h-[100px] flex flex-col items-center justify-center gap-1.5",
+                        slot.preview ? "border-primary/40 bg-primary/5" : "border-muted-foreground/25 hover:border-primary/40"
                       )}
                     >
                       {slot.preview ? (
@@ -347,39 +261,56 @@ export function ScorecardImportForm() {
                       type="file" accept="image/png,image/jpeg,image/webp"
                       onChange={e => handleUpload(slot.key, e)} className="hidden"
                     />
-                    {slot.base64 && !slot.parsed && (
-                      <Button size="sm" className="w-full" disabled={slot.loading} onClick={() => handleParse(slot)}>
-                        {slot.loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Table className="mr-1.5 h-3.5 w-3.5" />}
-                        {slot.loading ? 'Extracting...' : 'Extract Data'}
-                      </Button>
-                    )}
-                    {slot.parsed && (
-                      <Button size="sm" variant="outline" className="w-full" onClick={() => {
-                        updateSlot(slot.key, { parsed: false, preview: null, base64: null });
-                        if (slot.type === 'batting') {
-                          if (slot.innings === 1) setInnings1(prev => ({ ...prev, batting: [], didNotBat: [], totalRuns: undefined, wickets: undefined, overs: undefined, extras: undefined, battingTeam: undefined }));
-                          else setInnings2(prev => ({ ...prev, batting: [], didNotBat: [], totalRuns: undefined, wickets: undefined, overs: undefined, extras: undefined, battingTeam: undefined }));
-                        } else {
-                          if (slot.innings === 1) setInnings1(prev => ({ ...prev, bowling: [], fallOfWickets: [] }));
-                          else setInnings2(prev => ({ ...prev, bowling: [], fallOfWickets: [] }));
-                        }
-                      }}>
-                        <X className="mr-1.5 h-3.5 w-3.5" /> Remove
+                    {slot.base64 && (
+                      <Button size="sm" variant="ghost" className="w-full text-xs text-muted-foreground"
+                        onClick={() => { updateSlot(slot.key, { preview: null, base64: null }); setParsedInnings([]); }}>
+                        <X className="mr-1 h-3 w-3" /> Remove
                       </Button>
                     )}
                   </div>
                 ))}
               </div>
 
+              {/* Extract All button — single call */}
+              {uploadedSlots.length > 0 && (
+                <div className="space-y-2">
+                  <Button
+                    onClick={handleExtractAll}
+                    disabled={isExtracting}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {isExtracting
+                      ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analysing {uploadedSlots.length} image(s) with Claude...</>
+                      : <><Sparkles className="mr-2 h-4 w-4" /> Extract Scorecard from {uploadedSlots.length} Image(s)</>
+                    }
+                  </Button>
+                  <p className="text-xs text-center text-muted-foreground">
+                    All images are sent to Claude together — full player names are resolved across all screenshots
+                  </p>
+                </div>
+              )}
+
+              {hasExtracted && (
+                <Alert className="border-green-200 bg-green-50">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <AlertTitle className="text-green-700">Extraction complete</AlertTitle>
+                  <AlertDescription className="text-green-600 text-sm">
+                    {parsedInnings.length} innings extracted. Click Review to check before saving.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => setStep('details')}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
-                <Button onClick={() => setStep('review')} disabled={!hasAnyData} className="flex-1">
+                <Button onClick={() => setStep('review')} disabled={!hasExtracted} className="flex-1">
                   Review & Save <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
 
+          {/* ── Step: Review ──────────────────────────────────────────── */}
           {step === 'review' && (
             <div className="space-y-5">
               <Alert className="border-green-200 bg-green-50">
@@ -395,20 +326,28 @@ export function ScorecardImportForm() {
                 {result && <div className="flex justify-between p-2.5"><span className="text-muted-foreground">Result</span><span>{result}</span></div>}
               </div>
 
-              {[{ data: innings1, num: 1 }, { data: innings2, num: 2 }].map(({ data, num }) =>
-                (data.batting?.length || data.bowling?.length) ? (
-                  <div key={num} className="border rounded-lg p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-sm">Innings {num} — {data.battingTeam || (num === 1 ? team1 : team2)}</h4>
-                      {data.totalRuns !== undefined && <Badge variant="outline">{data.totalRuns}/{data.wickets} ({data.overs} ov)</Badge>}
-                    </div>
-                    {data.batting?.length ? <p className="text-xs text-green-600">✓ {data.batting.length} batters</p> : <p className="text-xs text-amber-600">⚠ No batting data</p>}
-                    {data.bowling?.length ? <p className="text-xs text-green-600">✓ {data.bowling.length} bowlers</p> : <p className="text-xs text-amber-600">⚠ No bowling data</p>}
-                    {data.fallOfWickets?.length ? <p className="text-xs text-green-600">✓ {data.fallOfWickets.length} fall of wickets</p> : null}
-                    {data.didNotBat?.length ? <p className="text-xs text-green-600">✓ Did not bat: {data.didNotBat.join(', ')}</p> : null}
+              {parsedInnings.map((inn, idx) => (
+                <div key={idx} className="border rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm">Innings {inn.inningsNumber} — {inn.battingTeam}</h4>
+                    <Badge variant="outline">{inn.totalRuns}/{inn.wickets} ({inn.overs} ov)</Badge>
                   </div>
-                ) : null
-              )}
+                  {inn.batting?.length ? <p className="text-xs text-green-600">✓ {inn.batting.length} batters</p> : <p className="text-xs text-amber-600">⚠ No batting data</p>}
+                  {inn.bowling?.length ? <p className="text-xs text-green-600">✓ {inn.bowling.length} bowlers</p> : <p className="text-xs text-amber-600">⚠ No bowling data</p>}
+                  {inn.fallOfWickets?.length ? <p className="text-xs text-green-600">✓ {inn.fallOfWickets.length} fall of wickets</p> : null}
+                  {inn.didNotBat?.length ? <p className="text-xs text-green-600">✓ Did not bat: {inn.didNotBat.join(', ')}</p> : null}
+
+                  {/* Sample dismissals to verify name expansion */}
+                  {inn.batting?.slice(0, 3).some(b => b.dismissal && b.dismissal !== 'not out') && (
+                    <div className="mt-2 pt-2 border-t">
+                      <p className="text-xs text-muted-foreground font-medium mb-1">Sample dismissals (verify names are expanded):</p>
+                      {inn.batting.filter(b => b.dismissal && b.dismissal !== 'not out').slice(0, 3).map((b, i) => (
+                        <p key={i} className="text-xs text-muted-foreground">{b.name}: {b.dismissal}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
 
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => setStep('uploads')}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
@@ -419,6 +358,7 @@ export function ScorecardImportForm() {
               </div>
             </div>
           )}
+
         </CardContent>
       </Card>
     </div>

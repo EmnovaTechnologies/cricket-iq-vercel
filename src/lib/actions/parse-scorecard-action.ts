@@ -1,149 +1,182 @@
 'use server';
 
 import Anthropic from '@anthropic-ai/sdk';
+import type { ScorecardInnings } from '@/types';
 
 const anthropic = new Anthropic();
 
 type MediaType = 'image/jpeg' | 'image/png' | 'image/webp';
 
-// ─── Parse Batting Screenshot ─────────────────────────────────────────────────
+export interface ImageInput {
+  base64: string;
+  mediaType: MediaType;
+  label: string; // e.g. "Innings 1 Batting", "Innings 2 Bowling"
+}
+
+export interface ParseAllResult {
+  success: boolean;
+  innings?: ScorecardInnings[];
+  error?: string;
+}
+
+/**
+ * Send all available scorecard screenshots to Claude in a single API call.
+ * Claude sees all images at once and can cross-reference full names across all tables,
+ * eliminating the abbreviated name problem in fielding/dismissals.
+ */
+export async function parseAllScorecardImagesAction(
+  images: ImageInput[],
+  team1: string,
+  team2: string
+): Promise<ParseAllResult> {
+  try {
+    if (!images.length) return { success: false, error: 'No images provided.' };
+
+    // Build image content blocks
+    const imageBlocks: any[] = images.flatMap((img, i) => [
+      {
+        type: 'text',
+        text: `--- Image ${i + 1}: ${img.label} ---`,
+      },
+      {
+        type: 'image',
+        source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
+      },
+    ]);
+
+    const response = await anthropic.messages.create({
+      model: 'claude-opus-4-5',
+      max_tokens: 4000,
+      messages: [{
+        role: 'user',
+        content: [
+          ...imageBlocks,
+          {
+            type: 'text',
+            text: `You have been given ${images.length} cricket scorecard screenshot(s) for a match between ${team1} and ${team2}.
+
+Extract the complete scorecard data and return ONLY a valid JSON object with no other text, markdown, or code fences.
+
+The JSON structure must be:
+{
+  "innings": [
+    {
+      "inningsNumber": 1,
+      "battingTeam": "exact team name e.g. ${team1}",
+      "totalRuns": 0,
+      "wickets": 0,
+      "overs": "20.1",
+      "extras": { "byes": 0, "legByes": 0, "wides": 0, "noballs": 0, "total": 0 },
+      "batting": [
+        {
+          "name": "Full Name",
+          "runs": 0,
+          "balls": 0,
+          "fours": 0,
+          "sixes": 0,
+          "strikeRate": 0.00,
+          "dismissal": "c Full Fielder Name b Full Bowler Name"
+        }
+      ],
+      "bowling": [
+        {
+          "name": "Full Name",
+          "overs": 3.0,
+          "maidens": 0,
+          "dots": 0,
+          "runs": 0,
+          "wickets": 0,
+          "economy": 0.00,
+          "wides": 0,
+          "noballs": 0
+        }
+      ],
+      "fallOfWickets": ["1-10 (Over 1.6)", "2-25 (Over 5.3)"],
+      "didNotBat": ["Full Name", "Full Name"]
+    }
+  ]
+}
+
+CRITICAL RULES:
+
+1. FULL NAMES EVERYWHERE — This is the most important rule:
+   - Use full player names from the Name column of batting/bowling tables
+   - In dismissal text, ALWAYS expand abbreviated names to full names by cross-referencing ALL visible player name columns across ALL images
+   - Example: "c Dhruva S b Nihaar G" → look up "Dhruva S" and "Nihaar G" in all batting/bowling tables across all images → expand to "c Dhruva Sharma b Nihaar Gaikwad"
+   - The keeper dagger symbol † must be preserved: "c †Vihaan Bannur b Ahnay Gupta"
+   - For run outs expand all names: "run out (Mikael Qazi/Jeyadev Kumar)"
+   - NEVER leave abbreviated names in dismissals if the full name appears anywhere in any of the provided images
+
+2. TEAM LOGIC:
+   - ${team1} innings 1: ${team1} bats, ${team2} bowls and fields
+   - ${team2} innings 2: ${team2} bats, ${team1} bowls and fields
+   - Assign inningsNumber based on which innings each screenshot shows
+
+3. BATTING TABLE:
+   - Extract ALL batters including "not out" players
+   - Set dismissal to "not out" for not out batters
+   - didNotBat: all names under "Did not bat" (strip asterisk * symbol)
+   - Extras: parse (b X lb X w X nb X) format
+
+4. BOWLING TABLE:
+   - Wides/noballs may appear in a notes column like "(3 w)" or "(5 w1 nb)"
+   - If Dot column missing set dots to 0
+
+5. Only include innings for screenshots that are provided. If only 2 images are given, only return those innings. Do not fabricate data.
+
+6. All numeric values must be numbers, not strings.`,
+          },
+        ],
+      }],
+    });
+
+    const text = response.content
+      .filter((b: any) => b.type === 'text')
+      .map((b: any) => b.text)
+      .join('');
+
+    const clean = text.replace(/```json\n?|\n?```/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    // Validate structure
+    if (!parsed.innings || !Array.isArray(parsed.innings)) {
+      return { success: false, error: 'Invalid response structure from Claude.' };
+    }
+
+    return { success: true, innings: parsed.innings as ScorecardInnings[] };
+  } catch (error: any) {
+    console.error('[parseAllScorecardImagesAction] Error:', error);
+    return { success: false, error: error.message || 'Failed to parse scorecard images.' };
+  }
+}
+
+// ─── Keep individual actions for backwards compatibility ──────────────────────
+// These are no longer used by the import form but kept in case needed elsewhere
 
 export async function parseBattingImageAction(
   base64Image: string,
   mediaType: MediaType,
   inningsNumber: 1 | 2
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-  try {
-    const response = await anthropic.messages.create({
-      model: 'claude-opus-4-5',
-      max_tokens: 2000,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: base64Image },
-          },
-          {
-            type: 'text',
-            text: `Extract ONLY the batting data from this cricket scorecard screenshot. Return ONLY valid JSON with no other text.
-
-{
-  "battingTeam": "exact team name from innings header e.g. WYCA innings or SCCAY innings",
-  "totalRuns": 120,
-  "wickets": 4,
-  "overs": "20.1",
-  "extras": { "byes": 0, "legByes": 0, "wides": 4, "noballs": 0, "total": 4 },
-  "batting": [
-    {
-      "name": "Full player name as shown in the Name column",
-      "runs": 18,
-      "balls": 21,
-      "fours": 2,
-      "sixes": 0,
-      "strikeRate": 85.71,
-      "dismissal": "c Vinuk Ubayasiri b Atharv Pilkhane"
-    }
-  ],
-  "didNotBat": ["Aarav Arora", "Siddhanth Kaul"]
+  const result = await parseAllScorecardImagesAction(
+    [{ base64: base64Image, mediaType, label: `Innings ${inningsNumber} Batting` }],
+    'Team 1', 'Team 2'
+  );
+  if (!result.success) return { success: false, error: result.error };
+  const inn = result.innings?.find(i => i.inningsNumber === inningsNumber);
+  return { success: true, data: inn };
 }
-
-Rules:
-- Extract ALL batters in the batting table
-- For extras: parse (b X lb X w X nb X) — if a value is missing assume 0
-- didNotBat: extract all names listed under "Did not bat" (ignore the asterisk * symbol)
-- Use exact full player names as shown in the Name column of the batting table
-- For "not out" dismissal, set dismissal to "not out"
-- All numbers must be actual numbers not strings
-
-CRITICAL — Dismissal name expansion:
-The dismissal text uses abbreviated names like "c Vinuk U b Atharv P" but the batting table has full names.
-You MUST expand ALL abbreviated names in dismissal text to their full names by cross-referencing the full player names visible in the batting table and did not bat section.
-Examples:
-- "c Vinuk U b Atharv P" → if batting table shows "Vinuk Ubayasiri" and "Atharv Pilkhane", expand to "c Vinuk Ubayasiri b Atharv Pilkhane"
-- "c †Vihaan B b Ahnay G" → expand to "c †Vihaan Bannur b Ahnay Gupta" (keep the † symbol for keeper)
-- "run out (Mikael Q/Jeyadev K)" → expand to "run out (Mikael Qazi/Jeyadev Kumar)"
-- "st Vihaan B b Nirwan D" → expand to "st Vihaan Bannur b Nirwan Dissanayake"
-If a name in the dismissal cannot be matched to any player in the batting table or did not bat list, keep it as-is.
-The bowling team's players will not be in this batting screenshot — keep those abbreviated if you cannot resolve them.`,
-          },
-        ],
-      }],
-    });
-
-    const text = response.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
-    const clean = text.replace(/```json\n?|\n?```/g, '').trim();
-    const data = JSON.parse(clean);
-    return { success: true, data };
-  } catch (error: any) {
-    console.error('[parseBattingImageAction] Error:', error);
-    return { success: false, error: error.message || 'Failed to parse batting image.' };
-  }
-}
-
-// ─── Parse Bowling Screenshot ─────────────────────────────────────────────────
 
 export async function parseBowlingImageAction(
   base64Image: string,
   mediaType: MediaType,
   inningsNumber: 1 | 2
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-  try {
-    const response = await anthropic.messages.create({
-      model: 'claude-opus-4-5',
-      max_tokens: 2000,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: base64Image },
-          },
-          {
-            type: 'text',
-            text: `Extract ONLY the bowling data and fall of wickets from this cricket scorecard screenshot. Return ONLY valid JSON with no other text.
-
-{
-  "bowling": [
-    {
-      "name": "Full player name as shown",
-      "overs": 5.0,
-      "maidens": 1,
-      "dots": 19,
-      "runs": 30,
-      "wickets": 1,
-      "economy": 6.00,
-      "wides": 3,
-      "noballs": 0
-    }
-  ],
-  "fallOfWickets": [
-    "1-10 (Over 1.6)",
-    "2-25 (Over 5.3)"
-  ]
-}
-
-Rules:
-- Extract ALL bowlers shown in the bowling table
-- Columns are: O (overs), M (maidens), Dot (dot balls), R (runs), W (wickets), Econ (economy)
-- Wides and no-balls may appear in a notes column like "(3 w)" or "(5 w1 nb)" — extract them
-- If Dot column is missing set dots to 0
-- If wides/noballs not shown set to 0
-- Fall of wickets: extract each entry as "score-runs (Over X.Y)" format
-- If no fall of wickets section visible set to empty array []
-- Use exact full player names as shown in the Name column of the bowling table
-- All numbers must be actual numbers not strings`,
-          },
-        ],
-      }],
-    });
-
-    const text = response.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
-    const clean = text.replace(/```json\n?|\n?```/g, '').trim();
-    const data = JSON.parse(clean);
-    return { success: true, data };
-  } catch (error: any) {
-    console.error('[parseBowlingImageAction] Error:', error);
-    return { success: false, error: error.message || 'Failed to parse bowling image.' };
-  }
+  const result = await parseAllScorecardImagesAction(
+    [{ base64: base64Image, mediaType, label: `Innings ${inningsNumber} Bowling` }],
+    'Team 1', 'Team 2'
+  );
+  if (!result.success) return { success: false, error: result.error };
+  const inn = result.innings?.find(i => i.inningsNumber === inningsNumber);
+  return { success: true, data: { bowling: inn?.bowling, fallOfWickets: inn?.fallOfWickets } };
 }
