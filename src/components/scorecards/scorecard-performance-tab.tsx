@@ -2,19 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Trophy, Settings, Medal } from 'lucide-react';
-import { getScoringConfigAction, saveScoringConfigAction } from '@/lib/actions/scoring-config-actions';
+import { Loader2, Trophy, Settings } from 'lucide-react';
+import Link from 'next/link';
+import { getScoringConfigAction } from '@/lib/actions/scoring-config-actions';
 import { calculatePlayerScores, getTopPlayers, getTopPlayersByTeam } from '@/lib/utils/scorecard-scoring-engine';
 import type { ScorecardInnings, ScorecardScoringConfig, PlayerScore } from '@/types';
 import { DEFAULT_SCORING_CONFIG } from '@/types';
-import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { cn } from '@/lib/utils';
 
 interface PerformanceTabProps {
@@ -84,102 +81,13 @@ function TopThreeSection({ title, players, scoreType = 'total' }: { title: strin
   );
 }
 
-// ─── Scoring Config Editor ────────────────────────────────────────────────────
-function ScoringConfigEditor({
-  config,
-  onSave,
-  isSaving,
-}: {
-  config: ScorecardScoringConfig;
-  onSave: (config: ScorecardScoringConfig) => void;
-  isSaving: boolean;
-}) {
-  const [local, setLocal] = useState(config);
-
-  useEffect(() => setLocal(config), [config]);
-
-  const num = (val: any) => parseFloat(val) || 0;
-
-  const field = (
-    section: 'batting' | 'bowling' | 'fielding',
-    key: string,
-    label: string,
-    hint?: string
-  ) => (
-    <div className="space-y-1">
-      <Label className="text-xs">{label}</Label>
-      <Input
-        type="number"
-        step="0.5"
-        className="h-8 text-sm"
-        value={(local[section] as any)[key]}
-        onChange={e => setLocal(prev => ({
-          ...prev,
-          [section]: { ...(prev[section] as any), [key]: num(e.target.value) }
-        }))}
-      />
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-    </div>
-  );
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Batting */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-blue-700 border-b border-blue-200 pb-1">Batting</h4>
-          {field('batting', 'runsMultiplier', 'Runs ×', 'Points per run')}
-          {field('batting', 'foursMultiplier', '4s ×')}
-          {field('batting', 'sixesMultiplier', '6s ×')}
-          {field('batting', 'srBonus200', 'SR > 200 bonus')}
-          {field('batting', 'srBonus150', 'SR > 150 bonus')}
-          {field('batting', 'srBonus100', 'SR > 100 bonus')}
-          {field('batting', 'srPenaltySub50', 'SR < 50 penalty', 'Applied if ≥5 balls faced')}
-        </div>
-
-        {/* Bowling */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-green-700 border-b border-green-200 pb-1">Bowling</h4>
-          {field('bowling', 'wicketsMultiplier', 'Wickets ×')}
-          {field('bowling', 'dotsMultiplier', 'Dots ×')}
-          {field('bowling', 'econBonus4', 'Econ < 4 bonus')}
-          {field('bowling', 'econBonus6', 'Econ < 6 bonus')}
-          {field('bowling', 'econPenalty8', 'Econ > 8 penalty')}
-          {field('bowling', 'widesMultiplier', 'Wides ×', 'Use negative value')}
-          {field('bowling', 'noballsMultiplier', 'No-balls ×', 'Use negative value')}
-        </div>
-
-        {/* Fielding */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-purple-700 border-b border-purple-200 pb-1">Fielding</h4>
-          {field('fielding', 'catchesMultiplier', 'Catches ×')}
-          {field('fielding', 'runOutsMultiplier', 'Run Outs ×')}
-          {field('fielding', 'stumpingsMultiplier', 'Stumpings ×')}
-          {field('fielding', 'keeperCatchesMultiplier', 'Keeper Catches ×')}
-          {field('fielding', 'byesMultiplier', 'Byes ×', 'Use negative value')}
-        </div>
-      </div>
-
-      <Button onClick={() => onSave(local)} disabled={isSaving} className="w-full sm:w-auto">
-        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-        {isSaving ? 'Saving...' : 'Save Scoring Formula'}
-      </Button>
-    </div>
-  );
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function ScorecardPerformanceTab({ innings, team1, team2 }: PerformanceTabProps) {
-  const { activeOrganizationId, effectivePermissions } = useAuth();
-  const { toast } = useToast();
+  const { activeOrganizationId } = useAuth();
 
   const [config, setConfig] = useState<ScorecardScoringConfig | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showConfig, setShowConfig] = useState(false);
-
-  const canEditConfig = effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
-    effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY];
+  const [showFormula, setShowFormula] = useState(false);
 
   useEffect(() => {
     if (!activeOrganizationId) return;
@@ -189,19 +97,6 @@ export function ScorecardPerformanceTab({ innings, team1, team2 }: PerformanceTa
     });
   }, [activeOrganizationId]);
 
-  const handleSaveConfig = async (updated: ScorecardScoringConfig) => {
-    setIsSaving(true);
-    const res = await saveScoringConfigAction(updated);
-    if (res.success) {
-      setConfig(updated);
-      toast({ title: 'Scoring formula saved' });
-      setShowConfig(false);
-    } else {
-      toast({ title: 'Save failed', description: res.error, variant: 'destructive' });
-    }
-    setIsSaving(false);
-  };
-
   if (isLoadingConfig) {
     return <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -209,7 +104,6 @@ export function ScorecardPerformanceTab({ innings, team1, team2 }: PerformanceTa
   const effectiveConfig = config || { ...DEFAULT_SCORING_CONFIG, organizationId: activeOrganizationId || '' };
   const scores = calculatePlayerScores(innings, effectiveConfig, team1, team2);
 
-  // Derive actual team names from scores (most reliable source)
   const teamsFromScores = Array.from(new Set(scores.map(s => s.team).filter(t => t && t !== 'Unknown')));
   const teams = teamsFromScores.length > 0 ? teamsFromScores : [team1, team2].filter(Boolean);
 
@@ -218,26 +112,62 @@ export function ScorecardPerformanceTab({ innings, team1, team2 }: PerformanceTa
 
   return (
     <div className="space-y-6">
-      {/* Config toggle */}
-      {canEditConfig && (
-        <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => setShowConfig(v => !v)}>
-            <Settings className="mr-2 h-4 w-4" />
-            {showConfig ? 'Hide' : 'Edit Scoring Formula'}
+      {/* Formula reference row */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setShowFormula(v => !v)}
+          className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+        >
+          <Settings className="h-3.5 w-3.5" />
+          {showFormula ? 'Hide scoring formula' : 'View scoring formula'}
+        </button>
+        <Link href="/admin/scoring-config">
+          <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7 px-2">
+            <Settings className="mr-1.5 h-3 w-3" /> Edit Formula
           </Button>
-        </div>
-      )}
+        </Link>
+      </div>
 
-      {/* Config editor */}
-      {showConfig && config && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Settings className="h-4 w-4" /> Scoring Formula
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScoringConfigEditor config={config} onSave={handleSaveConfig} isSaving={isSaving} />
+      {/* Read-only formula */}
+      {showFormula && (
+        <Card className="bg-muted/30">
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-3 gap-4 text-xs">
+              <div>
+                <p className="font-medium text-blue-700 mb-2">Batting</p>
+                <div className="space-y-1 text-muted-foreground">
+                  <p>Runs × {effectiveConfig.batting.runsMultiplier}</p>
+                  <p>4s × {effectiveConfig.batting.foursMultiplier}</p>
+                  <p>6s × {effectiveConfig.batting.sixesMultiplier}</p>
+                  <p>SR&gt;200: +{effectiveConfig.batting.srBonus200}</p>
+                  <p>SR&gt;150: +{effectiveConfig.batting.srBonus150}</p>
+                  <p>SR&gt;100: +{effectiveConfig.batting.srBonus100}</p>
+                  <p>SR&lt;50: {effectiveConfig.batting.srPenaltySub50}</p>
+                </div>
+              </div>
+              <div>
+                <p className="font-medium text-green-700 mb-2">Bowling</p>
+                <div className="space-y-1 text-muted-foreground">
+                  <p>Wickets × {effectiveConfig.bowling.wicketsMultiplier}</p>
+                  <p>Dots × {effectiveConfig.bowling.dotsMultiplier}</p>
+                  <p>Econ&lt;4: +{effectiveConfig.bowling.econBonus4}</p>
+                  <p>Econ&lt;6: +{effectiveConfig.bowling.econBonus6}</p>
+                  <p>Econ&gt;8: {effectiveConfig.bowling.econPenalty8}</p>
+                  <p>Wides × {effectiveConfig.bowling.widesMultiplier}</p>
+                  <p>No-balls × {effectiveConfig.bowling.noballsMultiplier}</p>
+                </div>
+              </div>
+              <div>
+                <p className="font-medium text-purple-700 mb-2">Fielding</p>
+                <div className="space-y-1 text-muted-foreground">
+                  <p>Catches × {effectiveConfig.fielding.catchesMultiplier}</p>
+                  <p>Run Outs × {effectiveConfig.fielding.runOutsMultiplier}</p>
+                  <p>Stumpings × {effectiveConfig.fielding.stumpingsMultiplier}</p>
+                  <p>Keeper Ct × {effectiveConfig.fielding.keeperCatchesMultiplier}</p>
+                  <p>Byes × {effectiveConfig.fielding.byesMultiplier}</p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
