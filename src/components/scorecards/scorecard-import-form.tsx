@@ -52,6 +52,7 @@ export function ScorecardImportForm() {
   const [seriesName, setSeriesName] = useState(searchParams.get('seriesName') || '');
   const [availableSeries, setAvailableSeries] = useState<Series[]>([]);
   const [availableYears, setAvailableYears] = useState<string[]>([]);
+  const prefilledSeriesId = searchParams.get('seriesId') || '';
   const [selectedYear, setSelectedYear] = useState('');
 
   // Load series for org
@@ -61,9 +62,20 @@ export function ScorecardImportForm() {
       setAvailableSeries(series);
       const years = [...new Set(series.map(s => s.year.toString()))].sort((a, b) => +b - +a);
       setAvailableYears(years);
-      if (years.length > 0) setSelectedYear(years[0]);
+
+      if (prefilledSeriesId) {
+        // Pre-select the year matching the pre-filled series
+        const matchedSeries = series.find(s => s.id === prefilledSeriesId);
+        if (matchedSeries) {
+          setSelectedYear(matchedSeries.year.toString());
+        } else if (years.length > 0) {
+          setSelectedYear(years[0]);
+        }
+      } else if (years.length > 0) {
+        setSelectedYear(years[0]);
+      }
     });
-  }, [activeOrganizationId]);
+  }, [activeOrganizationId, prefilledSeriesId]);
 
   const [parsedInnings, setParsedInnings] = useState<ScorecardInnings[]>([]);
 
@@ -253,7 +265,14 @@ export function ScorecardImportForm() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs">Year</Label>
-                      <Select value={selectedYear} onValueChange={v => { setSelectedYear(v); setSeriesId(''); setSeriesName(''); }}>
+                      <Select value={selectedYear} onValueChange={v => {
+                        setSelectedYear(v);
+                        // Only reset series if it doesn't belong to the new year
+                        const currentSeries = availableSeries.find(s => s.id === seriesId);
+                        if (currentSeries && currentSeries.year.toString() !== v) {
+                          setSeriesId(''); setSeriesName('');
+                        }
+                      }}>
                         <SelectTrigger className="h-8 text-sm">
                           <SelectValue placeholder="Year" />
                         </SelectTrigger>
