@@ -118,9 +118,33 @@ export function ScorecardImportForm() {
     }
   };
 
-  const buildInnings = (data: InningsData, num: 1 | 2): ScorecardInnings => {
+  /**
+   * Team 1 full roster = Inn1 batting + Inn1 didNotBat + Inn2 bowling
+   * Team 2 full roster = Inn2 batting + Inn2 didNotBat + Inn1 bowling
+   */
+  const buildRosters = () => {
+    const team1Names = new Set<string>();
+    const team2Names = new Set<string>();
+    innings1.batting?.forEach(b => team1Names.add(b.name));
+    innings1.didNotBat?.forEach(n => team1Names.add(n));
+    innings2.bowling?.forEach(b => team1Names.add(b.name));
+    innings2.batting?.forEach(b => team2Names.add(b.name));
+    innings2.didNotBat?.forEach(n => team2Names.add(n));
+    innings1.bowling?.forEach(b => team2Names.add(b.name));
+    return {
+      team1: Array.from(team1Names).filter(Boolean),
+      team2: Array.from(team2Names).filter(Boolean),
+    };
+  };
+
+  const buildInnings = (data: InningsData, num: 1 | 2, fieldingTeamNames: string[]): ScorecardInnings => {
     const batting = data.batting || [];
+    const bowling = data.bowling || [];
     const extras = data.extras || { byes: 0, legByes: 0, wides: 0, noballs: 0, total: 0 };
+    // Build mock bowler list from fielding team names for name resolution in deriveFieldingStats
+    const fieldingTeamBowlers = fieldingTeamNames.map(name => ({
+      name, overs: 0, maidens: 0, runs: 0, wickets: 0, economy: 0, wides: 0, noballs: 0, dots: 0,
+    }));
     return {
       inningsNumber: num,
       battingTeam: data.battingTeam || (num === 1 ? team1 : team2),
@@ -129,8 +153,8 @@ export function ScorecardImportForm() {
       overs: data.overs || '0',
       extras,
       batting,
-      bowling: data.bowling || [],
-      fielding: deriveFieldingStats(batting, extras.byes, data.bowling || [], data.didNotBat || []),
+      bowling,
+      fielding: deriveFieldingStats(batting, extras.byes, fieldingTeamBowlers, data.didNotBat || []),
       fallOfWickets: data.fallOfWickets || [],
       didNotBat: data.didNotBat || [],
     };
@@ -145,9 +169,12 @@ export function ScorecardImportForm() {
     setIsSaving(true);
     try {
       const parsed = parseCricClubsUrl(url);
+      const rosters = buildRosters();
       const innings: ScorecardInnings[] = [];
-      if (hasInnings1) innings.push(buildInnings(innings1, 1));
-      if (hasInnings2) innings.push(buildInnings(innings2, 2));
+      // Inn1 fielding = team2 fielding → pass team2 names for name resolution
+      if (hasInnings1) innings.push(buildInnings(innings1, 1, rosters.team2));
+      // Inn2 fielding = team1 fielding → pass team1 names for name resolution
+      if (hasInnings2) innings.push(buildInnings(innings2, 2, rosters.team1));
 
       const res = await saveScorecardAction({
         organizationId: activeOrganizationId,
