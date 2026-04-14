@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { getScorecardsForOrgAction, deleteScorecardAction } from '@/lib/actions/scorecard-actions';
@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, DialogTrigger,
@@ -17,7 +18,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import {
   Table, PlusCircle, Loader2, ShieldAlert, Info,
-  CalendarFold, ArrowRight, Trash2
+  CalendarFold, ArrowRight, Trash2, Filter
 } from 'lucide-react';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
@@ -28,6 +29,41 @@ export default function ScorecardsPage() {
   const [scorecards, setScorecards] = useState<MatchScorecard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Filters
+  const [selectedYear, setSelectedYear] = useState('all');
+  const [selectedSeries, setSelectedSeries] = useState('all');
+
+  // Derived filter options from loaded scorecards
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    scorecards.forEach(sc => {
+      if (sc.date) {
+        try { years.add(parseISO(sc.date).getFullYear().toString()); } catch {}
+      }
+    });
+    return Array.from(years).sort((a, b) => +b - +a);
+  }, [scorecards]);
+
+  const availableSeries = useMemo(() => {
+    const map = new Map<string, string>(); // id → name
+    scorecards.forEach(sc => {
+      if (sc.seriesId && sc.seriesName) map.set(sc.seriesId, sc.seriesName);
+    });
+    return Array.from(map.entries());
+  }, [scorecards]);
+
+  const filteredScorecards = useMemo(() => {
+    return scorecards.filter(sc => {
+      const yearMatch = selectedYear === 'all' || (sc.date && (() => {
+        try { return parseISO(sc.date).getFullYear().toString() === selectedYear; } catch { return false; }
+      })());
+      const seriesMatch = selectedSeries === 'all'
+        || (selectedSeries === 'none' && !sc.seriesId)
+        || sc.seriesId === selectedSeries;
+      return yearMatch && seriesMatch;
+    });
+  }, [scorecards, selectedYear, selectedSeries]);
 
   const handleDelete = async (sc: MatchScorecard) => {
     if (!activeOrganizationId) return;
@@ -113,8 +149,52 @@ export default function ScorecardsPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {scorecards.map(sc => (
+            <div className="space-y-4">
+              {/* Filter bar */}
+              <div className="flex flex-wrap items-center gap-3">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
+                  <SelectTrigger className="h-8 w-28 text-sm">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Years</SelectItem>
+                    {availableYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedSeries} onValueChange={setSelectedSeries}>
+                  <SelectTrigger className="h-8 w-48 text-sm">
+                    <SelectValue placeholder="Series" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Series</SelectItem>
+                    <SelectItem value="none">No Series</SelectItem>
+                    {availableSeries.map(([id, name]) => (
+                      <SelectItem key={id} value={id}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {(selectedYear !== 'all' || selectedSeries !== 'all') && (
+                  <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground"
+                    onClick={() => { setSelectedYear('all'); setSelectedSeries('all'); }}>
+                    Clear filters
+                  </Button>
+                )}
+
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {filteredScorecards.length} of {scorecards.length} scorecards
+                </span>
+              </div>
+
+              {filteredScorecards.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  No scorecards match the selected filters.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredScorecards.map(sc => (
                 <Card key={sc.id} className="hover:shadow-md transition-shadow">
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-start">
@@ -134,7 +214,10 @@ export default function ScorecardsPage() {
                     {sc.result && (
                       <p className="text-xs text-green-600 font-medium">{sc.result}</p>
                     )}
-                    {sc.cricClubsLeague && (
+                    {sc.seriesName && (
+                      <p className="text-xs text-primary/70 font-medium">{sc.seriesName}</p>
+                    )}
+                    {!sc.seriesName && sc.cricClubsLeague && (
                       <p className="text-xs text-muted-foreground">
                         CricClubs: {sc.cricClubsLeague}
                       </p>
@@ -177,6 +260,8 @@ export default function ScorecardsPage() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+              )}
             </div>
           )
         )}
