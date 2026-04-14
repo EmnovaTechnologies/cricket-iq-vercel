@@ -235,15 +235,16 @@ export function ScorecardImportForm() {
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Series</Label>
-                      <Select value={seriesId} onValueChange={v => {
-                        setSeriesId(v);
-                        setSeriesName(availableSeries.find(s => s.id === v)?.name || '');
+                      <Select value={seriesId || 'none'} onValueChange={v => {
+                        const val = v === 'none' ? '' : v;
+                        setSeriesId(val);
+                        setSeriesName(availableSeries.find(s => s.id === val)?.name || '');
                       }}>
                         <SelectTrigger className="h-8 text-sm">
                           <SelectValue placeholder="Select series" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="none">None</SelectItem>
                           {availableSeries.filter(s => !selectedYear || s.year.toString() === selectedYear).map(s => (
                             <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                           ))}
