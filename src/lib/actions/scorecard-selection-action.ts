@@ -51,7 +51,7 @@ export async function suggestXIFromScorecardAction(
       totalRunOuts: p.totalRunOuts,
       totalStumpings: p.totalStumpings,
       totalKeeperCatches: p.totalKeeperCatches,
-      isBowler: (p.totalOvers / p.gamesPlayed) >= constraints.minBowlerOversPerGame && p.totalWickets > 0,
+      isBowler: (p.totalOvers / p.gamesPlayed) >= constraints.minBowlerOversPerGame,
       isKeeper: p.totalStumpings > 0 || p.totalKeeperCatches > 0,
     }));
 

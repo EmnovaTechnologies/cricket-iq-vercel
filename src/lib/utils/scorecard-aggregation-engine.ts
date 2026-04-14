@@ -104,7 +104,7 @@ export function classifyPlayers(
   return players.map(p => {
     const avgOvers = p.totalOvers / p.gamesPlayed;
     const isKeeper = p.totalStumpings > 0 || p.totalKeeperCatches > 0;
-    const isBowler = avgOvers >= minBowlerOversPerGame && p.totalWickets > 0;
+    const isBowler = avgOvers >= minBowlerOversPerGame;
     const isBatter = p.totalRuns > 0 || p.totalBalls > 0;
     const isAllRounder = isBatter && isBowler;
 
