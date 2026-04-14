@@ -69,19 +69,7 @@ export function MatchReportTab({
 
   const [isSelector, setIsSelector] = useState(isAssignedSelector);
 
-  useEffect(() => {
-    // If not passed as assigned selector but we have a gameId from a linked game,
-    // check the game's selectorUserIds to determine if current user is assigned
-    if (!isAssignedSelector && gameId && currentUser?.uid) {
-      import('@/lib/db').then(({ getGameByIdFromDB }) => {
-        getGameByIdFromDB(gameId).then(game => {
-          if (game?.selectorUserIds?.includes(currentUser.uid)) {
-            setIsSelector(true);
-          }
-        });
-      });
-    }
-  }, [gameId, currentUser?.uid, isAssignedSelector]);
+  const canView = effectivePermissions[PERMISSIONS.SERIES_MANAGE_ADMINS_ANY] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
     userProfile?.roles?.includes('admin');
@@ -97,6 +85,19 @@ export function MatchReportTab({
 
   const opposingPlayers = playersByTeam[opposingTeam] || [];
 
+  // Check if current user is an assigned selector (for scorecard page where isAssignedSelector=false)
+  useEffect(() => {
+    if (!isAssignedSelector && gameId && currentUser?.uid) {
+      import('@/lib/db').then(({ getGameByIdFromDB }) => {
+        getGameByIdFromDB(gameId).then(game => {
+          if (game?.selectorUserIds?.includes(currentUser.uid)) {
+            setIsSelector(true);
+          }
+        });
+      });
+    }
+  }, [gameId, currentUser?.uid, isAssignedSelector]);
+
   useEffect(() => {
     if (!gameId || !currentUser) return;
     setIsLoading(true);
@@ -106,7 +107,6 @@ export function MatchReportTab({
     ]).then(([allRes, myRep]) => {
       if (allRes.success) setReports(allRes.reports || []);
       setMyReport(myRep);
-      // Pre-select opposing team
       if (!userTeam && !selectedOpposingTeam) {
         setSelectedOpposingTeam(team2);
       }
