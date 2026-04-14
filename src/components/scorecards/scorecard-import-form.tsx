@@ -80,11 +80,19 @@ export function ScorecardImportForm() {
   const [parsedInnings, setParsedInnings] = useState<ScorecardInnings[]>([]);
 
   const [slots, setSlots] = useState<ImageSlot[]>([
-    { key: 'inn1batting', label: 'Innings 1 — Batting', preview: null, base64: null, mediaType: 'image/png' },
-    { key: 'inn1bowling', label: 'Innings 1 — Bowling', preview: null, base64: null, mediaType: 'image/png' },
-    { key: 'inn2batting', label: 'Innings 2 — Batting', preview: null, base64: null, mediaType: 'image/png' },
-    { key: 'inn2bowling', label: 'Innings 2 — Bowling', preview: null, base64: null, mediaType: 'image/png' },
+    { key: 'inn1', label: 'Innings 1', preview: null, base64: null, mediaType: 'image/png' },
+    { key: 'inn2', label: 'Innings 2', preview: null, base64: null, mediaType: 'image/png' },
   ]);
+
+  const addExtraSlot = () => {
+    const id = `extra${Date.now()}`;
+    setSlots(prev => [...prev, { key: id, label: `Extra screenshot ${prev.length - 1}`, preview: null, base64: null, mediaType: 'image/png' }]);
+  };
+
+  const removeSlot = (key: string) => {
+    setSlots(prev => prev.filter(s => s.key !== key));
+    setParsedInnings([]);
+  };
 
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -337,9 +345,10 @@ export function ScorecardImportForm() {
                   <Info className="h-4 w-4 text-blue-600" />
                   <AlertTitle className="text-blue-700">How to capture screenshots</AlertTitle>
                   <AlertDescription className="text-blue-600 text-sm">
-                    On CricClubs, click <strong>Full Scorecard</strong> tab. Upload separate screenshots for batting
-                    and bowling for each innings. All 4 are optional — Claude will process all uploaded images
-                    together for the best name accuracy.
+                    On CricClubs, click <strong>Full Scorecard</strong> tab. Upload one screenshot per innings —
+                    each should show the full batting table, bowling table, extras and fall of wickets.
+                    If you need multiple shots per innings, use <strong>Add another screenshot</strong>.
+                    Claude reads all images together for the best accuracy.
                   </AlertDescription>
                 </Alert>
 
@@ -363,39 +372,57 @@ export function ScorecardImportForm() {
               </div>
 
               {/* Upload slots */}
-              <div className="grid grid-cols-2 gap-4">
-                {slots.map(slot => (
-                  <div key={slot.key} className="space-y-2">
-                    <Label className="text-sm font-medium">{slot.label}</Label>
-                    <div
-                      onClick={() => fileRefs.current[slot.key]?.click()}
-                      className={cn(
-                        "border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors min-h-[100px] flex flex-col items-center justify-center gap-1.5",
-                        slot.preview ? "border-primary/40 bg-primary/5" : "border-muted-foreground/25 hover:border-primary/40"
-                      )}
-                    >
-                      {slot.preview ? (
-                        <img src={slot.preview} alt="Preview" className="max-h-20 rounded object-contain" />
-                      ) : (
-                        <>
-                          <ImageIcon className="h-7 w-7 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">Click to upload</p>
-                        </>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {slots.map((slot, idx) => (
+                    <div key={slot.key} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">{slot.label}</Label>
+                        {/* Allow removing extra slots (not the first 2) */}
+                        {idx >= 2 && (
+                          <button onClick={() => removeSlot(slot.key)} className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-0.5">
+                            <X className="h-3 w-3" /> Remove
+                          </button>
+                        )}
+                      </div>
+                      <div
+                        onClick={() => fileRefs.current[slot.key]?.click()}
+                        className={cn(
+                          "border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors min-h-[100px] flex flex-col items-center justify-center gap-1.5",
+                          slot.preview ? "border-primary/40 bg-primary/5" : "border-muted-foreground/25 hover:border-primary/40"
+                        )}
+                      >
+                        {slot.preview ? (
+                          <img src={slot.preview} alt="Preview" className="max-h-20 rounded object-contain" />
+                        ) : (
+                          <>
+                            <ImageIcon className="h-7 w-7 text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">Click to upload</p>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        ref={el => { fileRefs.current[slot.key] = el; }}
+                        type="file" accept="image/png,image/jpeg,image/webp"
+                        onChange={e => handleUpload(slot.key, e)} className="hidden"
+                      />
+                      {slot.base64 && (
+                        <Button size="sm" variant="ghost" className="w-full text-xs text-muted-foreground"
+                          onClick={() => { updateSlot(slot.key, { preview: null, base64: null }); setParsedInnings([]); }}>
+                          <X className="mr-1 h-3 w-3" /> Clear
+                        </Button>
                       )}
                     </div>
-                    <input
-                      ref={el => { fileRefs.current[slot.key] = el; }}
-                      type="file" accept="image/png,image/jpeg,image/webp"
-                      onChange={e => handleUpload(slot.key, e)} className="hidden"
-                    />
-                    {slot.base64 && (
-                      <Button size="sm" variant="ghost" className="w-full text-xs text-muted-foreground"
-                        onClick={() => { updateSlot(slot.key, { preview: null, base64: null }); setParsedInnings([]); }}>
-                        <X className="mr-1 h-3 w-3" /> Remove
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                  ))}
+                </div>
+
+                {/* Add more screenshots */}
+                <Button variant="outline" size="sm" onClick={addExtraSlot} className="w-full text-muted-foreground border-dashed">
+                  <ImageIcon className="mr-2 h-3.5 w-3.5" /> Add another screenshot
+                </Button>
+                <p className="text-xs text-center text-muted-foreground">
+                  Upload 1–{slots.length} screenshots. Claude reads all images together to extract the full scorecard.
+                </p>
               </div>
 
               {/* Extract All button — single call */}
