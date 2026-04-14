@@ -78,16 +78,19 @@ export function MatchReportTab({
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
     userProfile?.roles?.includes('admin');
 
-  // Derive opposing team from userTeam
-  const opposingTeam = userTeam
-    ? (userTeam === team1 ? team2 : team1)
-    : selectedOpposingTeam;
-
-  const opposingPlayers = playersByTeam[opposingTeam] || [];
-
-  // Check if current user is an assigned selector (for scorecard page where isAssignedSelector=false)
+  // Check selector status — from prop, game lookup, or selector role (for scorecard page)
   useEffect(() => {
-    if (!isAssignedSelector && gameId && currentUser?.uid) {
+    if (isAssignedSelector) return;
+    // Check if user has selector role — allow submission from scorecard even without linked game
+    if (userProfile?.roles?.includes('selector') ||
+        userProfile?.roles?.includes('Series Admin') ||
+        userProfile?.roles?.includes('Organization Admin') ||
+        userProfile?.roles?.includes('admin')) {
+      setIsSelector(true);
+      return;
+    }
+    // Check if assigned to the linked game
+    if (gameId && currentUser?.uid) {
       import('@/lib/db').then(({ getGameByIdFromDB }) => {
         getGameByIdFromDB(gameId).then(game => {
           if (game?.selectorUserIds?.includes(currentUser.uid)) {
@@ -96,7 +99,14 @@ export function MatchReportTab({
         });
       });
     }
-  }, [gameId, currentUser?.uid, isAssignedSelector]);
+  }, [gameId, currentUser?.uid, isAssignedSelector, userProfile?.roles]);
+
+  // Derive opposing team from userTeam
+  const opposingTeam = userTeam
+    ? (userTeam === team1 ? team2 : team1)
+    : selectedOpposingTeam;
+
+  const opposingPlayers = playersByTeam[opposingTeam] || [];
 
   useEffect(() => {
     if (!gameId || !currentUser) return;
@@ -190,7 +200,7 @@ export function MatchReportTab({
     <div className="space-y-6">
 
       {/* ── Submit form — shown to assigned selectors who haven't submitted yet ── */}
-      {isAssignedSelector && !myReport && (
+      {isSelector && !myReport && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -337,7 +347,7 @@ export function MatchReportTab({
       )}
 
       {/* ── Already submitted notice ── */}
-      {isAssignedSelector && myReport && (
+      {isSelector && myReport && (
         <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           You submitted a report on <strong>{myReport.opposingTeam}</strong> on{' '}
