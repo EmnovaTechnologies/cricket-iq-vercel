@@ -156,13 +156,22 @@ export function ScorecardImportForm() {
         team2: team2.trim(),
         date,
         seriesId: seriesId || undefined,
+        linkedGameId: linkedGameId || undefined,
       });
       if (dupCheck.isDuplicate) {
-        toast({
-          title: 'Duplicate Scorecard',
-          description: dupCheck.message,
-          variant: 'destructive',
-        });
+        if (dupCheck.existingScorecardId) {
+          toast({
+            title: 'Scorecard Already Exists',
+            description: dupCheck.message + ' Redirecting to existing scorecard.',
+          });
+          router.push(`/scorecards/${dupCheck.existingScorecardId}`);
+        } else {
+          toast({
+            title: 'Duplicate Scorecard',
+            description: dupCheck.message,
+            variant: 'destructive',
+          });
+        }
         setIsSaving(false);
         return;
       }

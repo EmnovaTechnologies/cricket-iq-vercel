@@ -16,6 +16,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { addPlayerToGameRosterAction, updatePlayerGameInclusionAction, updateGameSelectorsAction } from '@/lib/actions/game-actions';
+import { getScorecardForGameAction } from '@/lib/actions/scorecard-actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -50,7 +51,15 @@ export default function GameDetailsPage() {
   const gameId = params.id;
   const router = useRouter();
   const { toast } = useToast();
-  const { userProfile: currentAuthProfile, effectivePermissions, isPermissionsLoading } = useAuth();
+  const { userProfile: currentAuthProfile, effectivePermissions, isPermissionsLoading, activeOrganizationId } = useAuth();
+
+  // Check if scorecard already exists for this game
+  useEffect(() => {
+    if (!gameId || !activeOrganizationId) return;
+    getScorecardForGameAction(gameId, activeOrganizationId).then(res => {
+      if (res.exists && res.scorecardId) setExistingScorecardId(res.scorecardId);
+    });
+  }, [gameId, activeOrganizationId]);
 
   const [game, setGame] = useState<Game | undefined>(undefined);
   const [series, setSeries] = useState<Series | undefined>(undefined);
@@ -77,6 +86,7 @@ export default function GameDetailsPage() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [gameUrl, setGameUrl] = useState('');
   const [isSavingGameUrl, setIsSavingGameUrl] = useState(false);
+  const [existingScorecardId, setExistingScorecardId] = useState<string | null>(null);
 
   const handleShareLink = () => {
     const url = `${window.location.origin}/rate/${gameId}`;
@@ -355,11 +365,19 @@ export default function GameDetailsPage() {
                   <ExternalLink className="h-4 w-4 shrink-0" />
                   {gameUrl}
                 </a>
-                <Link href={`/scorecards/import?gameId=${gameId}&url=${encodeURIComponent(gameUrl)}&team1=${encodeURIComponent(game.team1)}&team2=${encodeURIComponent(game.team2)}&date=${encodeURIComponent(game.date)}&venue=${encodeURIComponent(game.venue)}&seriesId=${encodeURIComponent(game.seriesId || '')}&seriesName=${encodeURIComponent(series?.name || '')}`}>
-                  <Button size="sm" className="bg-primary hover:bg-primary/90 gap-2">
-                    <Table2 className="h-4 w-4" /> Import Scorecard
-                  </Button>
-                </Link>
+                {existingScorecardId ? (
+                  <Link href={`/scorecards/${existingScorecardId}`}>
+                    <Button size="sm" variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/10">
+                      <Table2 className="h-4 w-4" /> View Scorecard
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link href={`/scorecards/import?gameId=${gameId}&url=${encodeURIComponent(gameUrl)}&team1=${encodeURIComponent(game.team1)}&team2=${encodeURIComponent(game.team2)}&date=${encodeURIComponent(game.date)}&venue=${encodeURIComponent(game.venue)}&seriesId=${encodeURIComponent(game.seriesId || '')}&seriesName=${encodeURIComponent(series?.name || '')}`}>
+                    <Button size="sm" className="bg-primary hover:bg-primary/90 gap-2">
+                      <Table2 className="h-4 w-4" /> Import Scorecard
+                    </Button>
+                  </Link>
+                )}
               </div>
             ) : canManageSelectors ? (
               <div className="space-y-2">
@@ -381,17 +399,21 @@ export default function GameDetailsPage() {
                     {isSavingGameUrl ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   </Button>
                 </div>
-                <Link href={`/scorecards/import?gameId=${gameId}&url=${encodeURIComponent(gameUrl)}&team1=${encodeURIComponent(game.team1)}&team2=${encodeURIComponent(game.team2)}&date=${encodeURIComponent(game.date)}&venue=${encodeURIComponent(game.venue)}&seriesId=${encodeURIComponent(game.seriesId || '')}&seriesName=${encodeURIComponent(series?.name || '')}`}
-                  className={!gameUrl ? 'pointer-events-none' : ''}>
-                  <Button
-                    size="sm"
-                    disabled={!gameUrl}
-                    className="bg-primary hover:bg-primary/90 gap-2 w-full sm:w-auto"
-                  >
-                    <Table2 className="h-4 w-4" /> Import Scorecard
-                  </Button>
-                </Link>
-                {!gameUrl && (
+                {existingScorecardId ? (
+                  <Link href={`/scorecards/${existingScorecardId}`}>
+                    <Button size="sm" variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/10 w-full sm:w-auto">
+                      <Table2 className="h-4 w-4" /> View Scorecard
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link href={`/scorecards/import?gameId=${gameId}&url=${encodeURIComponent(gameUrl)}&team1=${encodeURIComponent(game.team1)}&team2=${encodeURIComponent(game.team2)}&date=${encodeURIComponent(game.date)}&venue=${encodeURIComponent(game.venue)}&seriesId=${encodeURIComponent(game.seriesId || '')}&seriesName=${encodeURIComponent(series?.name || '')}`}
+                    className={!gameUrl ? 'pointer-events-none' : ''}>
+                    <Button size="sm" disabled={!gameUrl} className="bg-primary hover:bg-primary/90 gap-2 w-full sm:w-auto">
+                      <Table2 className="h-4 w-4" /> Import Scorecard
+                    </Button>
+                  </Link>
+                )}
+                {!gameUrl && !existingScorecardId && (
                   <p className="text-xs text-muted-foreground">Enter and save a CricClubs URL above to enable scorecard import.</p>
                 )}
               </div>

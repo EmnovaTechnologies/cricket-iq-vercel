@@ -250,11 +250,29 @@ export async function checkDuplicateScorecardAction(params: {
   team2: string;
   date: string;
   seriesId?: string;
-}): Promise<{ isDuplicate: boolean; message?: string }> {
+  linkedGameId?: string;
+}): Promise<{ isDuplicate: boolean; message?: string; existingScorecardId?: string }> {
   try {
-    const { organizationId, team1, team2, date, seriesId } = params;
+    const { organizationId, team1, team2, date, seriesId, linkedGameId } = params;
 
-    // Query by org + date — then check teams
+    // 1. Check by linkedGameId first — most reliable
+    if (linkedGameId) {
+      const gameSnap = await adminDb.collection('matchScorecards')
+        .where('organizationId', '==', organizationId)
+        .where('linkedGameId', '==', linkedGameId)
+        .limit(1)
+        .get();
+
+      if (!gameSnap.empty) {
+        return {
+          isDuplicate: true,
+          existingScorecardId: gameSnap.docs[0].id,
+          message: `A scorecard already exists for this game.`,
+        };
+      }
+    }
+
+    // 2. Check by org + date + teams
     const snap = await adminDb.collection('matchScorecards')
       .where('organizationId', '==', organizationId)
       .where('date', '==', date)
@@ -267,17 +285,17 @@ export async function checkDuplicateScorecardAction(params: {
         (data.team1 === team2 && data.team2 === team1);
 
       if (teamsMatch) {
-        // If both have seriesId, check that too
         if (seriesId && data.seriesId && data.seriesId === seriesId) {
           return {
             isDuplicate: true,
+            existingScorecardId: doc.id,
             message: `A scorecard for ${team1} vs ${team2} on this date already exists in this series.`,
           };
         }
-        // If no series context, flag as duplicate anyway
         if (!seriesId || !data.seriesId) {
           return {
             isDuplicate: true,
+            existingScorecardId: doc.id,
             message: `A scorecard for ${team1} vs ${team2} on this date already exists.`,
           };
         }
@@ -287,7 +305,26 @@ export async function checkDuplicateScorecardAction(params: {
     return { isDuplicate: false };
   } catch (error: any) {
     console.error('[checkDuplicateScorecardAction] Error:', error);
-    // On error, allow import to proceed
     return { isDuplicate: false };
+  }
+}
+
+// ─── Get Scorecard for Game ───────────────────────────────────────────────────
+
+export async function getScorecardForGameAction(
+  gameId: string,
+  organizationId: string
+): Promise<{ scorecardId?: string; exists: boolean }> {
+  try {
+    const snap = await adminDb.collection('matchScorecards')
+      .where('organizationId', '==', organizationId)
+      .where('linkedGameId', '==', gameId)
+      .limit(1)
+      .get();
+
+    if (snap.empty) return { exists: false };
+    return { exists: true, scorecardId: snap.docs[0].id };
+  } catch {
+    return { exists: false };
   }
 }
