@@ -208,7 +208,11 @@ export function ScorecardPerformanceTab({ innings, team1, team2 }: PerformanceTa
 
   const effectiveConfig = config || { ...DEFAULT_SCORING_CONFIG, organizationId: activeOrganizationId || '' };
   const scores = calculatePlayerScores(innings, effectiveConfig, team1, team2);
-  const teams = [team1, team2].filter(Boolean);
+
+  // Derive actual team names from scores (most reliable source)
+  const teamsFromScores = Array.from(new Set(scores.map(s => s.team).filter(t => t && t !== 'Unknown')));
+  const teams = teamsFromScores.length > 0 ? teamsFromScores : [team1, team2].filter(Boolean);
+
   const top = getTopPlayers(scores);
   const byTeam = getTopPlayersByTeam(scores, teams);
 

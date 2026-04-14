@@ -7,10 +7,20 @@ import { buildPlayerPerformances } from './scorecard-fielding-utils';
  * CricClubs stores "SCCAY innings (35 overs maximum)" — extract just the team name.
  */
 function normalizeTeamName(raw: string, team1: string, team2: string): string {
-  const r = raw.toLowerCase();
-  if (r.includes(team1.toLowerCase())) return team1;
-  if (r.includes(team2.toLowerCase())) return team2;
-  // Fallback — take first word
+  const r = raw.toLowerCase().trim();
+  const t1 = team1.toLowerCase().trim();
+  const t2 = team2.toLowerCase().trim();
+
+  // Direct inclusion match
+  if (r.includes(t1)) return team1;
+  if (r.includes(t2)) return team2;
+
+  // First word match (handles "SCCAY innings (35 overs maximum)")
+  const firstWord = r.split(/\s+/)[0];
+  if (firstWord === t1 || t1.includes(firstWord)) return team1;
+  if (firstWord === t2 || t2.includes(firstWord)) return team2;
+
+  // Fallback — return first word of raw
   return raw.split(/\s+/)[0];
 }
 
