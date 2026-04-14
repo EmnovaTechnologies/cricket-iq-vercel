@@ -212,28 +212,27 @@ export default function ScorecardsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredScorecards.map(sc => (
                     <Card key={sc.id} className="flex flex-col h-full hover:shadow-lg transition-shadow duration-300">
-                      <CardHeader>
-                        <CardTitle className="text-xl font-headline text-primary flex items-center gap-2">
-                          <Table className="h-5 w-5" />
-                          {sc.team1} vs {sc.team2}
-                        </CardTitle>
-                        <div className="space-y-1 pt-1">
-                          <CardDescription className="flex items-center gap-2">
-                            <CalendarFold className="h-4 w-4" />
-                            {sc.date ? (() => { try { return format(parseISO(sc.date), 'PPP'); } catch { return sc.date; } })() : 'No date'}
-                          </CardDescription>
-                          {sc.seriesName && (
-                            <CardDescription className="flex items-center gap-2 text-primary/70 font-medium">
-                              {sc.seriesName}
-                            </CardDescription>
-                          )}
-                          {!sc.seriesName && sc.cricClubsLeague && (
-                            <CardDescription>CricClubs: {sc.cricClubsLeague}</CardDescription>
-                          )}
+                      <CardHeader className="p-3 space-y-1">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-xl font-headline text-primary truncate">
+                              {sc.team1} vs {sc.team2}
+                            </CardTitle>
+                            {sc.seriesName && (
+                              <p className="text-xs text-muted-foreground truncate">Series: {sc.seriesName}</p>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="text-xs shrink-0">{sc.innings.length} inn</Badge>
                         </div>
+                        <CardDescription className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm pt-1">
+                          <span className="flex items-center gap-1">
+                            <CalendarFold className="h-4 w-4" />
+                            {sc.date ? (() => { try { return format(parseISO(sc.date), 'PP'); } catch { return sc.date; } })() : 'No date'}
+                          </span>
+                        </CardDescription>
                       </CardHeader>
-                      <CardContent className="flex-grow space-y-2">
-                        {sc.result && <p className="text-sm text-green-600 font-medium">{sc.result}</p>}
+                      <CardContent className="flex-grow p-3 pt-1 space-y-1">
+                        {sc.result && <p className="text-xs text-green-600 font-medium">{sc.result}</p>}
                         <div className="flex flex-wrap gap-1">
                           {sc.innings.map((inn, i) => (
                             <Badge key={i} variant="secondary" className="text-xs">
@@ -242,17 +241,19 @@ export default function ScorecardsPage() {
                           ))}
                         </div>
                       </CardContent>
-                      <CardFooter className="flex flex-col sm:flex-row gap-1.5 p-3 pt-2">
-                        <Button asChild variant="outline" size="sm" className="w-full flex-1 border-primary text-primary hover:bg-primary/10 text-sm">
-                          <Link href={`/scorecards/${sc.id}`} className="flex items-center justify-center gap-1.5">
-                            View Details <ArrowRight className="h-4 w-4" />
+                      <CardFooter className="grid grid-cols-2 gap-1.5 p-2 pt-1">
+                        <Button asChild variant="outline" size="sm" className="w-full border-primary text-primary hover:bg-primary/10 text-sm">
+                          <Link href={`/scorecards/${sc.id}`}>
+                            <span className="flex items-center justify-center gap-1">
+                              View Details <ArrowRight className="h-3.5 w-3.5" />
+                            </span>
                           </Link>
                         </Button>
                         {canImport && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="w-full flex-1 text-sm" disabled={deletingId === sc.id}>
-                                {deletingId === sc.id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
+                              <Button variant="destructive" size="sm" className="w-full text-sm" disabled={deletingId === sc.id}>
+                                {deletingId === sc.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />}
                                 {deletingId === sc.id ? 'Deleting...' : 'Delete'}
                               </Button>
                             </AlertDialogTrigger>
