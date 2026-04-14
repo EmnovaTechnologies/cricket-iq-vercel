@@ -12,7 +12,6 @@ import {
 import type { MatchReport } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -63,12 +62,26 @@ export function MatchReportTab({
   const [selectedOpposingTeam, setSelectedOpposingTeam] = useState('');
   const [top3, setTop3] = useState<string[]>(['', '', '']);
   const [highlights, setHighlights] = useState('');
-  const [missedCatches, setMissedCatches] = useState(0);
-  const [missedRunOuts, setMissedRunOuts] = useState(0);
+  const [missedCatches, setMissedCatches] = useState('');
+  const [missedRunOuts, setMissedRunOuts] = useState('');
   const [greatCatchesRunOuts, setGreatCatchesRunOuts] = useState('');
   const [sportsmanship, setSportsmanship] = useState('');
 
-  const canView = effectivePermissions[PERMISSIONS.SERIES_MANAGE_ADMINS_ANY] ||
+  const [isSelector, setIsSelector] = useState(isAssignedSelector);
+
+  useEffect(() => {
+    // If not passed as assigned selector but we have a gameId from a linked game,
+    // check the game's selectorUserIds to determine if current user is assigned
+    if (!isAssignedSelector && gameId && currentUser?.uid) {
+      import('@/lib/db').then(({ getGameByIdFromDB }) => {
+        getGameByIdFromDB(gameId).then(game => {
+          if (game?.selectorUserIds?.includes(currentUser.uid)) {
+            setIsSelector(true);
+          }
+        });
+      });
+    }
+  }, [gameId, currentUser?.uid, isAssignedSelector]);
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
     userProfile?.roles?.includes('admin');
@@ -262,27 +275,27 @@ export function MatchReportTab({
             </div>
 
             {/* Missed catches & run-outs */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label className="flex items-center gap-1.5">
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Missed Catches
                 </Label>
-                <Input
-                  type="number" min={0} max={20}
+                <Textarea
+                  placeholder="Describe any missed catches — player names and situation..."
                   value={missedCatches}
-                  onChange={e => setMissedCatches(parseInt(e.target.value) || 0)}
-                  className="h-9 text-sm"
+                  onChange={e => setMissedCatches(e.target.value)}
+                  className="min-h-[60px] text-sm"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="flex items-center gap-1.5">
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Missed Run-Outs
                 </Label>
-                <Input
-                  type="number" min={0} max={20}
+                <Textarea
+                  placeholder="Describe any missed run-out opportunities — player names and situation..."
                   value={missedRunOuts}
-                  onChange={e => setMissedRunOuts(parseInt(e.target.value) || 0)}
-                  className="h-9 text-sm"
+                  onChange={e => setMissedRunOuts(e.target.value)}
+                  className="min-h-[60px] text-sm"
                 />
               </div>
             </div>
@@ -396,17 +409,27 @@ export function MatchReportTab({
                     </div>
                   )}
 
-                  {/* Fielding numbers */}
-                  <div className="flex gap-4 text-sm">
-                    <span className="flex items-center gap-1 text-amber-600">
-                      <AlertTriangle className="h-3 w-3" />
-                      {report.missedCatches} missed catch{report.missedCatches !== 1 ? 'es' : ''}
-                    </span>
-                    <span className="flex items-center gap-1 text-amber-600">
-                      <AlertTriangle className="h-3 w-3" />
-                      {report.missedRunOuts} missed run-out{report.missedRunOuts !== 1 ? 's' : ''}
-                    </span>
-                  </div>
+                  {/* Missed fielding */}
+                  {(report.missedCatches || report.missedRunOuts) && (
+                    <div className="space-y-1.5">
+                      {report.missedCatches && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1 mb-1">
+                            <AlertTriangle className="h-3 w-3 text-amber-500" /> Missed Catches
+                          </p>
+                          <p className="text-sm">{report.missedCatches}</p>
+                        </div>
+                      )}
+                      {report.missedRunOuts && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1 mb-1">
+                            <AlertTriangle className="h-3 w-3 text-amber-500" /> Missed Run-Outs
+                          </p>
+                          <p className="text-sm">{report.missedRunOuts}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Great efforts */}
                   {report.greatCatchesRunOuts && (
@@ -460,7 +483,7 @@ export function MatchReportTab({
       )}
 
       {/* Non-selector, non-admin message */}
-      {!isAssignedSelector && !canView && (
+      {!isSelector && !canView && (
         <div className="text-center py-10 text-muted-foreground text-sm">
           Match reports are submitted by assigned selectors and visible to administrators only.
         </div>
