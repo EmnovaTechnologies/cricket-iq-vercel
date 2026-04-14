@@ -612,3 +612,33 @@ export const DEFAULT_SELECTION_CONSTRAINTS: ScorecardSelectionConstraints = {
   minAllRounders: 1,
   minBowlerOversPerGame: 2,
 };
+
+// ─── Match Report Types ───────────────────────────────────────────────────────
+
+export interface MatchReport {
+  id: string;
+  gameId: string;
+  scorecardId?: string;
+  organizationId: string;
+  seriesId?: string;
+  // Teams
+  reportingTeam: string;       // team the submitter represents
+  opposingTeam: string;        // team being evaluated
+  // Submission
+  submittedBy: string;         // uid
+  submittedByName: string;
+  submittedAt: string;
+  // Top 3 performers from opposing team
+  top3Players: string[];       // player names (up to 3)
+  // Notes
+  highlights: string;
+  missedCatches: number;
+  missedRunOuts: number;
+  greatCatchesRunOuts: string;
+  sportsmanship: string;
+  // Certification
+  isCertified: boolean;
+  certifiedBy?: string;
+  certifiedByName?: string;
+  certifiedAt?: string;
+}

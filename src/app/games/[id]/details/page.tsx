@@ -6,7 +6,7 @@ import type { Game, Player, PlayerRating, Series, UserProfile, RatingValue, Perm
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { CalendarDays, MapPin, Users, ArrowLeft, Layers, UserSquare2, UserPlus, CheckSquare, Square, Edit3, UserCog, Save, Check, ChevronsUpDown, Loader2, ExternalLink, Link2, Share2, CheckCheck, Table2 } from 'lucide-react';
+import { CalendarDays, MapPin, Users, ArrowLeft, Layers, UserSquare2, UserPlus, CheckSquare, Square, Edit3, UserCog, Save, Check, ChevronsUpDown, Loader2, ExternalLink, Link2, Share2, CheckCheck, Table2, FileText } from 'lucide-react';
 import { format, parseISO, startOfDay } from 'date-fns';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { addPlayerToGameRosterAction, updatePlayerGameInclusionAction, updateGameSelectorsAction } from '@/lib/actions/game-actions';
 import { getScorecardForGameAction } from '@/lib/actions/scorecard-actions';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MatchReportTab } from '@/components/match-report-tab';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -469,7 +471,19 @@ export default function GameDetailsPage() {
           </CardFooter></Card>
       )}
 
-      <Card><CardHeader>
+      <Tabs defaultValue="roster">
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="roster" className="flex items-center gap-1.5">
+            <Users className="h-4 w-4" /> Roster
+          </TabsTrigger>
+          <TabsTrigger value="report" className="flex items-center gap-1.5">
+            <FileText className="h-4 w-4" /> Match Report
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ── Roster Tab ── */}
+        <TabsContent value="roster" className="space-y-6 mt-4">
+          <Card><CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle className="text-xl font-headline text-primary flex items-center gap-2"><Users className="h-5 w-5" /> {game.team1} Roster</CardTitle>
             {isFutureGame ? (<TooltipProvider><Tooltip><TooltipTrigger asChild><span tabIndex={0} className="inline-block cursor-not-allowed"><Button variant="default" size="sm" className="bg-primary hover:bg-primary/90 pointer-events-none" disabled><Edit3 className="h-4 w-4 mr-1" /> Rate Players</Button></span></TooltipTrigger><TooltipContent><p>Cannot rate future games</p></TooltipContent></Tooltip></TooltipProvider>)
@@ -534,6 +548,28 @@ export default function GameDetailsPage() {
             : (<p className="text-sm text-muted-foreground">No other eligible players for {game.team2}.</p>)}
         </CardFooter>)}
       </Card>
+        </TabsContent>
+
+        {/* ── Match Report Tab ── */}
+        <TabsContent value="report" className="mt-4">
+          <MatchReportTab
+            gameId={gameId}
+            scorecardId={existingScorecardId || undefined}
+            organizationId={game.organizationId || activeOrganizationId || ''}
+            seriesId={game.seriesId}
+            team1={game.team1}
+            team2={game.team2}
+            playersByTeam={{
+              [game.team1]: potentialTeam1Players.map(p => p.name),
+              [game.team2]: potentialTeam2Players.map(p => p.name),
+            }}
+            isAssignedSelector={
+              !!currentAuthProfile?.uid &&
+              !!(game.selectorUserIds?.includes(currentAuthProfile.uid))
+            }
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
