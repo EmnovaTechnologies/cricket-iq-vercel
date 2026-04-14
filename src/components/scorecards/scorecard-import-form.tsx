@@ -39,11 +39,12 @@ export function ScorecardImportForm() {
   const [isSaving, setIsSaving] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
 
-  // Pre-fill from game details page URL params
+  // Pre-fill from game details page URL params — ensure date is YYYY-MM-DD
+  const rawDate = searchParams.get('date') || '';
   const [url, setUrl] = useState(searchParams.get('url') || '');
   const [team1, setTeam1] = useState(searchParams.get('team1') || '');
   const [team2, setTeam2] = useState(searchParams.get('team2') || '');
-  const [date, setDate] = useState(searchParams.get('date') || '');
+  const [date, setDate] = useState(rawDate ? rawDate.slice(0, 10) : '');
   const [venue, setVenue] = useState(searchParams.get('venue') || '');
   const [result, setResult] = useState('');
   const [linkedGameId] = useState(searchParams.get('gameId') || '');
