@@ -1,34 +1,50 @@
-import type { ScorecardInnings, ScorecardScoringConfig, PlayerScore, DEFAULT_SCORING_CONFIG } from '@/types';
+import type { ScorecardInnings, ScorecardScoringConfig, PlayerScore } from '@/types';
+import { DEFAULT_SCORING_CONFIG } from '@/types';
 import { buildPlayerPerformances } from './scorecard-fielding-utils';
+
+/**
+ * Normalize a battingTeam string to match team1/team2.
+ * CricClubs stores "SCCAY innings (35 overs maximum)" — extract just the team name.
+ */
+function normalizeTeamName(raw: string, team1: string, team2: string): string {
+  const r = raw.toLowerCase();
+  if (r.includes(team1.toLowerCase())) return team1;
+  if (r.includes(team2.toLowerCase())) return team2;
+  // Fallback — take first word
+  return raw.split(/\s+/)[0];
+}
 
 export function calculatePlayerScores(
   innings: ScorecardInnings[],
-  config: ScorecardScoringConfig | typeof DEFAULT_SCORING_CONFIG
+  config: ScorecardScoringConfig | typeof DEFAULT_SCORING_CONFIG,
+  team1: string,
+  team2: string
 ): PlayerScore[] {
   const performances = buildPlayerPerformances(innings);
 
-  // Build team map from innings — batting team per innings
+  // Build team map — batters belong to their batting team, bowlers/fielders to the other team
   const playerTeamMap = new Map<string, string>();
+
   for (const inn of innings) {
-    for (const b of inn.batting) playerTeamMap.set(b.name, inn.battingTeam);
+    const battingTeam = normalizeTeamName(inn.battingTeam, team1, team2);
+    const bowlingTeam = battingTeam === team1 ? team2 : team1;
+
+    for (const b of inn.batting) playerTeamMap.set(b.name, battingTeam);
     for (const b of inn.bowling) {
-      // Bowling team is opposite of batting team
-      const bowlingTeam = innings.find(i => i.battingTeam !== inn.battingTeam)?.battingTeam || 'Unknown';
-      playerTeamMap.set(b.name, bowlingTeam);
+      if (!playerTeamMap.has(b.name)) playerTeamMap.set(b.name, bowlingTeam);
     }
     for (const f of (inn.fielding || [])) {
-      const fieldingTeam = innings.find(i => i.battingTeam !== inn.battingTeam)?.battingTeam || 'Unknown';
-      playerTeamMap.set(f.name, fieldingTeam);
+      if (!playerTeamMap.has(f.name)) playerTeamMap.set(f.name, bowlingTeam);
     }
   }
 
-  return performances.map(p => {
-    const c = config as ScorecardScoringConfig;
+  const c = config as ScorecardScoringConfig;
 
-    // ── Batting score ──────────────────────────────────────────────────────
+  return performances.map(p => {
+    // ── Batting score ────────────────────────────────────────────────────
     let battingScore = 0;
     if (p.batting) {
-      const { runs, strikeRate, fours, sixes } = p.batting;
+      const { runs, strikeRate, fours, sixes, balls } = p.batting;
       battingScore += runs * c.batting.runsMultiplier;
       battingScore += fours * c.batting.foursMultiplier;
       battingScore += sixes * c.batting.sixesMultiplier;
@@ -36,10 +52,10 @@ export function calculatePlayerScores(
       if (strikeRate > 200) battingScore += c.batting.srBonus200;
       else if (strikeRate > 150) battingScore += c.batting.srBonus150;
       else if (strikeRate > 100) battingScore += c.batting.srBonus100;
-      else if (strikeRate < 50 && p.batting.balls >= 5) battingScore += c.batting.srPenaltySub50;
+      else if (strikeRate < 50 && balls >= 5) battingScore += c.batting.srPenaltySub50;
     }
 
-    // ── Bowling score ──────────────────────────────────────────────────────
+    // ── Bowling score ────────────────────────────────────────────────────
     let bowlingScore = 0;
     if (p.bowling) {
       const { wickets, economy, dots, wides, noballs, overs } = p.bowling;
@@ -48,7 +64,6 @@ export function calculatePlayerScores(
       bowlingScore += wides * c.bowling.widesMultiplier;
       bowlingScore += noballs * c.bowling.noballsMultiplier;
 
-      // Economy bonus only if bowled at least 1 over
       if (overs >= 1) {
         if (economy < 4) bowlingScore += c.bowling.econBonus4;
         else if (economy < 6) bowlingScore += c.bowling.econBonus6;
@@ -56,7 +71,7 @@ export function calculatePlayerScores(
       }
     }
 
-    // ── Fielding score ─────────────────────────────────────────────────────
+    // ── Fielding score ───────────────────────────────────────────────────
     let fieldingScore = 0;
     if (p.fielding) {
       const { catches, runOuts, stumpings, keeperCatches, byesConceded } = p.fielding;
