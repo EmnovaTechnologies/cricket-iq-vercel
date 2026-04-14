@@ -464,8 +464,10 @@ export interface MatchScorecard {
   date: string;
   venue?: string;
   result?: string;
-  // Optional link to Cricket IQ game
+  // Optional links
   linkedGameId?: string;
+  seriesId?: string;
+  seriesName?: string;
   // Innings data
   innings: ScorecardInnings[];
 }
@@ -558,3 +560,55 @@ export interface PlayerScore {
   bowling?: { overs: number; wickets: number; runs: number; economy: number; dots: number; wides: number; noballs: number };
   fielding?: { catches: number; runOuts: number; stumpings: number; keeperCatches: number; byesConceded?: number };
 }
+
+// ─── Scorecard Selection Types ────────────────────────────────────────────────
+
+export interface AggregatedPlayerStats {
+  name: string;
+  team: string;
+  gamesPlayed: number;
+  // Batting aggregates
+  totalRuns: number;
+  totalBalls: number;
+  totalFours: number;
+  totalSixes: number;
+  avgStrikeRate: number;
+  // Bowling aggregates
+  totalWickets: number;
+  totalOvers: number;
+  totalDots: number;
+  avgEconomy: number;
+  totalWides: number;
+  totalNoballs: number;
+  // Fielding aggregates
+  totalCatches: number;
+  totalRunOuts: number;
+  totalStumpings: number;
+  totalKeeperCatches: number;
+  // Scores
+  totalBattingScore: number;
+  totalBowlingScore: number;
+  totalFieldingScore: number;
+  totalScore: number;
+  avgScorePerGame: number;
+}
+
+export interface ScorecardSelectionConstraints {
+  teamSize: number;           // default 11
+  minOpeners: number;         // default 2
+  minMiddleOrder: number;     // default 3
+  mustHaveKeeper: boolean;    // default true
+  minBowlers: number;         // default 4
+  minAllRounders: number;     // default 1
+  minBowlerOversPerGame: number; // min avg overs per game to qualify as bowler, default 2
+}
+
+export const DEFAULT_SELECTION_CONSTRAINTS: ScorecardSelectionConstraints = {
+  teamSize: 11,
+  minOpeners: 2,
+  minMiddleOrder: 3,
+  mustHaveKeeper: true,
+  minBowlers: 4,
+  minAllRounders: 1,
+  minBowlerOversPerGame: 2,
+};

@@ -187,3 +187,57 @@ export async function getScorecardPlayersAction(
     return [];
   }
 }
+
+// ─── Link Scorecard to Series ─────────────────────────────────────────────────
+
+export async function linkScorecardToSeriesAction(
+  scorecardId: string,
+  seriesId: string,
+  seriesName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await adminDb.collection('matchScorecards').doc(scorecardId).update({ seriesId, seriesName });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function unlinkScorecardFromSeriesAction(
+  scorecardId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await adminDb.collection('matchScorecards').doc(scorecardId).update({
+      seriesId: admin.firestore.FieldValue.delete(),
+      seriesName: admin.firestore.FieldValue.delete(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── Get Scorecards by Series ─────────────────────────────────────────────────
+
+export async function getScorecardsBySeriesAction(
+  seriesId: string,
+  organizationId: string
+): Promise<{ success: boolean; scorecards?: MatchScorecard[]; error?: string }> {
+  try {
+    const snap = await adminDb.collection('matchScorecards')
+      .where('organizationId', '==', organizationId)
+      .where('seriesId', '==', seriesId)
+      .orderBy('date', 'asc')
+      .get();
+
+    const scorecards: MatchScorecard[] = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      importedAt: d.data().importedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+    })) as MatchScorecard[];
+
+    return { success: true, scorecards };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}

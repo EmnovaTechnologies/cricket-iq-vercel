@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -14,7 +14,9 @@ import { Loader2, CheckCircle, ArrowRight, ArrowLeft, ImageIcon, Info, Table, X,
 import { parseAllScorecardImagesAction, type ImageInput } from '@/lib/actions/parse-scorecard-action';
 import { saveScorecardAction } from '@/lib/actions/scorecard-actions';
 import { parseCricClubsUrl } from '@/lib/utils/cricclubs-utils';
-import type { ScorecardInnings } from '@/types';
+import { getAllSeriesFromDB } from '@/lib/db';
+import type { ScorecardInnings, Series } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 type Step = 'details' | 'uploads' | 'review';
@@ -42,6 +44,22 @@ export function ScorecardImportForm() {
   const [date, setDate] = useState('');
   const [venue, setVenue] = useState('');
   const [result, setResult] = useState('');
+  const [seriesId, setSeriesId] = useState('');
+  const [seriesName, setSeriesName] = useState('');
+  const [availableSeries, setAvailableSeries] = useState<Series[]>([]);
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
+  const [selectedYear, setSelectedYear] = useState('');
+
+  // Load series for org
+  useEffect(() => {
+    if (!activeOrganizationId) return;
+    getAllSeriesFromDB('active', activeOrganizationId).then(series => {
+      setAvailableSeries(series);
+      const years = [...new Set(series.map(s => s.year.toString()))].sort((a, b) => +b - +a);
+      setAvailableYears(years);
+      if (years.length > 0) setSelectedYear(years[0]);
+    });
+  }, [activeOrganizationId]);
 
   const [parsedInnings, setParsedInnings] = useState<ScorecardInnings[]>([]);
 
@@ -118,6 +136,8 @@ export function ScorecardImportForm() {
         date,
         venue: venue.trim() || undefined,
         result: result.trim() || undefined,
+        seriesId: seriesId || undefined,
+        seriesName: seriesName || undefined,
         innings: parsedInnings,
       }, currentUser.uid);
 
@@ -196,6 +216,44 @@ export function ScorecardImportForm() {
                 <Label>Result</Label>
                 <Input placeholder="e.g. WYCA won by 4 wickets" value={result} onChange={e => setResult(e.target.value)} />
               </div>
+
+              {/* Series picker */}
+              {availableSeries.length > 0 && (
+                <div className="space-y-3 border rounded-lg p-3 bg-muted/20">
+                  <p className="text-sm font-medium">Link to Series <span className="text-muted-foreground text-xs">(optional — required for AI Selection)</span></p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Year</Label>
+                      <Select value={selectedYear} onValueChange={v => { setSelectedYear(v); setSeriesId(''); setSeriesName(''); }}>
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder="Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Series</Label>
+                      <Select value={seriesId} onValueChange={v => {
+                        setSeriesId(v);
+                        setSeriesName(availableSeries.find(s => s.id === v)?.name || '');
+                      }}>
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder="Select series" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem>
+                          {availableSeries.filter(s => !selectedYear || s.year.toString() === selectedYear).map(s => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {seriesName && <p className="text-xs text-green-600">✓ Will be linked to: {seriesName}</p>}
+                </div>
+              )}
               <Button onClick={() => setStep('uploads')} disabled={!team1.trim() || !team2.trim() || !date} className="w-full">
                 Next: Upload Screenshots <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
