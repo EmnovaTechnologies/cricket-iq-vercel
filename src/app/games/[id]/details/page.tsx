@@ -6,7 +6,7 @@ import type { Game, Player, PlayerRating, Series, UserProfile, RatingValue, Perm
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { CalendarDays, MapPin, Users, ArrowLeft, Layers, UserSquare2, UserPlus, CheckSquare, Square, Edit3, UserCog, Save, Check, ChevronsUpDown, Loader2, ExternalLink, Link2, Share2, CheckCheck, Table } from 'lucide-react';
+import { CalendarDays, MapPin, Users, ArrowLeft, Layers, UserSquare2, UserPlus, CheckSquare, Square, Edit3, UserCog, Save, Check, ChevronsUpDown, Loader2, ExternalLink, Link2, Share2, CheckCheck, Table2 } from 'lucide-react';
 import { format, parseISO, startOfDay } from 'date-fns';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -374,7 +374,7 @@ export default function GameDetailsPage() {
                 </Button>
                 <Link href={`/scorecards/import?gameId=${gameId}&url=${encodeURIComponent(gameUrl)}&team1=${encodeURIComponent(game.team1)}&team2=${encodeURIComponent(game.team2)}&date=${encodeURIComponent(game.date)}&venue=${encodeURIComponent(game.venue)}&seriesId=${encodeURIComponent(game.seriesId || '')}&seriesName=${encodeURIComponent(series?.name || '')}`}>
                   <Button size="sm" variant="outline" className="shrink-0 border-primary text-primary hover:bg-primary/10" title="Import scorecard for this game">
-                    <Table className="h-4 w-4" />
+                    <Table2 className="h-4 w-4" />
                   </Button>
                 </Link>
               </div>
