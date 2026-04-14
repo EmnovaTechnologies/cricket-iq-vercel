@@ -20,7 +20,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -298,6 +297,7 @@ export default function ScorecardSelectionPage() {
                   { label: 'Team Size', key: 'teamSize', min: 11, max: 15 },
                   { label: 'Min Openers', key: 'minOpeners', min: 1, max: 4 },
                   { label: 'Min Middle Order', key: 'minMiddleOrder', min: 1, max: 6 },
+                  { label: 'Min Wicket Keepers', key: 'minWicketKeepers', min: 1, max: 2 },
                   { label: 'Min Bowlers', key: 'minBowlers', min: 2, max: 7 },
                   { label: 'Min All-Rounders', key: 'minAllRounders', min: 0, max: 4 },
                   { label: 'Min Overs/Game (Bowler)', key: 'minBowlerOversPerGame', min: 1, max: 10 },
@@ -312,13 +312,6 @@ export default function ScorecardSelectionPage() {
                     />
                   </div>
                 ))}
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-muted-foreground">Must Have Keeper</Label>
-                  <Switch
-                    checked={constraints.mustHaveKeeper}
-                    onCheckedChange={v => setConstraints(prev => ({ ...prev, mustHaveKeeper: v }))}
-                  />
-                </div>
 
                 <Button
                   onClick={handleGenerateXI}

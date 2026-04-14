@@ -597,7 +597,7 @@ export interface ScorecardSelectionConstraints {
   teamSize: number;           // default 11
   minOpeners: number;         // default 2
   minMiddleOrder: number;     // default 3
-  mustHaveKeeper: boolean;    // default true
+  minWicketKeepers: number;      // default 1, max 2
   minBowlers: number;         // default 4
   minAllRounders: number;     // default 1
   minBowlerOversPerGame: number; // min avg overs per game to qualify as bowler, default 2
@@ -607,7 +607,7 @@ export const DEFAULT_SELECTION_CONSTRAINTS: ScorecardSelectionConstraints = {
   teamSize: 11,
   minOpeners: 2,
   minMiddleOrder: 3,
-  mustHaveKeeper: true,
+  minWicketKeepers: 1,
   minBowlers: 4,
   minAllRounders: 1,
   minBowlerOversPerGame: 2,
