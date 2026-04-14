@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
-import { getScorecardByIdAction } from '@/lib/actions/scorecard-actions';
+import { getScorecardByIdAction, deleteScorecardAction } from '@/lib/actions/scorecard-actions';
 import type { MatchScorecard, ScorecardInnings } from '@/types';
 import { ScorecardPerformanceTab } from '@/components/scorecards/scorecard-performance-tab';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Loader2, ShieldAlert, Table, CalendarFold, MapPin, ExternalLink } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle, DialogTrigger,
+} from '@/components/ui/dialog';
+import { ArrowLeft, Loader2, ShieldAlert, Table, CalendarFold, MapPin, ExternalLink, Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 
@@ -141,11 +146,28 @@ function InningsView({ innings }: { innings: ScorecardInnings }) {
 export default function ScorecardDetailsPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { effectivePermissions } = useAuth();
+  const { effectivePermissions, activeOrganizationId } = useAuth();
+  const { toast } = useToast();
 
   const [scorecard, setScorecard] = useState<MatchScorecard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const handleDelete = async () => {
+    if (!scorecard || !activeOrganizationId) return;
+    setIsDeleting(true);
+    const res = await deleteScorecardAction(scorecard.id, activeOrganizationId);
+    if (res.success) {
+      toast({ title: 'Scorecard deleted' });
+      router.push('/scorecards');
+    } else {
+      toast({ title: 'Delete failed', description: res.error, variant: 'destructive' });
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
 
   useEffect(() => {
     if (!params.id) return;
@@ -189,13 +211,38 @@ export default function ScorecardDetailsPage() {
         <Button asChild variant="outline" size="sm">
           <Link href="/scorecards"><ArrowLeft className="mr-2 h-4 w-4" />Back to Scorecards</Link>
         </Button>
-        {scorecard.cricClubsUrl && (
-          <Button asChild variant="outline" size="sm">
-            <a href={scorecard.cricClubsUrl} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="mr-2 h-4 w-4" /> View on CricClubs
-            </a>
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {scorecard.cricClubsUrl && (
+            <Button asChild variant="outline" size="sm">
+              <a href={scorecard.cricClubsUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="mr-2 h-4 w-4" /> View on CricClubs
+              </a>
+            </Button>
+          )}
+          <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10">
+                <Trash2 className="mr-2 h-4 w-4" /> Delete
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete Scorecard</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete the scorecard for <strong>{scorecard.team1} vs {scorecard.team2}</strong>?
+                  Players who only appear on this scorecard will also be removed. This cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
+                <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+                  {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  {isDeleting ? 'Deleting...' : 'Delete Scorecard'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
-import { getScorecardsForOrgAction } from '@/lib/actions/scorecard-actions';
+import { getScorecardsForOrgAction, deleteScorecardAction } from '@/lib/actions/scorecard-actions';
 import type { MatchScorecard } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,16 +11,36 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle, DialogTrigger,
+} from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import {
   Table, PlusCircle, Loader2, ShieldAlert, Info,
-  CalendarFold, Users, ArrowRight
+  CalendarFold, ArrowRight, Trash2
 } from 'lucide-react';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 
 export default function ScorecardsPage() {
   const { activeOrganizationId, loading: authLoading, effectivePermissions, isPermissionsLoading } = useAuth();
+  const { toast } = useToast();
   const [scorecards, setScorecards] = useState<MatchScorecard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (sc: MatchScorecard) => {
+    if (!activeOrganizationId) return;
+    setDeletingId(sc.id);
+    const res = await deleteScorecardAction(sc.id, activeOrganizationId);
+    if (res.success) {
+      toast({ title: 'Scorecard deleted' });
+      setScorecards(prev => prev.filter(s => s.id !== sc.id));
+    } else {
+      toast({ title: 'Delete failed', description: res.error, variant: 'destructive' });
+    }
+    setDeletingId(null);
+  };
 
   const canImport = effectivePermissions[PERMISSIONS.SCORECARDS_IMPORT];
 
@@ -126,11 +146,34 @@ export default function ScorecardsPage() {
                         </Badge>
                       ))}
                     </div>
-                    <Button asChild variant="outline" size="sm" className="w-full mt-2 border-primary text-primary hover:bg-primary/10">
-                      <Link href={`/scorecards/${sc.id}`} className="flex items-center justify-center gap-1.5">
-                        View Scorecard <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
-                    </Button>
+                    <div className="flex gap-2 mt-2">
+                      <Button asChild variant="outline" size="sm" className="flex-1 border-primary text-primary hover:bg-primary/10">
+                        <Link href={`/scorecards/${sc.id}`} className="flex items-center justify-center gap-1.5">
+                          View Scorecard <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10" disabled={deletingId === sc.id}>
+                            {deletingId === sc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Delete Scorecard</DialogTitle>
+                            <DialogDescription>
+                              Delete scorecard for <strong>{sc.team1} vs {sc.team2}</strong>?
+                              Players who only appear on this scorecard will also be removed. This cannot be undone.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DialogFooter>
+                            <Button variant="destructive" onClick={() => handleDelete(sc)} disabled={deletingId === sc.id}>
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

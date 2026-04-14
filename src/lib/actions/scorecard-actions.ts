@@ -16,16 +16,72 @@ export async function saveScorecardAction(
       importedBy,
       importedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
-
     const ref = await adminDb.collection('matchScorecards').add(data);
-
-    // Upsert ScorecardPlayers for all players in all innings
     await upsertScorecardPlayers(scorecard.innings, scorecard.organizationId, ref.id);
-
     return { success: true, scorecardId: ref.id };
   } catch (error: any) {
     console.error('[saveScorecardAction] Error:', error);
     return { success: false, error: error.message || 'Failed to save scorecard.' };
+  }
+}
+
+// ─── Delete Scorecard ─────────────────────────────────────────────────────────
+
+export async function deleteScorecardAction(
+  scorecardId: string,
+  organizationId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // 1. Get scorecard to find all player names
+    const scorecardDoc = await adminDb.collection('matchScorecards').doc(scorecardId).get();
+    if (!scorecardDoc.exists) return { success: false, error: 'Scorecard not found.' };
+
+    const scorecard = scorecardDoc.data() as MatchScorecard;
+
+    // 2. Collect all unique player names from this scorecard
+    const playerNames = new Set<string>();
+    (scorecard.innings || []).forEach(inn => {
+      (inn.batting || []).forEach(b => playerNames.add(b.name));
+      (inn.bowling || []).forEach(b => playerNames.add(b.name));
+      (inn.didNotBat || []).forEach(n => { if (n) playerNames.add(n); });
+    });
+
+    const batch = adminDb.batch();
+
+    // 3. For each player — delete or decrement gamesAppeared
+    for (const name of playerNames) {
+      if (!name) continue;
+
+      const playerSnap = await adminDb.collection('scorecardPlayers')
+        .where('organizationId', '==', organizationId)
+        .where('name', '==', name)
+        .limit(1)
+        .get();
+
+      if (playerSnap.empty) continue;
+
+      const playerDoc = playerSnap.docs[0];
+      const gamesAppeared = playerDoc.data().gamesAppeared || 1;
+
+      if (gamesAppeared <= 1) {
+        // Only on this scorecard — delete
+        batch.delete(playerDoc.ref);
+      } else {
+        // On other scorecards — decrement
+        batch.update(playerDoc.ref, {
+          gamesAppeared: admin.firestore.FieldValue.increment(-1),
+        });
+      }
+    }
+
+    // 4. Delete the scorecard
+    batch.delete(adminDb.collection('matchScorecards').doc(scorecardId));
+    await batch.commit();
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('[deleteScorecardAction] Error:', error);
+    return { success: false, error: error.message || 'Failed to delete scorecard.' };
   }
 }
 
@@ -41,14 +97,14 @@ async function upsertScorecardPlayers(
   innings.forEach(inn => {
     inn.batting.forEach(b => playerNames.add(b.name));
     inn.bowling.forEach(b => playerNames.add(b.name));
-    inn.didNotBat.forEach(name => playerNames.add(name));
+    inn.didNotBat.forEach(name => { if (name) playerNames.add(name); });
   });
 
   const batch = adminDb.batch();
   const now = new Date().toISOString();
 
   for (const name of playerNames) {
-    // Check if player already exists for this org
+    if (!name) continue;
     const existing = await adminDb.collection('scorecardPlayers')
       .where('organizationId', '==', organizationId)
       .where('name', '==', name)
@@ -57,13 +113,7 @@ async function upsertScorecardPlayers(
 
     if (existing.empty) {
       const newRef = adminDb.collection('scorecardPlayers').doc();
-      batch.set(newRef, {
-        organizationId,
-        name,
-        firstSeenAt: now,
-        lastSeenAt: now,
-        gamesAppeared: 1,
-      });
+      batch.set(newRef, { organizationId, name, firstSeenAt: now, lastSeenAt: now, gamesAppeared: 1 });
     } else {
       batch.update(existing.docs[0].ref, {
         lastSeenAt: now,
@@ -75,7 +125,7 @@ async function upsertScorecardPlayers(
   await batch.commit();
 }
 
-// ─── Get Scorecards for Org ────────────────────────────────────────────────────
+// ─── Get Scorecards for Org ───────────────────────────────────────────────────
 
 export async function getScorecardsForOrgAction(
   organizationId: string
@@ -100,7 +150,7 @@ export async function getScorecardsForOrgAction(
   }
 }
 
-// ─── Get Single Scorecard ──────────────────────────────────────────────────────
+// ─── Get Single Scorecard ─────────────────────────────────────────────────────
 
 export async function getScorecardByIdAction(
   scorecardId: string
@@ -121,7 +171,7 @@ export async function getScorecardByIdAction(
   }
 }
 
-// ─── Get ScorecardPlayers for Org ─────────────────────────────────────────────
+// ─── Get ScorecardPlayers for Org ────────────────────────────────────────────
 
 export async function getScorecardPlayersAction(
   organizationId: string
