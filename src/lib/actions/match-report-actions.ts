@@ -4,7 +4,19 @@ import { adminDb } from '../firebase-admin';
 import * as admin from 'firebase-admin';
 import type { MatchReport } from '@/types';
 
-const COLLECTION = 'matchReports';
+const toISO = (val: any): string | undefined => {
+  if (!val) return undefined;
+  if (typeof val === 'string') return val;
+  if (val?.toDate) return val.toDate().toISOString();
+  return undefined;
+};
+
+const serializeReport = (doc: any): MatchReport => ({
+  id: doc.id,
+  ...doc.data(),
+  submittedAt: toISO(doc.data().submittedAt) || new Date().toISOString(),
+  certifiedAt: toISO(doc.data().certifiedAt),
+});
 
 // ─── Submit Report ────────────────────────────────────────────────────────────
 
@@ -47,12 +59,7 @@ export async function getMatchReportsForGameAction(
       .orderBy('submittedAt', 'desc')
       .get();
 
-    const reports = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      submittedAt: d.data().submittedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-      certifiedAt: d.data().certifiedAt?.toDate?.()?.toISOString() || undefined,
-    })) as MatchReport[];
+    const reports = snap.docs.map(serializeReport) as MatchReport[];
 
     return { success: true, reports };
   } catch (error: any) {
@@ -71,12 +78,7 @@ export async function getMatchReportsForScorecardAction(
       .orderBy('submittedAt', 'desc')
       .get();
 
-    const reports = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      submittedAt: d.data().submittedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-      certifiedAt: d.data().certifiedAt?.toDate?.()?.toISOString() || undefined,
-    })) as MatchReport[];
+    const reports = snap.docs.map(serializeReport) as MatchReport[];
 
     return { success: true, reports };
   } catch (error: any) {
@@ -97,12 +99,7 @@ export async function getMatchReportsForSeriesAction(
       .orderBy('submittedAt', 'desc')
       .get();
 
-    const reports = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      submittedAt: d.data().submittedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-      certifiedAt: d.data().certifiedAt?.toDate?.()?.toISOString() || undefined,
-    })) as MatchReport[];
+    const reports = snap.docs.map(serializeReport) as MatchReport[];
 
     return { success: true, reports };
   } catch (error: any) {
@@ -144,11 +141,7 @@ export async function getUserReportForGameAction(
       .get();
 
     if (snap.empty) return null;
-    return {
-      id: snap.docs[0].id,
-      ...snap.docs[0].data(),
-      submittedAt: snap.docs[0].data().submittedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-    } as MatchReport;
+    return serializeReport(snap.docs[0]) as MatchReport;
   } catch {
     return null;
   }
