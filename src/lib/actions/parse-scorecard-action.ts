@@ -36,13 +36,13 @@ export async function parseBattingImageAction(
   "extras": { "byes": 0, "legByes": 0, "wides": 4, "noballs": 0, "total": 4 },
   "batting": [
     {
-      "name": "Full player name as shown",
+      "name": "Full player name as shown in the Name column",
       "runs": 18,
       "balls": 21,
       "fours": 2,
       "sixes": 0,
       "strikeRate": 85.71,
-      "dismissal": "c Vinuk U b Atharv P"
+      "dismissal": "c Vinuk Ubayasiri b Atharv Pilkhane"
     }
   ],
   "didNotBat": ["Aarav Arora", "Siddhanth Kaul"]
@@ -52,9 +52,20 @@ Rules:
 - Extract ALL batters in the batting table
 - For extras: parse (b X lb X w X nb X) — if a value is missing assume 0
 - didNotBat: extract all names listed under "Did not bat" (ignore the asterisk * symbol)
-- Use exact player names as shown
+- Use exact full player names as shown in the Name column of the batting table
 - For "not out" dismissal, set dismissal to "not out"
-- All numbers must be actual numbers not strings`,
+- All numbers must be actual numbers not strings
+
+CRITICAL — Dismissal name expansion:
+The dismissal text uses abbreviated names like "c Vinuk U b Atharv P" but the batting table has full names.
+You MUST expand ALL abbreviated names in dismissal text to their full names by cross-referencing the full player names visible in the batting table and did not bat section.
+Examples:
+- "c Vinuk U b Atharv P" → if batting table shows "Vinuk Ubayasiri" and "Atharv Pilkhane", expand to "c Vinuk Ubayasiri b Atharv Pilkhane"
+- "c †Vihaan B b Ahnay G" → expand to "c †Vihaan Bannur b Ahnay Gupta" (keep the † symbol for keeper)
+- "run out (Mikael Q/Jeyadev K)" → expand to "run out (Mikael Qazi/Jeyadev Kumar)"
+- "st Vihaan B b Nirwan D" → expand to "st Vihaan Bannur b Nirwan Dissanayake"
+If a name in the dismissal cannot be matched to any player in the batting table or did not bat list, keep it as-is.
+The bowling team's players will not be in this batting screenshot — keep those abbreviated if you cannot resolve them.`,
           },
         ],
       }],
@@ -120,7 +131,7 @@ Rules:
 - If wides/noballs not shown set to 0
 - Fall of wickets: extract each entry as "score-runs (Over X.Y)" format
 - If no fall of wickets section visible set to empty array []
-- Use exact player names
+- Use exact full player names as shown in the Name column of the bowling table
 - All numbers must be actual numbers not strings`,
           },
         ],
