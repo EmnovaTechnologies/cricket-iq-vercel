@@ -130,7 +130,7 @@ export function ScorecardImportForm() {
       extras,
       batting,
       bowling: data.bowling || [],
-      fielding: deriveFieldingStats(batting, extras.byes),
+      fielding: deriveFieldingStats(batting, extras.byes, data.bowling || [], data.didNotBat || []),
       fallOfWickets: data.fallOfWickets || [],
       didNotBat: data.didNotBat || [],
     };
