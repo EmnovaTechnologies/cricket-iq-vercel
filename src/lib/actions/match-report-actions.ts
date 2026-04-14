@@ -18,6 +18,8 @@ const serializeReport = (doc: any): MatchReport => ({
   certifiedAt: toISO(doc.data().certifiedAt),
 });
 
+const COLLECTION = 'matchReports';
+
 // ─── Submit Report ────────────────────────────────────────────────────────────
 
 export async function submitMatchReportAction(
