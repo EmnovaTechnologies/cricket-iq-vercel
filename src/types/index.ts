@@ -632,8 +632,8 @@ export interface MatchReport {
   top3Players: string[];       // player names (up to 3)
   // Notes
   highlights: string;
-  missedCatches: number;
-  missedRunOuts: number;
+  missedCatches: string;
+  missedRunOuts: string;
   greatCatchesRunOuts: string;
   sportsmanship: string;
   // Certification
