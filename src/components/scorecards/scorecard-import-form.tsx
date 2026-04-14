@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle, ArrowRight, ArrowLeft, ImageIcon, Info, Table, X, Sparkles } from 'lucide-react';
 import { parseAllScorecardImagesAction, type ImageInput } from '@/lib/actions/parse-scorecard-action';
-import { saveScorecardAction } from '@/lib/actions/scorecard-actions';
+import { saveScorecardAction, checkDuplicateScorecardAction } from '@/lib/actions/scorecard-actions';
 import { parseCricClubsUrl } from '@/lib/utils/cricclubs-utils';
 import { getAllSeriesFromDB } from '@/lib/db';
 import type { ScorecardInnings, Series } from '@/types';
@@ -32,20 +32,23 @@ interface ImageSlot {
 export function ScorecardImportForm() {
   const { currentUser, activeOrganizationId } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [step, setStep] = useState<Step>('details');
   const [isSaving, setIsSaving] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
 
-  const [url, setUrl] = useState('');
-  const [team1, setTeam1] = useState('');
-  const [team2, setTeam2] = useState('');
-  const [date, setDate] = useState('');
-  const [venue, setVenue] = useState('');
+  // Pre-fill from game details page URL params
+  const [url, setUrl] = useState(searchParams.get('url') || '');
+  const [team1, setTeam1] = useState(searchParams.get('team1') || '');
+  const [team2, setTeam2] = useState(searchParams.get('team2') || '');
+  const [date, setDate] = useState(searchParams.get('date') || '');
+  const [venue, setVenue] = useState(searchParams.get('venue') || '');
   const [result, setResult] = useState('');
-  const [seriesId, setSeriesId] = useState('');
-  const [seriesName, setSeriesName] = useState('');
+  const [linkedGameId] = useState(searchParams.get('gameId') || '');
+  const [seriesId, setSeriesId] = useState(searchParams.get('seriesId') || '');
+  const [seriesName, setSeriesName] = useState(searchParams.get('seriesName') || '');
   const [availableSeries, setAvailableSeries] = useState<Series[]>([]);
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState('');
@@ -124,6 +127,24 @@ export function ScorecardImportForm() {
     try {
       const parsed = parseCricClubsUrl(url);
 
+      // Duplicate detection
+      const dupCheck = await checkDuplicateScorecardAction({
+        organizationId: activeOrganizationId,
+        team1: team1.trim(),
+        team2: team2.trim(),
+        date,
+        seriesId: seriesId || undefined,
+      });
+      if (dupCheck.isDuplicate) {
+        toast({
+          title: 'Duplicate Scorecard',
+          description: dupCheck.message,
+          variant: 'destructive',
+        });
+        setIsSaving(false);
+        return;
+      }
+
       const res = await saveScorecardAction({
         organizationId: activeOrganizationId,
         importedBy: currentUser.uid,
@@ -138,6 +159,7 @@ export function ScorecardImportForm() {
         result: result.trim() || undefined,
         seriesId: seriesId || undefined,
         seriesName: seriesName || undefined,
+        linkedGameId: linkedGameId || undefined,
         innings: parsedInnings,
       }, currentUser.uid);
 
@@ -183,6 +205,12 @@ export function ScorecardImportForm() {
           {/* ── Step: Details ─────────────────────────────────────────── */}
           {step === 'details' && (
             <div className="space-y-5">
+              {linkedGameId && (
+                <div className="flex items-center gap-2 text-xs text-primary bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+                  <Table className="h-3.5 w-3.5 shrink-0" />
+                  Pre-filled from game details. Review and adjust if needed.
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>CricClubs URL <span className="text-muted-foreground text-xs">(optional)</span></Label>
                 <Input placeholder="https://cricclubs.com/SCCAY/viewScorecard.do?matchId=99&clubId=5273" value={url} onChange={e => setUrl(e.target.value)} />
