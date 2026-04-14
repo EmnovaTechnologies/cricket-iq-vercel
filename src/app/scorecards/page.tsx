@@ -6,15 +6,16 @@ import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { getScorecardsForOrgAction, deleteScorecardAction } from '@/lib/actions/scorecard-actions';
 import type { MatchScorecard } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter,
-  DialogHeader, DialogTitle, DialogTrigger,
-} from '@/components/ui/dialog';
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import {
   Table, PlusCircle, Loader2, ShieldAlert, Info,
@@ -210,63 +211,69 @@ export default function ScorecardsPage() {
                 <p className="text-sm text-muted-foreground">{filteredScorecards.length} of {scorecards.length} scorecards</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredScorecards.map(sc => (
-                    <Card key={sc.id} className="hover:shadow-md transition-shadow">
-                      <CardHeader className="pb-2">
-                        <div className="flex justify-between items-start">
-                          <CardTitle className="text-base font-semibold text-primary">
-                            {sc.team1} vs {sc.team2}
-                          </CardTitle>
-                          <Badge variant="outline" className="text-xs">
-                            {sc.innings.length} inn
-                          </Badge>
+                    <Card key={sc.id} className="flex flex-col h-full hover:shadow-lg transition-shadow duration-300">
+                      <CardHeader>
+                        <CardTitle className="text-xl font-headline text-primary flex items-center gap-2">
+                          <Table className="h-5 w-5" />
+                          {sc.team1} vs {sc.team2}
+                        </CardTitle>
+                        <div className="space-y-1 pt-1">
+                          <CardDescription className="flex items-center gap-2">
+                            <CalendarFold className="h-4 w-4" />
+                            {sc.date ? (() => { try { return format(parseISO(sc.date), 'PPP'); } catch { return sc.date; } })() : 'No date'}
+                          </CardDescription>
+                          {sc.seriesName && (
+                            <CardDescription className="flex items-center gap-2 text-primary/70 font-medium">
+                              {sc.seriesName}
+                            </CardDescription>
+                          )}
+                          {!sc.seriesName && sc.cricClubsLeague && (
+                            <CardDescription>CricClubs: {sc.cricClubsLeague}</CardDescription>
+                          )}
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <CalendarFold className="h-3.5 w-3.5" />
-                          {sc.date ? (() => { try { return format(parseISO(sc.date), 'PPP'); } catch { return sc.date; } })() : 'No date'}
-                        </div>
-                        {sc.result && <p className="text-xs text-green-600 font-medium">{sc.result}</p>}
-                        {sc.seriesName && <p className="text-xs text-primary/70 font-medium">{sc.seriesName}</p>}
-                        {!sc.seriesName && sc.cricClubsLeague && (
-                          <p className="text-xs text-muted-foreground">CricClubs: {sc.cricClubsLeague}</p>
-                        )}
-                        <div className="flex gap-1 mt-1">
+                      <CardContent className="flex-grow space-y-2">
+                        {sc.result && <p className="text-sm text-green-600 font-medium">{sc.result}</p>}
+                        <div className="flex flex-wrap gap-1">
                           {sc.innings.map((inn, i) => (
                             <Badge key={i} variant="secondary" className="text-xs">
                               {inn.battingTeam}: {inn.totalRuns}/{inn.wickets}
                             </Badge>
                           ))}
                         </div>
-                        <div className="flex gap-2 mt-2">
-                          <Button asChild variant="outline" size="sm" className="flex-1 border-primary text-primary hover:bg-primary/10">
-                            <Link href={`/scorecards/${sc.id}`} className="flex items-center justify-center gap-1.5">
-                              View <ArrowRight className="h-3.5 w-3.5" />
-                            </Link>
-                          </Button>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10" disabled={deletingId === sc.id}>
-                                {deletingId === sc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Delete Scorecard</DialogTitle>
-                                <DialogDescription>
-                                  Delete scorecard for <strong>{sc.team1} vs {sc.team2}</strong>?
-                                  Players who only appear on this scorecard will also be removed. This cannot be undone.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <DialogFooter>
-                                <Button variant="destructive" onClick={() => handleDelete(sc)} disabled={deletingId === sc.id}>
-                                  <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-                        </div>
                       </CardContent>
+                      <CardFooter className="flex flex-col sm:flex-row gap-1.5 p-3 pt-2">
+                        <Button asChild variant="outline" size="sm" className="w-full flex-1 border-primary text-primary hover:bg-primary/10 text-sm">
+                          <Link href={`/scorecards/${sc.id}`} className="flex items-center justify-center gap-1.5">
+                            View Details <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        {canImport && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="w-full flex-1 text-sm" disabled={deletingId === sc.id}>
+                                {deletingId === sc.id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
+                                {deletingId === sc.id ? 'Deleting...' : 'Delete'}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Scorecard</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to permanently delete the scorecard for <strong>{sc.team1} vs {sc.team2}</strong>?
+                                  Players who only appear on this scorecard will also be removed. This cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(sc)} className="bg-destructive hover:bg-destructive/90">
+                                  Confirm Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </CardFooter>
                     </Card>
                   ))}
                 </div>
