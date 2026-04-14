@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle, ArrowRight, ArrowLeft, ImageIcon, Info, Table, X, Sparkles } from 'lucide-react';
+import { Loader2, CheckCircle, ArrowRight, ArrowLeft, ImageIcon, Info, Table, X, Sparkles, ExternalLink } from 'lucide-react';
 import { parseAllScorecardImagesAction, type ImageInput } from '@/lib/actions/parse-scorecard-action';
 import { saveScorecardAction, checkDuplicateScorecardAction } from '@/lib/actions/scorecard-actions';
 import { parseCricClubsUrl } from '@/lib/utils/cricclubs-utils';
@@ -221,32 +221,41 @@ export function ScorecardImportForm() {
               {linkedGameId && (
                 <div className="flex items-center gap-2 text-xs text-primary bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
                   <Table className="h-3.5 w-3.5 shrink-0" />
-                  Pre-filled from game details. Review and adjust if needed.
+                  Pre-filled from game details. URL, teams and date are locked.
                 </div>
               )}
               <div className="space-y-2">
                 <Label>CricClubs URL <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                <Input placeholder="https://cricclubs.com/SCCAY/viewScorecard.do?matchId=99&clubId=5273" value={url} onChange={e => setUrl(e.target.value)} />
-                {parseCricClubsUrl(url).valid && (
-                  <p className="text-xs text-green-600 flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" /> League: {parseCricClubsUrl(url).league} · Match: {parseCricClubsUrl(url).matchId}
-                  </p>
+                {linkedGameId && url ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 border rounded-md px-3 py-2 break-all">
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="text-primary">{url}</span>
+                  </div>
+                ) : (
+                  <>
+                    <Input placeholder="https://cricclubs.com/SCCAY/viewScorecard.do?matchId=99&clubId=5273" value={url} onChange={e => setUrl(e.target.value)} />
+                    {parseCricClubsUrl(url).valid && (
+                      <p className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" /> League: {parseCricClubsUrl(url).league} · Match: {parseCricClubsUrl(url).matchId}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Team 1 <span className="text-destructive">*</span></Label>
-                  <Input placeholder="e.g. SCCAY" value={team1} onChange={e => setTeam1(e.target.value)} />
+                  <Input placeholder="e.g. SCCAY" value={team1} onChange={e => setTeam1(e.target.value)} readOnly={!!linkedGameId} className={linkedGameId ? 'bg-muted/40 text-muted-foreground' : ''} />
                 </div>
                 <div className="space-y-2">
                   <Label>Team 2 <span className="text-destructive">*</span></Label>
-                  <Input placeholder="e.g. WYCA" value={team2} onChange={e => setTeam2(e.target.value)} />
+                  <Input placeholder="e.g. WYCA" value={team2} onChange={e => setTeam2(e.target.value)} readOnly={!!linkedGameId} className={linkedGameId ? 'bg-muted/40 text-muted-foreground' : ''} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Match Date <span className="text-destructive">*</span></Label>
-                  <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                  <Input type="date" value={date} onChange={e => setDate(e.target.value)} readOnly={!!linkedGameId} className={linkedGameId ? 'bg-muted/40 text-muted-foreground' : ''} />
                 </div>
                 <div className="space-y-2">
                   <Label>Venue</Label>
@@ -258,49 +267,60 @@ export function ScorecardImportForm() {
                 <Input placeholder="e.g. WYCA won by 4 wickets" value={result} onChange={e => setResult(e.target.value)} />
               </div>
 
-              {/* Series picker */}
+              {/* Series picker — locked if coming from game */}
               {availableSeries.length > 0 && (
                 <div className="space-y-3 border rounded-lg p-3 bg-muted/20">
-                  <p className="text-sm font-medium">Link to Series <span className="text-muted-foreground text-xs">(optional — required for AI Selection)</span></p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Year</Label>
-                      <Select value={selectedYear} onValueChange={v => {
-                        setSelectedYear(v);
-                        // Only reset series if it doesn't belong to the new year
-                        const currentSeries = availableSeries.find(s => s.id === seriesId);
-                        if (currentSeries && currentSeries.year.toString() !== v) {
-                          setSeriesId(''); setSeriesName('');
-                        }
-                      }}>
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue placeholder="Year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                  <p className="text-sm font-medium">
+                    Link to Series
+                    {!linkedGameId && <span className="text-muted-foreground text-xs ml-1">(optional — required for AI Selection)</span>}
+                  </p>
+                  {linkedGameId ? (
+                    <div className="flex items-center gap-2">
+                      {seriesName
+                        ? <p className="text-xs text-green-600">✓ Linked to series: <span className="font-medium">{seriesName}</span></p>
+                        : <p className="text-xs text-muted-foreground">No series linked to this game.</p>
+                      }
                     </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Series</Label>
-                      <Select value={seriesId || 'none'} onValueChange={v => {
-                        const val = v === 'none' ? '' : v;
-                        setSeriesId(val);
-                        setSeriesName(availableSeries.find(s => s.id === val)?.name || '');
-                      }}>
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue placeholder="Select series" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {availableSeries.filter(s => !selectedYear || s.year.toString() === selectedYear).map(s => (
-                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Year</Label>
+                        <Select value={selectedYear} onValueChange={v => {
+                          setSelectedYear(v);
+                          const currentSeries = availableSeries.find(s => s.id === seriesId);
+                          if (currentSeries && currentSeries.year.toString() !== v) {
+                            setSeriesId(''); setSeriesName('');
+                          }
+                        }}>
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue placeholder="Year" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Series</Label>
+                        <Select value={seriesId || 'none'} onValueChange={v => {
+                          const val = v === 'none' ? '' : v;
+                          setSeriesId(val);
+                          setSeriesName(availableSeries.find(s => s.id === val)?.name || '');
+                        }}>
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue placeholder="Select series" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {availableSeries.filter(s => !selectedYear || s.year.toString() === selectedYear).map(s => (
+                              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
-                  {seriesName && <p className="text-xs text-green-600">✓ Will be linked to: {seriesName}</p>}
+                  )}
+                  {!linkedGameId && seriesName && <p className="text-xs text-green-600">✓ Will be linked to: {seriesName}</p>}
                 </div>
               )}
               <Button onClick={() => setStep('uploads')} disabled={!team1.trim() || !team2.trim() || !date} className="w-full">
