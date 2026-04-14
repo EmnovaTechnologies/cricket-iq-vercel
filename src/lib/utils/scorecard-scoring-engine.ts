@@ -30,6 +30,7 @@ export function calculatePlayerScores(
     const bowlingTeam = battingTeam === team1 ? team2 : team1;
 
     for (const b of inn.batting) playerTeamMap.set(b.name, battingTeam);
+    for (const name of (inn.didNotBat || [])) { if (name) playerTeamMap.set(name, battingTeam); }
     for (const b of inn.bowling) {
       if (!playerTeamMap.has(b.name)) playerTeamMap.set(b.name, bowlingTeam);
     }
