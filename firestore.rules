@@ -116,6 +116,30 @@ service cloud.firestore {
       allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
     }
 
+    match /matchScorecards/{docId} {
+      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
+      allow list: if isSignedIn();
+      allow write: if false; // Admin SDK only
+    }
+    match /scorecardPlayers/{docId} {
+      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
+      allow list: if isSignedIn();
+      allow write: if false; // Admin SDK only
+    }
+
+    match /scorecardScoringConfig/{docId} {
+      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
+      allow list: if isSignedIn();
+      allow write: if false; // Admin SDK only
+    }
+
+    match /matchReports/{docId} {
+      // Assigned selectors and org members can read reports for their org
+      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
+      allow list: if isSignedIn();
+      allow write: if false; // Admin SDK only
+    }
+
     // Default deny all access to other paths.
     match /{document=**} {
       allow read, write: if false;
