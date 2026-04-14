@@ -57,7 +57,7 @@ function buildNameMap(
  * Falls back to the abbreviated name if no match found.
  */
 function resolveName(raw: string, nameMap: Map<string, string>): string {
-  const cleaned = raw.trim().replace(/^\†/, '');
+  const cleaned = raw.trim().replace(/^[†+✝]/, '');
   const key = cleaned.toLowerCase();
 
   // Direct match
@@ -120,16 +120,16 @@ export function deriveFieldingStats(
 
     if (!raw || lower === 'not out' || lower === 'absent' || lower === 'retired hurt' || lower === 'hit wicket') continue;
 
-    // Keeper catch: "c †Name b ..."
-    const keeperCatchMatch = raw.match(/^c\s+†([^b]+?)\s+b\s+/i);
+    // Keeper catch: "c †Name b ..." or "c +Name b ..." (some encode † as +)
+    const keeperCatchMatch = raw.match(/^c\s+[†+✝]([^b]+?)\s+b\s+/i);
     if (keeperCatchMatch) { getOrCreate(keeperCatchMatch[1].trim()).keeperCatches++; continue; }
 
-    // Regular catch: "c Name b ..."
-    const catchMatch = raw.match(/^c\s+(?!†)(.+?)\s+b\s+/i);
+    // Regular catch: "c Name b ..." (not preceded by dagger)
+    const catchMatch = raw.match(/^c\s+(?![†+✝])(.+?)\s+b\s+/i);
     if (catchMatch) { getOrCreate(catchMatch[1].trim()).catches++; continue; }
 
     // Stumping: "st †?Name b ..."
-    const stumpMatch = raw.match(/^st\s+†?(.+?)\s+b\s+/i);
+    const stumpMatch = raw.match(/^st\s+[†+✝]?(.+?)\s+b\s+/i);
     if (stumpMatch) { getOrCreate(stumpMatch[1].trim()).stumpings++; continue; }
 
     // Run out: "run out (Name)" or "run out (Name1/Name2)"

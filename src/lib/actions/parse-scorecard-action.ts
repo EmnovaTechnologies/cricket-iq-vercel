@@ -103,7 +103,7 @@ CRITICAL RULES:
    - Use full player names from the Name column of batting/bowling tables
    - In dismissal text, ALWAYS expand abbreviated names to full names by cross-referencing ALL visible player name columns across ALL images
    - Example: "c Dhruva S b Nihaar G" → look up "Dhruva S" and "Nihaar G" in all batting/bowling tables across all images → expand to "c Dhruva Sharma b Nihaar Gaikwad"
-   - The keeper dagger symbol † must be preserved: "c †Vihaan Bannur b Ahnay Gupta"
+   - The wicket keeper dagger symbol † MUST be preserved exactly as-is before the keeper's name. This is critical for identifying the wicket keeper. Example: "c †Nihaar Gaikwad b Varun Thomas" — the † must appear before Nihaar Gaikwad's name. Never remove or replace the † symbol.
    - For run outs expand all names: "run out (Mikael Qazi/Jeyadev Kumar)"
    - NEVER leave abbreviated names in dismissals if the full name appears anywhere in any of the provided images
 

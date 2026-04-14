@@ -99,11 +99,31 @@ export function aggregatePlayerStats(
  */
 export function classifyPlayers(
   players: AggregatedPlayerStats[],
-  minBowlerOversPerGame: number = 2
+  minBowlerOversPerGame: number = 2,
+  scorecards: MatchScorecard[] = []
 ) {
+  // Build keeper name set from dismissal text across all scorecards
+  // This catches cases where keeper was identified in dismissals but fielding wasn't stored correctly
+  const keeperNames = new Set<string>();
+  for (const sc of scorecards) {
+    for (const inn of (sc.innings || [])) {
+      for (const b of (inn.batting || [])) {
+        const d = b.dismissal || '';
+        // Match "c †Name b ..." or "st †?Name b ..."
+        const keeperMatch = d.match(/^(?:c|st)\s+[†+✝]([^b]+?)\s+b\s+/i);
+        if (keeperMatch) keeperNames.add(keeperMatch[1].trim().toLowerCase());
+        const stumpMatch = d.match(/^st\s+(?![†+✝])(.+?)\s+b\s+/i);
+        if (stumpMatch) keeperNames.add(stumpMatch[1].trim().toLowerCase());
+      }
+    }
+  }
+
   return players.map(p => {
     const avgOvers = p.totalOvers / p.gamesPlayed;
-    const isKeeper = p.totalStumpings > 0 || p.totalKeeperCatches > 0;
+    const isKeeperByFielding = p.totalStumpings > 0 || p.totalKeeperCatches > 0;
+    const isKeeperByDismissal = keeperNames.has(p.name.toLowerCase()) ||
+      Array.from(keeperNames).some(k => p.name.toLowerCase().includes(k) || k.includes(p.name.toLowerCase().split(' ')[0]));
+    const isKeeper = isKeeperByFielding || isKeeperByDismissal;
     const isBowler = avgOvers >= minBowlerOversPerGame;
     const isBatter = p.totalRuns > 0 || p.totalBalls > 0;
     const isAllRounder = isBatter && isBowler;

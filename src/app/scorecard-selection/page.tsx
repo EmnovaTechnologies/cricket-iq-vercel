@@ -194,7 +194,7 @@ export default function ScorecardSelectionPage() {
       setScorecards(res.scorecards);
       const effectiveConfig = config || { ...DEFAULT_SCORING_CONFIG, organizationId: activeOrganizationId };
       const stats = aggregatePlayerStats(res.scorecards, effectiveConfig);
-      setAggregated(classifyPlayers(stats, constraints.minBowlerOversPerGame));
+      setAggregated(classifyPlayers(stats, constraints.minBowlerOversPerGame, res.scorecards));
     } else {
       setScorecards([]);
       setAggregated([]);
