@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle, ArrowRight, ArrowLeft, ImageIcon, Info, Table, X, Sparkles, ExternalLink } from 'lucide-react';
+import { Loader2, CheckCircle, ArrowRight, ArrowLeft, ImageIcon, Info, Table, X, Sparkles, ExternalLink, HelpCircle } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { parseAllScorecardImagesAction, type ImageInput } from '@/lib/actions/parse-scorecard-action';
 import { saveScorecardAction, checkDuplicateScorecardAction } from '@/lib/actions/scorecard-actions';
 import { parseCricClubsUrl } from '@/lib/utils/cricclubs-utils';
@@ -340,7 +341,7 @@ export function ScorecardImportForm() {
           {/* ── Step: Uploads ─────────────────────────────────────────── */}
           {step === 'uploads' && (
             <div className="space-y-6">
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <Alert className="border-blue-200 bg-blue-50">
                   <Info className="h-4 w-4 text-blue-600" />
                   <AlertTitle className="text-blue-700">How to capture screenshots</AlertTitle>
@@ -352,22 +353,35 @@ export function ScorecardImportForm() {
                   </AlertDescription>
                 </Alert>
 
-                {/* Sample images help */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sample: Batting</p>
-                    <div className="border rounded-lg overflow-hidden bg-muted/20">
-                      <img src="/images/sample-batting.png" alt="Sample batting scorecard" className="w-full object-contain max-h-40"
-                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sample: Bowling</p>
-                    <div className="border rounded-lg overflow-hidden bg-muted/20">
-                      <img src="/images/sample-bowling.png" alt="Sample bowling scorecard" className="w-full object-contain max-h-40"
-                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    </div>
-                  </div>
+                {/* Sample image popovers */}
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>Not sure what to screenshot?</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center gap-1 text-primary hover:underline text-xs">
+                        <HelpCircle className="h-3.5 w-3.5" /> Batting sample
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" className="w-72 p-2">
+                      <p className="text-xs font-medium text-muted-foreground mb-1.5">Sample batting screenshot</p>
+                      <img src="/images/sample-batting.png" alt="Sample batting scorecard"
+                        className="w-full rounded border object-contain"
+                        onError={e => { (e.target as HTMLImageElement).parentElement!.innerHTML = '<p class="text-xs text-muted-foreground p-2">Add public/images/sample-batting.png</p>'; }} />
+                    </PopoverContent>
+                  </Popover>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center gap-1 text-primary hover:underline text-xs">
+                        <HelpCircle className="h-3.5 w-3.5" /> Bowling sample
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" className="w-72 p-2">
+                      <p className="text-xs font-medium text-muted-foreground mb-1.5">Sample bowling screenshot</p>
+                      <img src="/images/sample-bowling.png" alt="Sample bowling scorecard"
+                        className="w-full rounded border object-contain"
+                        onError={e => { (e.target as HTMLImageElement).parentElement!.innerHTML = '<p class="text-xs text-muted-foreground p-2">Add public/images/sample-bowling.png</p>'; }} />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
 
