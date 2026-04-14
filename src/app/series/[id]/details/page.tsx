@@ -58,7 +58,7 @@ export default function SeriesDetailsPage() {
   const seriesId = params.id;
   const { toast } = useToast();
   const router = useRouter();
-  const { userProfile: currentAuthProfile, effectivePermissions, isPermissionsLoading } = useAuth();
+  const { userProfile: currentAuthProfile, effectivePermissions, isPermissionsLoading, activeOrganizationId } = useAuth();
 
   const [series, setSeries] = useState<Series | undefined>(undefined);
   const [canDelete, setCanDelete] = useState<boolean | null>(null);
