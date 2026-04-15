@@ -290,7 +290,7 @@ export function ScorecardImportForm() {
                 <div className="space-y-3 border rounded-lg p-3 bg-muted/20">
                   <p className="text-sm font-medium">
                     Link to Series
-                    {!linkedGameId && <span className="text-muted-foreground text-xs ml-1">(optional — required for AI Selection)</span>}
+                    {!linkedGameId && <span className="text-destructive text-xs ml-1">*</span>}
                   </p>
                   {linkedGameId ? (
                     <div className="flex items-center gap-2">
@@ -341,9 +341,12 @@ export function ScorecardImportForm() {
                   {!linkedGameId && seriesName && <p className="text-xs text-green-600">✓ Will be linked to: {seriesName}</p>}
                 </div>
               )}
-              <Button onClick={() => setStep('uploads')} disabled={!team1.trim() || !team2.trim() || !date} className="w-full">
+              <Button onClick={() => setStep('uploads')} disabled={!team1.trim() || !team2.trim() || !date || (!linkedGameId && !seriesId)} className="w-full">
                 Next: Upload Screenshots <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
+              {!linkedGameId && !seriesId && (
+                <p className="text-xs text-center text-muted-foreground">Select a series to continue.</p>
+              )}
             </div>
           )}
 
