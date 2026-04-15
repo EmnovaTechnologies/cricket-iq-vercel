@@ -131,12 +131,34 @@ function SuggestedXIDisplay({ result }: { result: SelectionResult }) {
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">{player.reason}</p>
-            <div className="flex flex-wrap gap-1.5 pt-1 border-t">
-              <span className="text-xs text-primary font-medium">{player.stats.totalScore} pts</span>
-              <span className="text-xs text-muted-foreground">({player.stats.gamesPlayed} games)</span>
-              {player.stats.totalRuns ? <span className="text-xs text-blue-600">{player.stats.totalRuns}r</span> : null}
-              {player.stats.totalWickets ? <span className="text-xs text-green-600">{player.stats.totalWickets}w</span> : null}
-              {player.stats.totalCatches ? <span className="text-xs text-purple-600">{player.stats.totalCatches}ct</span> : null}
+            <div className="pt-1 border-t space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-primary">{player.stats.totalScore} pts</span>
+                <span className="text-xs text-muted-foreground">{player.stats.gamesPlayed} game{player.stats.gamesPlayed !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {player.stats.totalRuns > 0 && (
+                  <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-1.5 py-0.5">
+                    🏏 {player.stats.totalRuns}r
+                  </span>
+                )}
+                {player.stats.totalWickets > 0 && (
+                  <span className="text-xs bg-green-50 text-green-700 border border-green-200 rounded px-1.5 py-0.5">
+                    🎳 {player.stats.totalWickets}w
+                  </span>
+                )}
+                {player.stats.totalCatches > 0 && (
+                  <span className="text-xs bg-purple-50 text-purple-700 border border-purple-200 rounded px-1.5 py-0.5">
+                    🧤 {player.stats.totalCatches}ct
+                  </span>
+                )}
+                {(player.stats as any).coachMentions > 0 && (
+                  <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded px-1.5 py-0.5 font-medium"
+                    title="Mentioned by opposing coaches">
+                    👥 ×{(player.stats as any).coachMentions}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}
