@@ -84,15 +84,31 @@ export default function ScorecardsPage() {
     });
   }, [selectedSeries]);
 
+  // Years from all series in org (not just scorecards)
   const uniqueYears = useMemo(() => {
     const years = new Set<string>();
+    allSeries.forEach(s => { if (s.year) years.add(s.year.toString()); });
+    // Also include years from scorecards that may not have a series
     scorecards.forEach(sc => {
       if (sc.date) { try { years.add(parseISO(sc.date).getFullYear().toString()); } catch {} }
     });
     return Array.from(years).sort((a, b) => +b - +a);
-  }, [scorecards]);
+  }, [allSeries, scorecards]);
 
-  useEffect(() => { setSelectedSeries('all'); }, [selectedYear, activeOrganizationId]);
+  // Series filtered by selected year
+  const filteredSeriesOptions = useMemo(() => {
+    if (selectedYear === 'all') return allSeries;
+    return allSeries.filter(s => s.year.toString() === selectedYear);
+  }, [allSeries, selectedYear]);
+
+  useEffect(() => {
+    // Reset series only if it doesn't belong to the newly selected year
+    if (selectedYear === 'all') return;
+    const currentSeries = allSeries.find(s => s.id === selectedSeries);
+    if (currentSeries && currentSeries.year.toString() !== selectedYear) {
+      setSelectedSeries('all');
+    }
+  }, [selectedYear, activeOrganizationId]);
 
   const filteredScorecards = useMemo(() => {
     return scorecards.filter(sc => {
@@ -187,11 +203,11 @@ export default function ScorecardsPage() {
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Series</label>
                     <Select value={selectedSeries} onValueChange={setSelectedSeries}>
-                      <SelectTrigger><SelectValue placeholder="Select Series" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={filteredSeriesOptions.length === 0 ? 'No series for this year' : 'Select Series'} /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Series</SelectItem>
                         <SelectItem value="none">No Series</SelectItem>
-                        {allSeries.map(s => (
+                        {filteredSeriesOptions.map(s => (
                           <SelectItem key={s.id} value={s.id}>{s.name} ({s.year})</SelectItem>
                         ))}
                       </SelectContent>
