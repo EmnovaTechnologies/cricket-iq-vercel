@@ -171,6 +171,12 @@ export function ScorecardPerformanceTab({ innings, team1, team2, seriesId }: Per
                   <p>Byes × {effectiveConfig.fielding.byesMultiplier}</p>
                 </div>
               </div>
+              <div className="col-span-3 border-t pt-2 mt-1">
+                <p className="font-medium text-yellow-700 mb-1">Coach Top Rating</p>
+                <p className="text-xs text-muted-foreground">
+                  Per mention × {effectiveConfig.coachTopRatingPerMention ?? 15} (max 3 mentions = {((effectiveConfig.coachTopRatingPerMention ?? 15) * 3)} pts)
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>

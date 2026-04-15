@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { getAllSeriesFromDB } from '@/lib/db';
 import { getScorecardsBySeriesAction } from '@/lib/actions/scorecard-actions';
+import { getMatchReportsForSeriesAction } from '@/lib/actions/match-report-actions';
 import { getScoringConfigAction } from '@/lib/actions/scoring-config-actions';
 import { suggestXIFromScorecardAction, type SelectionResult } from '@/lib/actions/scorecard-selection-action';
 import { aggregatePlayerStats, classifyPlayers } from '@/lib/utils/scorecard-aggregation-engine';
@@ -37,7 +38,15 @@ function PlayerStatsRow({ player, rank }: { player: ReturnType<typeof classifyPl
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground w-5 text-right">{rank + 1}</span>
           <div>
-            <p className="font-medium text-sm">{player.name}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="font-medium text-sm">{player.name}</p>
+              {player.coachMentions > 0 && (
+                <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded px-1 py-0.5 font-medium"
+                  title={`Mentioned by opposing coaches ${player.coachMentions} time${player.coachMentions > 1 ? 's' : ''}`}>
+                  👥 ×{player.coachMentions}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">{player.team}</p>
           </div>
         </div>
@@ -49,6 +58,9 @@ function PlayerStatsRow({ player, rank }: { player: ReturnType<typeof classifyPl
       <td className="p-2.5 text-right text-green-600 text-sm">{player.totalWickets || '-'}</td>
       <td className="p-2.5 text-right text-purple-600 text-sm">
         {(player.totalCatches + player.totalRunOuts + player.totalStumpings + player.totalKeeperCatches) || '-'}
+      </td>
+      <td className="p-2.5 text-right text-yellow-600 text-sm font-medium">
+        {player.totalCoachTopRatingScore > 0 ? `+${player.totalCoachTopRatingScore}` : '-'}
       </td>
       <td className="p-2.5 text-center">
         <div className="flex gap-1 justify-center flex-wrap">
@@ -192,9 +204,11 @@ export default function ScorecardSelectionPage() {
     const res = await getScorecardsBySeriesAction(seriesId, activeOrganizationId);
     if (res.success && res.scorecards) {
       setScorecards(res.scorecards);
-      // Use series-level config if available, else org config
       const effectiveConfig = await getScoringConfigAction(activeOrganizationId, seriesId);
-      const stats = aggregatePlayerStats(res.scorecards, effectiveConfig);
+      // Fetch match reports for coach top rating scores
+      const reportsRes = await getMatchReportsForSeriesAction(seriesId, activeOrganizationId);
+      const matchReports = reportsRes.success ? (reportsRes.reports || []) : [];
+      const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports);
       setAggregated(classifyPlayers(stats, constraints.minBowlerOversPerGame, res.scorecards));
     } else {
       setScorecards([]);
@@ -374,6 +388,7 @@ export default function ScorecardSelectionPage() {
                               <th className="p-2.5 font-medium text-right text-blue-200">Runs</th>
                               <th className="p-2.5 font-medium text-right text-green-200">Wkts</th>
                               <th className="p-2.5 font-medium text-right text-purple-200">Field</th>
+                              <th className="p-2.5 font-medium text-right text-yellow-200">Coach</th>
                               <th className="p-2.5 font-medium text-center">Role</th>
                             </tr>
                           </thead>

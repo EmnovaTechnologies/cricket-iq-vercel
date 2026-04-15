@@ -518,6 +518,8 @@ export interface ScorecardScoringConfig {
     keeperCatchesMultiplier: number; // default 10
     byesMultiplier: number;        // default -2
   };
+  // Coach top rating
+  coachTopRatingPerMention: number;  // default 15, per mention (max 3 mentions)
 }
 
 export const DEFAULT_SCORING_CONFIG: Omit<ScorecardScoringConfig, 'id' | 'organizationId' | 'updatedAt'> = {
@@ -546,6 +548,7 @@ export const DEFAULT_SCORING_CONFIG: Omit<ScorecardScoringConfig, 'id' | 'organi
     keeperCatchesMultiplier: 10,
     byesMultiplier: -2,
   },
+  coachTopRatingPerMention: 15,
 };
 
 export interface PlayerScore {
@@ -589,6 +592,8 @@ export interface AggregatedPlayerStats {
   totalBattingScore: number;
   totalBowlingScore: number;
   totalFieldingScore: number;
+  totalCoachTopRatingScore: number;  // sum of coach top rating scores
+  coachMentions: number;             // raw mention count (for badge display)
   totalScore: number;
   avgScorePerGame: number;
 }

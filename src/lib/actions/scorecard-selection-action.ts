@@ -51,6 +51,8 @@ export async function suggestXIFromScorecardAction(
       totalRunOuts: p.totalRunOuts,
       totalStumpings: p.totalStumpings,
       totalKeeperCatches: p.totalKeeperCatches,
+      coachMentions: p.coachMentions || 0,
+      coachTopRatingScore: p.totalCoachTopRatingScore || 0,
       isBowler: (p.totalOvers / p.gamesPlayed) >= constraints.minBowlerOversPerGame,
       isKeeper: p.totalStumpings > 0 || p.totalKeeperCatches > 0,
     }));
@@ -69,15 +71,15 @@ SELECTION CONSTRAINTS:
 - Team size: ${constraints.teamSize} players
 - Minimum openers: ${constraints.minOpeners}
 - Minimum middle order batters: ${constraints.minMiddleOrder}
-- Must have wicket keeper: ${constraints.mustHaveKeeper}
+- Minimum wicket keepers: ${constraints.minWicketKeepers}
 - Minimum bowlers: ${constraints.minBowlers} (who bowl at least ${constraints.minBowlerOversPerGame} overs per game on average)
 - Minimum all-rounders: ${constraints.minAllRounders}
 
 SELECTION RULES:
-1. Prioritize players with higher totalScore across the series
+1. Prioritize players with higher totalScore across the series. Note that totalScore already includes coachTopRatingScore — players with coachMentions > 0 have been independently recognized by opposing coaches and should be given extra consideration when scores are close.
 2. Players with more gamesPlayed are more reliable — prefer them over one-game wonders unless the performance gap is significant
 3. Must satisfy all constraints above
-4. A player marked isKeeper=true should be selected as wicket keeper if mustHaveKeeper is true
+4. Select exactly ${constraints.minWicketKeepers} wicket keeper(s) — players marked isKeeper=true. If minWicketKeepers is 2, select the top 2 keepers by score.
 5. All-rounders (bat AND bowl) are valuable — they can count toward both batting and bowling quotas
 6. Captain should be the highest overall scorer who bats
 7. Vice captain should be the second best performer

@@ -1,14 +1,38 @@
-import type { MatchScorecard, AggregatedPlayerStats, ScorecardScoringConfig } from '@/types';
+import type { MatchScorecard, AggregatedPlayerStats, ScorecardScoringConfig, MatchReport } from '@/types';
 import { DEFAULT_SCORING_CONFIG } from '@/types';
 import { calculatePlayerScores } from './scorecard-scoring-engine';
 
+/** Fuzzy name match — returns true if names are likely the same player */
+function namesMatch(a: string, b: string): boolean {
+  const norm = (s: string) => s.toLowerCase().trim();
+  const na = norm(a), nb = norm(b);
+  if (na === nb) return true;
+  // Check if first word matches (Aarush Datla vs Aarush D)
+  const firstA = na.split(' ')[0], firstB = nb.split(' ')[0];
+  if (firstA === firstB && (na.includes(nb) || nb.includes(na))) return true;
+  return false;
+}
+
+/** Count how many times a player appears in top3 across all reports */
+function countCoachMentions(playerName: string, reports: MatchReport[]): number {
+  let count = 0;
+  for (const report of reports) {
+    for (const mention of report.top3Players) {
+      if (namesMatch(playerName, mention)) { count++; break; } // max 1 per report
+    }
+  }
+  return count;
+}
+
 /**
  * Aggregates player performance across all scorecards in a series.
+ * Optionally applies coachTopRatingScore from match reports.
  * Returns sorted list by totalScore descending.
  */
 export function aggregatePlayerStats(
   scorecards: MatchScorecard[],
-  config: ScorecardScoringConfig | typeof DEFAULT_SCORING_CONFIG
+  config: ScorecardScoringConfig | typeof DEFAULT_SCORING_CONFIG,
+  matchReports: MatchReport[] = []
 ): AggregatedPlayerStats[] {
   const playerMap = new Map<string, AggregatedPlayerStats>();
 
@@ -43,10 +67,12 @@ export function aggregatePlayerStats(
           totalRunOuts: s.fielding?.runOuts || 0,
           totalStumpings: s.fielding?.stumpings || 0,
           totalKeeperCatches: s.fielding?.keeperCatches || 0,
-          // Scores
+          // Scores (coach rating applied later)
           totalBattingScore: s.battingScore,
           totalBowlingScore: s.bowlingScore,
           totalFieldingScore: s.fieldingScore,
+          totalCoachTopRatingScore: 0,
+          coachMentions: 0,
           totalScore: s.totalScore,
           avgScorePerGame: s.totalScore,
         });
@@ -72,6 +98,16 @@ export function aggregatePlayerStats(
         existing.totalScore += s.totalScore;
       }
     }
+  }
+
+  // Apply coach top rating scores from match reports
+  const perMention = (config as ScorecardScoringConfig).coachTopRatingPerMention ?? 15;
+  for (const p of playerMap.values()) {
+    const mentions = countCoachMentions(p.name, matchReports);
+    const cappedMentions = Math.min(mentions, 3);
+    p.coachMentions = mentions;
+    p.totalCoachTopRatingScore = Math.round(cappedMentions * perMention * 10) / 10;
+    p.totalScore += p.totalCoachTopRatingScore;
   }
 
   // Compute derived averages

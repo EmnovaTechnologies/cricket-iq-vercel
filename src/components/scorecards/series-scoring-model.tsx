@@ -197,6 +197,34 @@ export function SeriesScoringModel({
         </div>
       </div>
 
+      {/* Coach Top Rating */}
+      <div className="border rounded-lg p-3 bg-muted/10 space-y-1">
+        <p className="text-xs font-semibold text-yellow-700 uppercase tracking-wide">Coach Top Rating</p>
+        <div className="flex items-center justify-between gap-4 py-1">
+          <div>
+            <p className="text-xs font-medium">Per Mention ×</p>
+            <p className="text-xs text-muted-foreground">Applied up to 3 times (max 45 pts)</p>
+          </div>
+          {(!canEdit || !useCustom) ? (
+            <span className="text-xs font-medium text-muted-foreground w-16 text-right">
+              {editConfig?.coachTopRatingPerMention ?? orgConfig?.coachTopRatingPerMention ?? 15}
+            </span>
+          ) : (
+            <Input
+              type="number" step="0.5"
+              className="h-7 w-16 text-xs text-right shrink-0"
+              value={editConfig?.coachTopRatingPerMention ?? 15}
+              onChange={e => setEditConfig(prev => prev ? ({
+                ...prev,
+                coachTopRatingPerMention: parseFloat(e.target.value) || 0
+              }) : prev)}
+            />
+          )}
+        </div>
+      </div>
+        </div>
+      </div>
+
       {canEdit && useCustom && (
         <Button onClick={handleSave} disabled={isSaving} size="sm">
           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
