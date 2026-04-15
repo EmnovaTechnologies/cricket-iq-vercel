@@ -17,10 +17,11 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import { ArrowLeft, Loader2, ShieldAlert, Table, CalendarFold, MapPin, ExternalLink, Trash2, FileText } from 'lucide-react';
+import { ArrowLeft, Loader2, ShieldAlert, Table, CalendarFold, MapPin, ExternalLink, Trash2, FileText, QrCode } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
+import { QRCodeSVG } from 'qrcode.react';
 
 function InningsView({ innings }: { innings: ScorecardInnings }) {
   return (
@@ -173,6 +174,7 @@ export default function ScorecardDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showQrDialog, setShowQrDialog] = useState(false);
 
   const handleDelete = async () => {
     if (!scorecard || !activeOrganizationId) return;
@@ -238,6 +240,66 @@ export default function ScorecardDetailsPage() {
               </a>
             </Button>
           )}
+          {/* ── Mobile QR for Match Report ── */}
+          <Button variant="outline" size="sm" onClick={() => setShowQrDialog(true)}>
+            <QrCode className="mr-2 h-4 w-4" /> Match Report QR
+          </Button>
+          <Dialog open={showQrDialog} onOpenChange={setShowQrDialog}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <QrCode className="h-5 w-5 text-primary" /> Mobile Match Report Link
+                </DialogTitle>
+                <DialogDescription>
+                  This QR code is tied to your account. Only your phone number can unlock it.
+                </DialogDescription>
+              </DialogHeader>
+              {!userProfile?.phoneNumber ? (
+                <div className="py-4 space-y-3 text-center">
+                  <div className="text-4xl">📵</div>
+                  <p className="font-semibold text-sm">No phone number on your profile</p>
+                  <p className="text-xs text-muted-foreground">
+                    Add your phone number to your profile before using the mobile match report link.
+                    This ensures only you can access your link.
+                  </p>
+                  <Button asChild variant="default" size="sm" className="w-full" onClick={() => setShowQrDialog(false)}>
+                    <a href="/profile">Go to Profile → Add Phone Number</a>
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-4 py-4">
+                  <div className="p-4 bg-white rounded-xl border shadow-sm">
+                    <QRCodeSVG
+                      value={`${typeof window !== 'undefined' ? window.location.origin : 'https://cricket-iq-hub.vercel.app'}/match-report/${scorecard.id}?uid=${currentUser?.uid || ''}`}
+                      size={220}
+                      level="M"
+                      includeMargin={false}
+                    />
+                  </div>
+                  <div className="w-full space-y-1">
+                    <p className="text-xs text-muted-foreground text-center break-all">
+                      Linked to: <span className="font-medium text-foreground">{userProfile.phoneNumber}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Only this phone number can access this link
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => {
+                      const url = `${window.location.origin}/match-report/${scorecard.id}?uid=${currentUser?.uid || ''}`;
+                      navigator.clipboard.writeText(url);
+                      toast({ title: 'Link copied!', description: 'Share this link only with the assigned selector.' });
+                    }}
+                  >
+                    Copy Link
+                  </Button>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
           <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10">
