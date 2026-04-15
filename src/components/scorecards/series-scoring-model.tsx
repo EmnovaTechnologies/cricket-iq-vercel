@@ -222,8 +222,6 @@ export function SeriesScoringModel({
           )}
         </div>
       </div>
-        </div>
-      </div>
 
       {canEdit && useCustom && (
         <Button onClick={handleSave} disabled={isSaving} size="sm">

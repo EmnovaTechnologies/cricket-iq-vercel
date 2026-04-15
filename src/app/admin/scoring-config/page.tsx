@@ -197,27 +197,29 @@ export default function ScoringConfigPage() {
               {field('fielding', 'byesMultiplier', 'Byes ×', 'Use negative')}
             </CardContent>
           </Card>
-          {/* Coach Top Rating */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base text-yellow-700">Coach Top Rating</CardTitle>
-              <CardDescription className="text-xs">Points per mention in opposing coach's Top 3 (max 3 mentions)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between gap-4 py-2">
-                <div>
-                  <p className="text-sm font-medium">Per Mention ×</p>
-                  <p className="text-xs text-muted-foreground">Applied up to 3 times per player</p>
-                </div>
-                <Input
-                  type="number" step="0.5"
-                  className="h-8 w-20 text-sm text-right shrink-0"
-                  value={config?.coachTopRatingPerMention ?? 15}
-                  onChange={e => setConfig(prev => prev ? ({ ...prev, coachTopRatingPerMention: num(e.target.value) }) : prev)}
-                />
+        </div>
+
+        {/* Coach Top Rating */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-yellow-700">Coach Top Rating</CardTitle>
+            <CardDescription className="text-xs">Points per mention in opposing coach's Top 3 (max 3 mentions)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4 py-2">
+              <div>
+                <p className="text-sm font-medium">Per Mention ×</p>
+                <p className="text-xs text-muted-foreground">Applied up to 3 times per player</p>
               </div>
-            </CardContent>
-          </Card>
+              <Input
+                type="number" step="0.5"
+                className="h-8 w-20 text-sm text-right shrink-0"
+                value={config?.coachTopRatingPerMention ?? 15}
+                onChange={e => setConfig(prev => prev ? ({ ...prev, coachTopRatingPerMention: num(e.target.value) }) : prev)}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
       {config && (
         <div className="flex gap-3 justify-end">
