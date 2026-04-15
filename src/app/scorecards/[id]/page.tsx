@@ -319,7 +319,7 @@ export default function ScorecardDetailsPage() {
             <InningsView innings={scorecard.innings[0]} />
           </TabsContent>
           <TabsContent value="performance" className="mt-4">
-            <ScorecardPerformanceTab innings={scorecard.innings} team1={scorecard.team1} team2={scorecard.team2} seriesId={scorecard.seriesId} />
+            <ScorecardPerformanceTab innings={scorecard.innings} team1={scorecard.team1} team2={scorecard.team2} seriesId={scorecard.seriesId} gameId={scorecard.linkedGameId} scorecardId={scorecard.id} />
           </TabsContent>
           <TabsContent value="report" className="mt-4">
             <MatchReportTab
@@ -331,6 +331,7 @@ export default function ScorecardDetailsPage() {
               team2={scorecard.team2}
               playersByTeam={buildPlayersByTeam(scorecard)}
               isAssignedSelector={false}
+              scorecardMode={true}
             />
           </TabsContent>
         </Tabs>
@@ -353,7 +354,7 @@ export default function ScorecardDetailsPage() {
             </TabsContent>
           ))}
           <TabsContent value="performance" className="mt-4">
-            <ScorecardPerformanceTab innings={scorecard.innings} team1={scorecard.team1} team2={scorecard.team2} seriesId={scorecard.seriesId} />
+            <ScorecardPerformanceTab innings={scorecard.innings} team1={scorecard.team1} team2={scorecard.team2} seriesId={scorecard.seriesId} gameId={scorecard.linkedGameId} scorecardId={scorecard.id} />
           </TabsContent>
           <TabsContent value="report" className="mt-4">
             <MatchReportTab
@@ -365,6 +366,7 @@ export default function ScorecardDetailsPage() {
               team2={scorecard.team2}
               playersByTeam={buildPlayersByTeam(scorecard)}
               isAssignedSelector={false}
+              scorecardMode={true}
             />
           </TabsContent>
         </Tabs>

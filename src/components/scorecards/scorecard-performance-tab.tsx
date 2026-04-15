@@ -9,8 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Trophy, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { getScoringConfigAction } from '@/lib/actions/scoring-config-actions';
+import { getMatchReportsForGameAction } from '@/lib/actions/match-report-actions';
 import { calculatePlayerScores, getTopPlayers, getTopPlayersByTeam } from '@/lib/utils/scorecard-scoring-engine';
-import type { ScorecardInnings, ScorecardScoringConfig, PlayerScore } from '@/types';
+import type { ScorecardInnings, ScorecardScoringConfig, PlayerScore, MatchReport } from '@/types';
 import { DEFAULT_SCORING_CONFIG } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +20,8 @@ interface PerformanceTabProps {
   team1: string;
   team2: string;
   seriesId?: string;
+  gameId?: string;
+  scorecardId?: string;
 }
 
 // ─── Medal colors ─────────────────────────────────────────────────────────────
@@ -83,12 +86,13 @@ function TopThreeSection({ title, players, scoreType = 'total' }: { title: strin
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function ScorecardPerformanceTab({ innings, team1, team2, seriesId }: PerformanceTabProps) {
+export function ScorecardPerformanceTab({ innings, team1, team2, seriesId, gameId, scorecardId }: PerformanceTabProps) {
   const { activeOrganizationId } = useAuth();
 
   const [config, setConfig] = useState<ScorecardScoringConfig | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [showFormula, setShowFormula] = useState(false);
+  const [coachMentionedPlayers, setCoachMentionedPlayers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!activeOrganizationId) return;
@@ -97,6 +101,22 @@ export function ScorecardPerformanceTab({ innings, team1, team2, seriesId }: Per
       setIsLoadingConfig(false);
     });
   }, [activeOrganizationId, seriesId]);
+
+  // Fetch match reports for this game to show coach mention badges
+  useEffect(() => {
+    const gid = gameId || scorecardId;
+    if (!gid) return;
+    getMatchReportsForGameAction(gid).then(res => {
+      if (!res.success || !res.reports?.length) return;
+      const mentioned = new Set<string>();
+      for (const report of res.reports) {
+        for (const name of report.top3Players) {
+          if (name.trim()) mentioned.add(name.trim().toLowerCase());
+        }
+      }
+      setCoachMentionedPlayers(mentioned);
+    });
+  }, [gameId, scorecardId]);
 
   if (isLoadingConfig) {
     return <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -110,6 +130,14 @@ export function ScorecardPerformanceTab({ innings, team1, team2, seriesId }: Per
 
   const top = getTopPlayers(scores);
   const byTeam = getTopPlayersByTeam(scores, teams);
+
+  const isCoachMentioned = (name: string) => {
+    const n = name.toLowerCase();
+    for (const m of coachMentionedPlayers) {
+      if (n === m || n.startsWith(m.split(' ')[0]) || m.startsWith(n.split(' ')[0])) return true;
+    }
+    return false;
+  };
 
   return (
     <div className="space-y-6">
@@ -215,7 +243,17 @@ export function ScorecardPerformanceTab({ innings, team1, team2, seriesId }: Per
                 <tbody>
                   {scores.map((p, i) => (
                     <tr key={i} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
-                      <td className="p-2.5 font-medium">{p.name}</td>
+                      <td className="p-2.5 font-medium">
+                        <div className="flex items-center gap-1.5">
+                          {p.name}
+                          {isCoachMentioned(p.name) && (
+                            <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded px-1 py-0.5 font-medium"
+                              title="Mentioned by opposing coach in Top 3">
+                              👥
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="p-2.5 text-center text-muted-foreground text-xs">{p.team}</td>
                       <td className="p-2.5 text-right text-blue-600">{p.battingScore || '-'}</td>
                       <td className="p-2.5 text-right text-green-600">{p.bowlingScore || '-'}</td>
