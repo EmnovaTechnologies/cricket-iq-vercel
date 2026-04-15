@@ -98,7 +98,7 @@ const Navbar = () => {
     { href: '/team-composition', label: 'Team AI', icon: <Target className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAM_COMPOSITION },
     { href: '/export', label: 'Export', icon: <Download className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_EXPORT },
     { href: '/scorecards', label: 'Scorecards', icon: <Table className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SCORECARDS },
-    { href: '/scorecard-selection', label: 'SC Select', icon: <ClipboardCheck className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SCORECARDS },
+    { href: '/scorecard-selection', label: 'XI Selector', icon: <ClipboardCheck className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SCORECARDS },
   ];
 
   const loggedInUserLinks = [

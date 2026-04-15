@@ -462,3 +462,41 @@ export async function saveAITeamToSeriesAction(seriesId: string, suggestedTeam: 
     return { success: false, error: message };
   }
 }
+
+export async function saveScorecardXIAction(
+  seriesId: string,
+  result: any,
+  savedBy: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+    const { db } = await import('@/lib/firebase');
+    const seriesRef = doc(db, 'series', seriesId);
+    await updateDoc(seriesRef, {
+      savedScorecardXI: result,
+      savedScorecardXIAt: serverTimestamp(),
+      savedScorecardXIBy: savedBy,
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function clearScorecardXIAction(
+  seriesId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { doc, updateDoc, deleteField } = await import('firebase/firestore');
+    const { db } = await import('@/lib/firebase');
+    const seriesRef = doc(db, 'series', seriesId);
+    await updateDoc(seriesRef, {
+      savedScorecardXI: deleteField(),
+      savedScorecardXIAt: deleteField(),
+      savedScorecardXIBy: deleteField(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}

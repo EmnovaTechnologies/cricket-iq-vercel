@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { getAllSeriesFromDB } from '@/lib/db';
 import { getScorecardsBySeriesAction } from '@/lib/actions/scorecard-actions';
-import { getMatchReportsForSeriesAction } from '@/lib/actions/match-report-actions';
+import { saveScorecardXIAction, clearScorecardXIAction } from '@/lib/actions/series-actions';
 import { getScoringConfigAction } from '@/lib/actions/scoring-config-actions';
 import { suggestXIFromScorecardAction, type SelectionResult } from '@/lib/actions/scorecard-selection-action';
 import { aggregatePlayerStats, classifyPlayers } from '@/lib/utils/scorecard-aggregation-engine';
@@ -25,7 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import {
   Loader2, Sparkles, Users, Trophy, Info, Table,
-  TrendingUp, Star, Shield, Target
+  TrendingUp, Star, Shield, Target, Save, RotateCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -170,7 +170,7 @@ function SuggestedXIDisplay({ result }: { result: SelectionResult }) {
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function ScorecardSelectionPage() {
-  const { activeOrganizationId, loading: authLoading } = useAuth();
+  const { activeOrganizationId, loading: authLoading, currentUser, effectivePermissions } = useAuth();
   const { toast } = useToast();
 
   const [allSeries, setAllSeries] = useState<Series[]>([]);
@@ -185,6 +185,8 @@ export default function ScorecardSelectionPage() {
 
   const [constraints, setConstraints] = useState<ScorecardSelectionConstraints>(DEFAULT_SELECTION_CONSTRAINTS);
   const [selectionResult, setSelectionResult] = useState<SelectionResult | null>(null);
+  const [savedXI, setSavedXI] = useState<SelectionResult | null>(null);
+  const [isSavingXI, setIsSavingXI] = useState(false);
 
   const [isLoadingSeries, setIsLoadingSeries] = useState(true);
   const [isLoadingScorecards, setIsLoadingScorecards] = useState(false);
@@ -217,9 +219,15 @@ export default function ScorecardSelectionPage() {
   const handleSeriesSelect = useCallback(async (seriesId: string) => {
     setSelectedSeriesId(seriesId);
     setSelectionResult(null);
+    setSavedXI(null);
     setAggregated([]);
     const series = allSeries.find(s => s.id === seriesId) || null;
     setSelectedSeries(series);
+
+    // Load saved XI if exists
+    if ((series as any)?.savedScorecardXI) {
+      setSavedXI((series as any).savedScorecardXI);
+    }
 
     if (!seriesId || !activeOrganizationId) return;
     setIsLoadingScorecards(true);
@@ -240,7 +248,25 @@ export default function ScorecardSelectionPage() {
     setIsLoadingScorecards(false);
   }, [allSeries, activeOrganizationId, config, constraints.minBowlerOversPerGame, toast]);
 
-  const handleGenerateXI = async () => {
+  const handleSaveXI = async () => {
+    if (!selectionResult || !selectedSeriesId || !currentUser?.uid) return;
+    setIsSavingXI(true);
+    const res = await saveScorecardXIAction(selectedSeriesId, selectionResult, currentUser.uid);
+    if (res.success) {
+      setSavedXI(selectionResult);
+      toast({ title: 'XI Saved', description: 'This XI has been saved for this series.' });
+    } else {
+      toast({ title: 'Save failed', description: res.error, variant: 'destructive' });
+    }
+    setIsSavingXI(false);
+  };
+
+  const handleRegenerateXI = async () => {
+    if (!selectedSeriesId) return;
+    await clearScorecardXIAction(selectedSeriesId);
+    setSavedXI(null);
+    setSelectionResult(null);
+  };
     if (!aggregated.length || !selectedSeries) return;
     setIsGenerating(true);
     setSelectionResult(null);
@@ -379,14 +405,15 @@ export default function ScorecardSelectionPage() {
             )}
 
             {!isLoadingScorecards && aggregated.length > 0 && (
-              <Tabs defaultValue={selectionResult ? 'xi' : 'players'}>
+              <Tabs defaultValue={(selectionResult || savedXI) ? 'xi' : 'players'}>
                 <TabsList>
                   <TabsTrigger value="players">
                     <Users className="mr-2 h-4 w-4" /> Player Rankings ({aggregated.length})
                   </TabsTrigger>
-                  {selectionResult && (
+                  {(selectionResult || savedXI) && (
                     <TabsTrigger value="xi">
                       <Trophy className="mr-2 h-4 w-4" /> Suggested XI
+                      {savedXI && !selectionResult && <Badge className="ml-1.5 text-xs bg-green-600">Saved</Badge>}
                     </TabsTrigger>
                   )}
                 </TabsList>
@@ -423,19 +450,41 @@ export default function ScorecardSelectionPage() {
                   </Card>
                 </TabsContent>
 
-                {selectionResult && (
+                {(selectionResult || savedXI) && (
                   <TabsContent value="xi" className="mt-4">
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Trophy className="h-4 w-4 text-yellow-500" /> Suggested XI — {selectedSeries?.name}
-                        </CardTitle>
-                        <CardDescription>
-                          Generated by Claude based on {scorecards.length} scorecard(s) in this series
-                        </CardDescription>
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
+                          <div>
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <Trophy className="h-4 w-4 text-yellow-500" />
+                              {savedXI && !selectionResult ? 'Saved XI' : 'Suggested XI'} — {selectedSeries?.name}
+                            </CardTitle>
+                            <CardDescription>
+                              {savedXI && !selectionResult
+                                ? 'Previously saved selection. Regenerate to get a fresh suggestion.'
+                                : `Generated by Claude based on ${scorecards.length} scorecard(s)`}
+                            </CardDescription>
+                          </div>
+                          <div className="flex gap-2">
+                            {selectionResult && (
+                              <Button size="sm" onClick={handleSaveXI} disabled={isSavingXI}
+                                className="bg-green-600 hover:bg-green-700 text-white">
+                                {isSavingXI
+                                  ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                  : <Save className="mr-1.5 h-3.5 w-3.5" />}
+                                Save XI
+                              </Button>
+                            )}
+                            <Button size="sm" variant="outline" onClick={handleRegenerateXI}>
+                              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                              {savedXI && !selectionResult ? 'Regenerate' : 'Reset'}
+                            </Button>
+                          </div>
+                        </div>
                       </CardHeader>
                       <CardContent>
-                        <SuggestedXIDisplay result={selectionResult} />
+                        <SuggestedXIDisplay result={selectionResult || savedXI!} />
                       </CardContent>
                     </Card>
                   </TabsContent>
