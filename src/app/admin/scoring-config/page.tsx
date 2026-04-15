@@ -148,6 +148,7 @@ export default function ScoringConfigPage() {
       {isLoading ? (
         <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       ) : config ? (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Batting */}
           <Card>
@@ -230,6 +231,7 @@ export default function ScoringConfigPage() {
             {isSaving ? 'Saving...' : 'Save Formula'}
           </Button>
         </div>
+        </>
       ) : null}
     </div>
   );
