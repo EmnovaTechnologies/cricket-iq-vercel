@@ -293,7 +293,7 @@ export default function ScorecardSelectionPage() {
       <div className="flex items-center gap-3">
         <Target className="h-8 w-8 text-primary" />
         <div>
-          <h1 className="text-3xl font-headline font-bold text-primary">Scorecard Selection</h1>
+          <h1 className="text-3xl font-headline font-bold text-primary">XI Selector</h1>
           <p className="text-muted-foreground text-sm">AI-powered team selection based on scorecard performance points</p>
         </div>
       </div>
@@ -381,14 +381,22 @@ export default function ScorecardSelectionPage() {
 
                 <Button
                   onClick={handleGenerateXI}
-                  disabled={!aggregated.length || isGenerating || isLoadingScorecards}
+                  disabled={!aggregated.length || isGenerating || isLoadingScorecards || !!savedXI}
                   className="w-full mt-2"
+                  title={savedXI ? 'A saved XI exists. Use Regenerate to get a fresh suggestion.' : ''}
                 >
                   {isGenerating
                     ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating XI...</>
+                    : savedXI
+                    ? <><Trophy className="mr-2 h-4 w-4" /> XI Already Saved</>
                     : <><Sparkles className="mr-2 h-4 w-4" /> Suggest Best XI</>
                   }
                 </Button>
+                {savedXI && (
+                  <p className="text-xs text-center text-muted-foreground mt-1">
+                    A saved XI exists. Use <strong>Regenerate</strong> in the Suggested XI tab to get a fresh suggestion.
+                  </p>
+                )}
 
                 {!aggregated.length && selectedSeriesId && !isLoadingScorecards && (
                   <p className="text-xs text-amber-600 text-center">
