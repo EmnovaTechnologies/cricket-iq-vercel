@@ -69,10 +69,12 @@ export function MatchReportTab({
 
   const [isSelector, setIsSelector] = useState(isAssignedSelector);
 
-  const canView = effectivePermissions[PERMISSIONS.SERIES_MANAGE_ADMINS_ANY] ||
+  const canViewAdmin = effectivePermissions[PERMISSIONS.SERIES_MANAGE_ADMINS_ANY] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
     userProfile?.roles?.includes('admin');
+  // Selectors can view their own submitted report (but not others)
+  const canView = canViewAdmin || (isSelector && !!myReport);
 
   const canCertify = effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
@@ -357,17 +359,19 @@ export function MatchReportTab({
       )}
 
       {/* ── Reports list — admins only ── */}
-      {canView && (
+      {(canViewAdmin || (isSelector && myReport)) && (
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            Submitted Reports ({reports.length})
+            {canViewAdmin ? `Submitted Reports (${reports.length})` : 'Your Submitted Report'}
           </h3>
 
-          {reports.length === 0 ? (
+          {(() => {
+            const visibleReports = canViewAdmin ? reports : reports.filter(r => r.submittedBy === currentUser?.uid);
+            return visibleReports.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No reports submitted yet.</p>
           ) : (
-            reports.map(report => (
+            visibleReports.map(report => (
               <Card key={report.id} className={report.isCertified ? 'border-green-300 bg-green-50/30' : ''}>
                 <CardHeader className="pb-2 pt-4 px-4">
                   <div className="flex items-start justify-between gap-2">
@@ -488,12 +492,13 @@ export function MatchReportTab({
                 </CardContent>
               </Card>
             ))
-          )}
+          );
+          })()}
         </div>
       )}
 
       {/* Non-selector, non-admin message */}
-      {!isSelector && !canView && (
+      {!isSelector && !canViewAdmin && (
         <div className="text-center py-10 text-muted-foreground text-sm">
           Match reports are submitted by assigned selectors and visible to administrators only.
         </div>
