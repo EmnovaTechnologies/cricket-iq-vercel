@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getAllSeriesFromDB } from '@/lib/db';
 import { getScorecardsBySeriesAction } from '@/lib/actions/scorecard-actions';
 import { saveScorecardXIAction, clearScorecardXIAction } from '@/lib/actions/series-actions';
+import { getMatchReportsForSeriesAction } from '@/lib/actions/match-report-actions';
 import { getScoringConfigAction } from '@/lib/actions/scoring-config-actions';
 import { suggestXIFromScorecardAction, type SelectionResult } from '@/lib/actions/scorecard-selection-action';
 import { aggregatePlayerStats, classifyPlayers } from '@/lib/utils/scorecard-aggregation-engine';
