@@ -221,7 +221,6 @@ export default function ScoringConfigPage() {
           </CardContent>
         </Card>
 
-      {config && (
         <div className="flex gap-3 justify-end">
           <Button variant="outline" onClick={handleReset} disabled={isSaving}>
             <RotateCcw className="mr-2 h-4 w-4" /> Reset to Defaults
@@ -231,7 +230,7 @@ export default function ScoringConfigPage() {
             {isSaving ? 'Saving...' : 'Save Formula'}
           </Button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
