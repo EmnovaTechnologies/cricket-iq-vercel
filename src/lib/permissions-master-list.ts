@@ -128,6 +128,7 @@ export const PERMISSIONS = {
 
   // Scorecard Permissions
   PAGE_VIEW_SCORECARDS: 'page:view:scorecards',
+  PAGE_VIEW_XI_SELECTOR: 'page:view:xi_selector',
   SCORECARDS_IMPORT: 'scorecards:import',
 } as const;
 
@@ -157,6 +158,7 @@ export const PERMISSION_CATEGORIES = {
     label: 'Scorecards',
     permissions: [
       PERMISSIONS.PAGE_VIEW_SCORECARDS,
+      PERMISSIONS.PAGE_VIEW_XI_SELECTOR,
       PERMISSIONS.SCORECARDS_IMPORT,
     ]
   },
@@ -410,5 +412,6 @@ export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
   [PERMISSIONS.DATA_EXPORT_SERIES]: "Export data (players, ratings) for their assigned series only",
 
   [PERMISSIONS.PAGE_VIEW_SCORECARDS]: "View scorecards list page",
+  [PERMISSIONS.PAGE_VIEW_XI_SELECTOR]: "Access XI Selector tool (Admin/Org Admin only)",
   [PERMISSIONS.SCORECARDS_IMPORT]: "Import scorecards from CricClubs images",
 };
