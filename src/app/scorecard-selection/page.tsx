@@ -267,6 +267,8 @@ export default function ScorecardSelectionPage() {
     setSavedXI(null);
     setSelectionResult(null);
   };
+
+  const handleGenerateXI = async () => {
     if (!aggregated.length || !selectedSeries) return;
     setIsGenerating(true);
     setSelectionResult(null);
