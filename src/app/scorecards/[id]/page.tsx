@@ -175,6 +175,7 @@ export default function ScorecardDetailsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showQrDialog, setShowQrDialog] = useState(false);
+  const [isAssignedSelector, setIsAssignedSelector] = useState(false);
 
   const handleDelete = async () => {
     if (!scorecard || !activeOrganizationId) return;
@@ -192,12 +193,22 @@ export default function ScorecardDetailsPage() {
 
   useEffect(() => {
     if (!params.id) return;
-    getScorecardByIdAction(params.id).then(res => {
-      if (res.success && res.scorecard) setScorecard(res.scorecard);
-      else setError(res.error || 'Scorecard not found.');
+    getScorecardByIdAction(params.id).then(async res => {
+      if (res.success && res.scorecard) {
+        setScorecard(res.scorecard);
+        if (currentUser?.uid && res.scorecard.linkedGameId) {
+          const { getGameByIdFromDB } = await import('@/lib/db');
+          const game = await getGameByIdFromDB(res.scorecard.linkedGameId);
+          if (game?.selectorUserIds?.includes(currentUser.uid)) {
+            setIsAssignedSelector(true);
+          }
+        }
+      } else {
+        setError(res.error || 'Scorecard not found.');
+      }
       setIsLoading(false);
     });
-  }, [params.id]);
+  }, [params.id, currentUser?.uid]);
 
   if (isLoading) {
     return (
@@ -392,7 +403,7 @@ export default function ScorecardDetailsPage() {
               team1={scorecard.team1}
               team2={scorecard.team2}
               playersByTeam={buildPlayersByTeam(scorecard)}
-              isAssignedSelector={false}
+              isAssignedSelector={isAssignedSelector}
               scorecardMode={true}
             />
           </TabsContent>
@@ -427,7 +438,7 @@ export default function ScorecardDetailsPage() {
               team1={scorecard.team1}
               team2={scorecard.team2}
               playersByTeam={buildPlayersByTeam(scorecard)}
-              isAssignedSelector={false}
+              isAssignedSelector={isAssignedSelector}
               scorecardMode={true}
             />
           </TabsContent>
