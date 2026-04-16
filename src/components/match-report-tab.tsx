@@ -241,7 +241,7 @@ export function MatchReportTab({
               <FileText className="h-4 w-4 text-primary" /> {isEditing ? 'Edit Match Report' : 'Submit Match Report'}
             </CardTitle>
             <CardDescription>
-              {isEditing ? 'Update your report. Lock it again when done.' : 'Report on the opposing team's performance. One submission per selector per game.'}
+              {isEditing ? 'Update your report. Lock it again when done.' : "Report on the opposing team's performance. One submission per selector per game."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
