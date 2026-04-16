@@ -130,6 +130,39 @@ export async function certifyMatchReportAction(
   }
 }
 
+// ─── Update Report (only allowed when not selector-certified) ────────────────
+
+export async function updateMatchReportAction(
+  reportId: string,
+  submittedBy: string,
+  updates: {
+    opposingTeam: string;
+    top3Players: string[];
+    highlights: string;
+    missedCatches: string;
+    missedRunOuts: string;
+    greatCatchesRunOuts: string;
+    sportsmanship: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const doc = await adminDb.collection(COLLECTION).doc(reportId).get();
+    if (!doc.exists) return { success: false, error: 'Report not found.' };
+    const data = doc.data()!;
+    if (data.submittedBy !== submittedBy) return { success: false, error: 'You can only edit your own report.' };
+    if (data.isSelectorCertified) return { success: false, error: 'Unlock your report before editing.' };
+    if (data.isCertified) return { success: false, error: 'Report has been admin-certified and cannot be edited.' };
+
+    await adminDb.collection(COLLECTION).doc(reportId).update({
+      ...updates,
+      reportingTeam: updates.opposingTeam === data.team1 ? data.team2 : data.team1,
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 // ─── Selector Self-Certify ────────────────────────────────────────────────────
 
 export async function selectorCertifyMatchReportAction(

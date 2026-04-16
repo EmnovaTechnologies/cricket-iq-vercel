@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import {
   submitMatchReportAction,
+  updateMatchReportAction,
   getMatchReportsForGameAction,
   certifyMatchReportAction,
   selectorCertifyMatchReportAction,
@@ -60,6 +61,7 @@ export function MatchReportTab({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [certifyingId, setCertifyingId] = useState<string | null>(null);
   const [isSelectorCertifying, setIsSelectorCertifying] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Form state
   const [selectedOpposingTeam, setSelectedOpposingTeam] = useState('');
@@ -178,6 +180,33 @@ export function MatchReportTab({
     setIsSubmitting(false);
   };
 
+  const handleUpdate = async () => {
+    if (!currentUser || !myReport) return;
+    setIsSubmitting(true);
+    const res = await updateMatchReportAction(myReport.id, currentUser.uid, {
+      opposingTeam: opposingTeam || selectedOpposingTeam,
+      top3Players: top3.filter(p => p.trim()),
+      highlights: highlights.trim(),
+      missedCatches: missedCatches.trim(),
+      missedRunOuts: missedRunOuts.trim(),
+      greatCatchesRunOuts: greatCatchesRunOuts.trim(),
+      sportsmanship: sportsmanship.trim(),
+    });
+    if (res.success) {
+      toast({ title: 'Report updated' });
+      const [allRes, myRep] = await Promise.all([
+        canViewAdmin ? getMatchReportsForGameAction(gameId) : Promise.resolve({ success: true, reports: [] }),
+        getUserReportForGameAction(gameId, currentUser.uid),
+      ]);
+      if (allRes.success) setReports(allRes.reports || []);
+      setMyReport(myRep);
+      setIsEditing(false);
+    } else {
+      toast({ title: 'Update failed', description: res.error, variant: 'destructive' });
+    }
+    setIsSubmitting(false);
+  };
+
   const handleCertify = async (reportId: string) => {
     if (!currentUser || !userProfile) return;
     setCertifyingId(reportId);
@@ -204,15 +233,15 @@ export function MatchReportTab({
   return (
     <div className="space-y-6">
 
-      {/* ── Submit form — shown to assigned selectors who haven't submitted yet ── */}
-      {isSelector && !myReport && (
+      {/* ── Submit/Edit form — shown when no report yet, OR when editing an unlocked report ── */}
+      {isSelector && (!myReport || (isEditing && !myReport.isSelectorCertified && !myReport.isCertified)) && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" /> Submit Match Report
+              <FileText className="h-4 w-4 text-primary" /> {isEditing ? 'Edit Match Report' : 'Submit Match Report'}
             </CardTitle>
             <CardDescription>
-              Report on the opposing team's performance. One submission per selector per game.
+              {isEditing ? 'Update your report. Lock it again when done.' : 'Report on the opposing team's performance. One submission per selector per game.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -341,12 +370,19 @@ export function MatchReportTab({
               />
             </div>
 
-            <Button onClick={handleSubmit} disabled={isSubmitting} className="w-full">
+            <Button onClick={isEditing ? handleUpdate : handleSubmit} disabled={isSubmitting} className="w-full">
               {isSubmitting
-                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
-                : <><Send className="mr-2 h-4 w-4" /> Submit Report</>
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isEditing ? 'Saving...' : 'Submitting...'}</>
+                : isEditing
+                  ? <><CheckCircle2 className="mr-2 h-4 w-4" /> Save Changes</>
+                  : <><Send className="mr-2 h-4 w-4" /> Submit Report</>
               }
             </Button>
+            {isEditing && (
+              <Button variant="outline" className="w-full" onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -397,28 +433,49 @@ export function MatchReportTab({
                 </Button>
               </div>
             ) : (
-              <Button
-                size="sm"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={isSelectorCertifying}
-                onClick={async () => {
-                  setIsSelectorCertifying(true);
-                  const res = await selectorCertifyMatchReportAction(myReport.id, currentUser!.uid);
-                  if (res.success) {
-                    toast({ title: '🔒 Report locked', description: 'Your report is locked and ready for admin review.' });
-                    const updated = await getUserReportForGameAction(gameId, currentUser!.uid);
-                    setMyReport(updated);
-                  } else {
-                    toast({ title: 'Could not lock', description: res.error, variant: 'destructive' });
-                  }
-                  setIsSelectorCertifying(false);
-                }}
-              >
-                {isSelectorCertifying
-                  ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                  : <Lock className="mr-2 h-3.5 w-3.5" />}
-                Lock My Report
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 border-muted-foreground/30"
+                  onClick={() => {
+                    // Pre-fill form with existing report values
+                    setSelectedOpposingTeam(myReport.opposingTeam);
+                    setTop3([...myReport.top3Players, '', '', ''].slice(0, 3));
+                    setHighlights(myReport.highlights || '');
+                    setMissedCatches(myReport.missedCatches || '');
+                    setMissedRunOuts(myReport.missedRunOuts || '');
+                    setGreatCatchesRunOuts(myReport.greatCatchesRunOuts || '');
+                    setSportsmanship(myReport.sportsmanship || '');
+                    setIsEditing(true);
+                  }}
+                >
+                  <FileText className="mr-1.5 h-3.5 w-3.5" /> Edit Report
+                </Button>
+                <Button
+                  size="sm"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={isSelectorCertifying}
+                  onClick={async () => {
+                    setIsSelectorCertifying(true);
+                    const res = await selectorCertifyMatchReportAction(myReport.id, currentUser!.uid);
+                    if (res.success) {
+                      toast({ title: '🔒 Report locked', description: 'Your report is locked and ready for admin review.' });
+                      const updated = await getUserReportForGameAction(gameId, currentUser!.uid);
+                      setMyReport(updated);
+                      setIsEditing(false);
+                    } else {
+                      toast({ title: 'Could not lock', description: res.error, variant: 'destructive' });
+                    }
+                    setIsSelectorCertifying(false);
+                  }}
+                >
+                  {isSelectorCertifying
+                    ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    : <Lock className="mr-2 h-3.5 w-3.5" />}
+                  Lock Report
+                </Button>
+              </div>
             )
           )}
         </div>
