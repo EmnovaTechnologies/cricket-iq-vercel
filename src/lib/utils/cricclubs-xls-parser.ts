@@ -57,8 +57,13 @@ export function parseCricClubsCsv(csvText: string): ParsedCricClubsScorecard {
 
   // Extract result — everything between the last team name and the date
   // e.g. "...LeagueWYCA won by 6 Wickets (12/20/2025)" → "WYCA won by 6 Wickets"
+  // CricClubs smashes the league name into the team name: "LeagueWYCA" → strip leading word
   const resultMatch = headerLine.match(/([A-Z][A-Za-z0-9\s]+won\s+by\s+[^(]+)/i);
-  const result = resultMatch ? resultMatch[1].trim() : '';
+  let result = resultMatch ? resultMatch[1].trim() : '';
+  // Strip leading non-team token (e.g. "League" prefix smashed before team name like "LeagueWYCA")
+  // Find the first all-caps team name token and start the result from there
+  const teamStartMatch = result.match(/([A-Z]{2,}(?:\s+[A-Za-z0-9]+)*\s+won\s+by\s+[^(]+)/);
+  if (teamStartMatch) result = teamStartMatch[1].trim();
 
   // Extract series name — everything before the result in line 1
   // "SCCAY - Socal Practice Games: LeagueWYCA won by 6 Wickets"
@@ -208,9 +213,26 @@ function parseBattingSection(lines: string[], warnings: string[]): {
   // Derive wickets from batting (non-not-out, non-DNB dismissals)
   wickets = batting.filter(b => b.dismissal && b.dismissal !== 'not out' && b.balls > 0).length;
 
-  // DNB: rows after extras with 0 balls
-  // Edge case: last batter who came in but faced no balls — if they appear in fielder
-  // names they definitely played, so still DNB by the zero-balls rule but keep them in batting
+  // DNB: rows where balls=0 AND howOut is empty AND not a confirmed fielder
+  // These can appear anywhere in the batting section (CricClubs puts them before extras)
+  // Separate pass: identify DNB from already-parsed batting array
+  const toRemove: string[] = [];
+  for (const b of batting) {
+    if (b.balls === 0 && (!b.dismissal || b.dismissal === 'not out')) {
+      // Check if they appeared as a fielder — if so they batted (just faced 0 balls)
+      if (!fielderNames.has(b.name) && !fielderNames.has(b.name.split(' ')[0])) {
+        didNotBat.push(b.name);
+        toRemove.push(b.name);
+      }
+    }
+  }
+  // Remove DNB players from batting array
+  for (const name of toRemove) {
+    const idx = batting.findIndex(b => b.name === name);
+    if (idx !== -1) batting.splice(idx, 1);
+  }
+
+  // Also check afterExtras for any remaining DNB rows
   for (const line of afterExtras) {
     const cl = cleanLine(line);
     if (!cl) continue;
@@ -218,19 +240,8 @@ function parseBattingSection(lines: string[], warnings: string[]): {
     const cols = parseCsvRow(line);
     if (cols.length < 2) continue;
     const name = cols[0]?.trim();
-    const balls = parseInt(cols[5]) || 0;
-    if (name && balls === 0) {
-      // If they appeared as a fielder in this innings, they batted but faced 0 balls
-      // Keep in batting array with 0 balls (not DNB)
-      if (fielderNames.has(name) || fielderNames.has(name.split(' ')[0])) {
-        const howOut = cols[1]?.trim() || '';
-        const fielder = cols[2]?.trim() || '';
-        const bowler = cols[3]?.trim() || '';
-        const dismissal = buildDismissal(howOut, fielder, bowler);
-        batting.push({ name, runs: 0, balls: 0, fours: 0, sixes: 0, strikeRate: 0, dismissal });
-      } else {
-        didNotBat.push(name);
-      }
+    if (name && !didNotBat.includes(name)) {
+      didNotBat.push(name);
     }
   }
 
@@ -339,18 +350,17 @@ function cleanLine(line: string): string {
 }
 
 function parseCsvRow(line: string): string[] {
-  // Simple CSV split — handles quoted fields
+  // Strip leading tabs/whitespace from the whole line before splitting
+  const cleanedLine = line.replace(/^[\t\s,]+/, '');
   const result: string[] = [];
   let current = '';
   let inQuotes = false;
-  for (const char of line) {
+  for (const char of cleanedLine) {
     if (char === '"') { inQuotes = !inQuotes; continue; }
     if (char === ',' && !inQuotes) { result.push(current.trim()); current = ''; continue; }
     current += char;
   }
   result.push(current.trim());
-  // Strip leading tabs from first element
-  if (result[0]) result[0] = result[0].replace(/^\t+/, '').trim();
   return result;
 }
 
