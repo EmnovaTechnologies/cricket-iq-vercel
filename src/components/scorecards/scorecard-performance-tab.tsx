@@ -87,9 +87,10 @@ function TopThreeSection({ title, players, scoreType = 'total' }: { title: strin
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function ScorecardPerformanceTab({ innings, team1, team2, seriesId, gameId, scorecardId }: PerformanceTabProps) {
-  const { activeOrganizationId } = useAuth();
+  const { activeOrganizationId, userProfile } = useAuth();
 
   const [config, setConfig] = useState<ScorecardScoringConfig | null>(null);
+  const canEditFormula = userProfile?.roles?.includes('admin') || userProfile?.roles?.includes('Organization Admin');
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [showFormula, setShowFormula] = useState(false);
   const [coachMentionedPlayers, setCoachMentionedPlayers] = useState<Set<string>>(new Set());
@@ -153,11 +154,13 @@ export function ScorecardPerformanceTab({ innings, team1, team2, seriesId, gameI
             <span className="ml-1 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">Series model</span>
           )}
         </button>
-        <Link href="/admin/scoring-config">
-          <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7 px-2">
-            <Settings className="mr-1.5 h-3 w-3" /> Edit Formula
-          </Button>
-        </Link>
+        {canEditFormula && (
+          <Link href={seriesId ? `/admin/scoring-config?seriesId=${seriesId}` : '/admin/scoring-config'}>
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7 px-2">
+              <Settings className="mr-1.5 h-3 w-3" /> Edit Formula
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Read-only formula */}
