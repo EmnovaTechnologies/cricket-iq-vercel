@@ -16,6 +16,7 @@ const serializeReport = (doc: any): MatchReport => ({
   ...doc.data(),
   submittedAt: toISO(doc.data().submittedAt) || new Date().toISOString(),
   certifiedAt: toISO(doc.data().certifiedAt),
+  selectorCertifiedAt: toISO(doc.data().selectorCertifiedAt),
 });
 
 const COLLECTION = 'matchReports';
