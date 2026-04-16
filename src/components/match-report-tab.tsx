@@ -199,7 +199,8 @@ export function MatchReportTab({
         getUserReportForGameAction(gameId, currentUser.uid),
       ]);
       if (allRes.success) setReports(allRes.reports || []);
-      setMyReport(myRep);
+      // Always update myReport so the submitted report card refreshes for selectors too
+      if (myRep) setMyReport(myRep);
       setIsEditing(false);
     } else {
       toast({ title: 'Update failed', description: res.error, variant: 'destructive' });
@@ -404,8 +405,8 @@ export function MatchReportTab({
             )}
           </div>
 
-          {/* Selector lock / unlock — not available once admin has certified */}
-          {!myReport.isCertified && (
+          {/* Selector lock / unlock — hidden while editing */}
+          {!myReport.isCertified && !isEditing && (
             myReport.isSelectorCertified ? (
               <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span className="text-xs text-blue-700 flex items-center gap-1.5">
@@ -490,7 +491,9 @@ export function MatchReportTab({
           </h3>
 
           {(() => {
-            const visibleReports = canViewAdmin ? reports : reports.filter(r => r.submittedBy === currentUser?.uid);
+            const visibleReports = canViewAdmin
+              ? reports
+              : myReport ? [myReport] : [];
             return visibleReports.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No reports submitted yet.</p>
           ) : (
