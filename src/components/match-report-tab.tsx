@@ -7,6 +7,8 @@ import {
   submitMatchReportAction,
   getMatchReportsForGameAction,
   certifyMatchReportAction,
+  selectorCertifyMatchReportAction,
+  selectorUncertifyMatchReportAction,
   getUserReportForGameAction,
 } from '@/lib/actions/match-report-actions';
 import type { MatchReport } from '@/types';
@@ -18,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   Loader2, Send, ShieldCheck, Trophy, AlertTriangle,
-  Star, Heart, FileText, CheckCircle2, Clock
+  Star, Heart, FileText, CheckCircle2, Clock, Lock, LockOpen
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
@@ -57,6 +59,7 @@ export function MatchReportTab({
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [certifyingId, setCertifyingId] = useState<string | null>(null);
+  const [isSelectorCertifying, setIsSelectorCertifying] = useState(false);
 
   // Form state
   const [selectedOpposingTeam, setSelectedOpposingTeam] = useState('');
@@ -348,13 +351,76 @@ export function MatchReportTab({
         </Card>
       )}
 
-      {/* ── Already submitted notice ── */}
+      {/* ── Already submitted notice + selector lock/unlock ── */}
       {isSelector && myReport && (
-        <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          You submitted a report on <strong>{myReport.opposingTeam}</strong> on{' '}
-          {format(parseISO(myReport.submittedAt), 'PPP')}
-          {myReport.isCertified && <Badge className="ml-2 text-xs bg-green-600">Certified</Badge>}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>
+              You submitted a report on <strong>{myReport.opposingTeam}</strong> on{' '}
+              {format(parseISO(myReport.submittedAt), 'PPP')}
+            </span>
+            {myReport.isSelectorCertified && !myReport.isCertified && (
+              <Badge className="ml-auto shrink-0 text-xs bg-blue-600">🔒 Locked</Badge>
+            )}
+            {myReport.isCertified && (
+              <Badge className="ml-auto shrink-0 text-xs bg-green-600"><ShieldCheck className="h-3 w-3 mr-1 inline" />Certified</Badge>
+            )}
+          </div>
+
+          {/* Selector lock / unlock — not available once admin has certified */}
+          {!myReport.isCertified && (
+            myReport.isSelectorCertified ? (
+              <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                <span className="text-xs text-blue-700 flex items-center gap-1.5">
+                  <Lock className="h-3.5 w-3.5" /> Your report is locked — awaiting admin certification.
+                </span>
+                <Button
+                  size="sm" variant="ghost"
+                  className="text-xs text-blue-600 hover:text-blue-800 h-7 px-2"
+                  disabled={isSelectorCertifying}
+                  onClick={async () => {
+                    setIsSelectorCertifying(true);
+                    const res = await selectorUncertifyMatchReportAction(myReport.id, currentUser!.uid);
+                    if (res.success) {
+                      toast({ title: 'Report unlocked', description: 'You can now edit and re-lock your report.' });
+                      const updated = await getUserReportForGameAction(gameId, currentUser!.uid);
+                      setMyReport(updated);
+                    } else {
+                      toast({ title: 'Could not unlock', description: res.error, variant: 'destructive' });
+                    }
+                    setIsSelectorCertifying(false);
+                  }}
+                >
+                  {isSelectorCertifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LockOpen className="h-3.5 w-3.5 mr-1" />}
+                  Unlock
+                </Button>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={isSelectorCertifying}
+                onClick={async () => {
+                  setIsSelectorCertifying(true);
+                  const res = await selectorCertifyMatchReportAction(myReport.id, currentUser!.uid);
+                  if (res.success) {
+                    toast({ title: '🔒 Report locked', description: 'Your report is locked and ready for admin review.' });
+                    const updated = await getUserReportForGameAction(gameId, currentUser!.uid);
+                    setMyReport(updated);
+                  } else {
+                    toast({ title: 'Could not lock', description: res.error, variant: 'destructive' });
+                  }
+                  setIsSelectorCertifying(false);
+                }}
+              >
+                {isSelectorCertifying
+                  ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  : <Lock className="mr-2 h-3.5 w-3.5" />}
+                Lock My Report
+              </Button>
+            )
+          )}
         </div>
       )}
 
@@ -474,20 +540,26 @@ export function MatchReportTab({
                     </p>
                   )}
 
-                  {/* Certify button */}
+                  {/* Certify button — only available after selector has locked */}
                   {canCertify && !report.isCertified && (
-                    <Button
-                      size="sm" variant="outline"
-                      className="border-green-500 text-green-600 hover:bg-green-50 w-full sm:w-auto"
-                      disabled={certifyingId === report.id}
-                      onClick={() => handleCertify(report.id)}
-                    >
-                      {certifyingId === report.id
-                        ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                        : <ShieldCheck className="mr-2 h-3.5 w-3.5" />
-                      }
-                      Certify Report
-                    </Button>
+                    report.isSelectorCertified ? (
+                      <Button
+                        size="sm" variant="outline"
+                        className="border-green-500 text-green-600 hover:bg-green-50 w-full sm:w-auto"
+                        disabled={certifyingId === report.id}
+                        onClick={() => handleCertify(report.id)}
+                      >
+                        {certifyingId === report.id
+                          ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                          : <ShieldCheck className="mr-2 h-3.5 w-3.5" />
+                        }
+                        Certify Report
+                      </Button>
+                    ) : (
+                      <p className="text-xs text-amber-600 flex items-center gap-1">
+                        <Lock className="h-3 w-3" /> Awaiting selector to lock report
+                      </p>
+                    )
                   )}
                 </CardContent>
               </Card>

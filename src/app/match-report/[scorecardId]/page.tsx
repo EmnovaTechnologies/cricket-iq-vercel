@@ -20,7 +20,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { getScorecardByIdAction } from '@/lib/actions/scorecard-actions';
-import { submitMatchReportAction, getUserReportForGameAction } from '@/lib/actions/match-report-actions';
+import { submitMatchReportAction, getUserReportForGameAction, selectorCertifyMatchReportAction, selectorUncertifyMatchReportAction } from '@/lib/actions/match-report-actions';
 import type { MatchScorecard, MatchReport } from '@/types';
 import type { ConfirmationResult } from 'firebase/auth';
 import { collection, query, where, limit, getDocs } from 'firebase/firestore';
@@ -31,7 +31,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Loader2, Send, CheckCircle, ShieldAlert, Trophy,
-  Star, AlertTriangle, Heart, CheckCircle2, ShieldCheck, FileText,
+  Star, AlertTriangle, Heart, CheckCircle2, ShieldCheck, FileText, Lock, LockOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -112,6 +112,7 @@ function MobileMatchReportPage() {
   const [greatCatchesRunOuts, setGreatCatchesRunOuts] = useState('');
   const [sportsmanship, setSportsmanship] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSelectorCertifying, setIsSelectorCertifying] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   // ── Load scorecard + authorize after phone sign-in ──────────────────────────
@@ -510,6 +511,58 @@ function MobileMatchReportPage() {
               </span>
             )}
           </div>
+
+          {/* Selector lock / unlock */}
+          {myReport && !myReport.isCertified && (
+            myReport.isSelectorCertified ? (
+              <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                <span className="text-xs text-blue-700 flex items-center gap-1.5">
+                  <Lock className="h-3.5 w-3.5" /> Report locked — awaiting admin review.
+                </span>
+                <button
+                  disabled={isSelectorCertifying}
+                  className="text-xs text-blue-600 font-medium flex items-center gap-1 disabled:opacity-50"
+                  onClick={async () => {
+                    setIsSelectorCertifying(true);
+                    const res = await selectorUncertifyMatchReportAction(myReport.id, resolvedSelectorUid || currentUser!.uid);
+                    if (res.success) {
+                      const updated = await getUserReportForGameAction(scorecard!.linkedGameId || scorecardId, resolvedSelectorUid || currentUser!.uid);
+                      if (updated) setMyReport(updated);
+                      toast({ title: 'Report unlocked' });
+                    } else {
+                      toast({ title: 'Could not unlock', description: res.error, variant: 'destructive' });
+                    }
+                    setIsSelectorCertifying(false);
+                  }}
+                >
+                  {isSelectorCertifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LockOpen className="h-3.5 w-3.5 mr-0.5" />}
+                  Unlock
+                </button>
+              </div>
+            ) : (
+              <Button
+                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                disabled={isSelectorCertifying}
+                onClick={async () => {
+                  setIsSelectorCertifying(true);
+                  const res = await selectorCertifyMatchReportAction(myReport.id, resolvedSelectorUid || currentUser!.uid);
+                  if (res.success) {
+                    const updated = await getUserReportForGameAction(scorecard!.linkedGameId || scorecardId, resolvedSelectorUid || currentUser!.uid);
+                    if (updated) setMyReport(updated);
+                    toast({ title: '🔒 Report locked', description: 'Ready for admin review.' });
+                  } else {
+                    toast({ title: 'Could not lock', description: res.error, variant: 'destructive' });
+                  }
+                  setIsSelectorCertifying(false);
+                }}
+              >
+                {isSelectorCertifying
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <Lock className="mr-2 h-4 w-4" />}
+                Lock My Report
+              </Button>
+            )
+          )}
 
           {/* Report detail card */}
           {myReport && (

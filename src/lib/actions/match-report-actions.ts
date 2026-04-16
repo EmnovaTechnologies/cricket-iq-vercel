@@ -129,6 +129,53 @@ export async function certifyMatchReportAction(
   }
 }
 
+// ─── Selector Self-Certify ────────────────────────────────────────────────────
+
+export async function selectorCertifyMatchReportAction(
+  reportId: string,
+  submittedBy: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Verify the requester is the submitter and report is not admin-certified
+    const doc = await adminDb.collection(COLLECTION).doc(reportId).get();
+    if (!doc.exists) return { success: false, error: 'Report not found.' };
+    const data = doc.data()!;
+    if (data.submittedBy !== submittedBy) return { success: false, error: 'You can only lock your own report.' };
+    if (data.isCertified) return { success: false, error: 'Report has already been admin-certified and cannot be changed.' };
+
+    await adminDb.collection(COLLECTION).doc(reportId).update({
+      isSelectorCertified: true,
+      selectorCertifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── Selector Un-Certify (unlock) ─────────────────────────────────────────────
+
+export async function selectorUncertifyMatchReportAction(
+  reportId: string,
+  submittedBy: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const doc = await adminDb.collection(COLLECTION).doc(reportId).get();
+    if (!doc.exists) return { success: false, error: 'Report not found.' };
+    const data = doc.data()!;
+    if (data.submittedBy !== submittedBy) return { success: false, error: 'You can only unlock your own report.' };
+    if (data.isCertified) return { success: false, error: 'Report has been admin-certified and cannot be unlocked.' };
+
+    await adminDb.collection(COLLECTION).doc(reportId).update({
+      isSelectorCertified: false,
+      selectorCertifiedAt: admin.firestore.FieldValue.delete(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 // ─── Check if user already submitted ─────────────────────────────────────────
 
 export async function getUserReportForGameAction(

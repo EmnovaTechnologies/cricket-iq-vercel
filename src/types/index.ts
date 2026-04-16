@@ -641,7 +641,10 @@ export interface MatchReport {
   missedRunOuts: string;
   greatCatchesRunOuts: string;
   sportsmanship: string;
-  // Certification
+  // Selector self-certification (locks report; reversible until admin certifies)
+  isSelectorCertified?: boolean;
+  selectorCertifiedAt?: string;
+  // Admin certification (final approval; irreversible)
   isCertified: boolean;
   certifiedBy?: string;
   certifiedByName?: string;
