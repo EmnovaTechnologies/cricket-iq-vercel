@@ -334,6 +334,9 @@ function MobileMatchReportPage() {
 
       if (res.success) {
         toast({ title: '✅ Report submitted!', description: 'Your match report has been submitted.' });
+        // Reload the report so the submitted view shows full details
+        const saved = await getUserReportForGameAction(gameIdToUse, uidToUse);
+        if (saved) setMyReport(saved);
         setSubmitted(true);
       } else {
         toast({ title: 'Submission failed', description: res.error, variant: 'destructive' });
@@ -476,23 +479,126 @@ function MobileMatchReportPage() {
     );
   }
 
-  // Already submitted
+  // Already submitted — show report details
   if (submitted) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
-        <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
-        <h2 className="text-2xl font-bold text-green-600 mb-2">Report Submitted! 🎉</h2>
-        <p className="text-muted-foreground max-w-xs">
-          Your match report for{' '}
-          <span className="font-medium">{scorecard.team1} vs {scorecard.team2}</span> has been submitted.
-        </p>
-        {myReport?.isCertified && (
-          <div className="mt-4 flex items-center gap-2 text-green-600 text-sm">
-            <ShieldCheck className="h-4 w-4" />
-            <span>Report certified</span>
+      <div className="min-h-screen bg-background flex flex-col max-w-lg mx-auto">
+        {/* Header */}
+        <div className="bg-primary text-primary-foreground px-4 py-2.5 sticky top-0 z-10">
+          <p className="text-xs font-medium leading-snug truncate">
+            {scorecard.team1} vs {scorecard.team2}
+            {scorecard.cricClubsLeague ? <span className="opacity-70"> · {scorecard.cricClubsLeague}</span> : ''}
+          </p>
+          <p className="text-xs opacity-75 leading-snug truncate">
+            {scorecard.date ? (() => { try { return new Date(scorecard.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); } catch { return ''; } })() : ''}
+            {scorecard.venue ? <span> · {scorecard.venue}</span> : ''}
+          </p>
+        </div>
+
+        <div className="flex-1 px-4 py-5 space-y-4">
+          {/* Submitted banner */}
+          <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>
+              You submitted a report on{' '}
+              <span className="font-semibold">{myReport?.opposingTeam}</span>
+              {myReport?.submittedAt ? (() => { try { return ` on ${new Date(myReport.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`; } catch { return ''; } })() : ''}
+            </span>
+            {myReport?.isCertified && (
+              <span className="ml-auto shrink-0 flex items-center gap-1 text-xs bg-green-600 text-white px-2 py-0.5 rounded-full">
+                <ShieldCheck className="h-3 w-3" /> Certified
+              </span>
+            )}
           </div>
-        )}
-        <p className="text-sm text-muted-foreground mt-4">You can now close this page.</p>
+
+          {/* Report detail card */}
+          {myReport && (
+            <div className="bg-card border rounded-xl p-4 space-y-4">
+              <p className="font-semibold text-sm">
+                Report on <span className="text-primary">{myReport.opposingTeam}</span>
+              </p>
+
+              {/* Top 3 */}
+              {myReport.top3Players?.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-2">
+                    <Trophy className="h-3.5 w-3.5 text-yellow-500" /> Top Performers
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {myReport.top3Players.map((p, i) => (
+                      <span key={i} className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-foreground border">
+                        {i + 1}. {p}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Highlights */}
+              {myReport.highlights && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
+                    <Star className="h-3.5 w-3.5 text-primary" /> Highlights
+                  </p>
+                  <p className="text-sm">{myReport.highlights}</p>
+                </div>
+              )}
+
+              {/* Missed catches */}
+              {myReport.missedCatches && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Missed Catches
+                  </p>
+                  <p className="text-sm">{myReport.missedCatches}</p>
+                </div>
+              )}
+
+              {/* Missed run-outs */}
+              {myReport.missedRunOuts && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Missed Run-Outs
+                  </p>
+                  <p className="text-sm">{myReport.missedRunOuts}</p>
+                </div>
+              )}
+
+              {/* Great catches */}
+              {myReport.greatCatchesRunOuts && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> Great Catches / Run-Outs
+                  </p>
+                  <p className="text-sm">{myReport.greatCatchesRunOuts}</p>
+                </div>
+              )}
+
+              {/* Sportsmanship */}
+              {myReport.sportsmanship && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
+                    <Heart className="h-3.5 w-3.5 text-rose-500" /> Sportsmanship
+                  </p>
+                  <p className="text-sm">{myReport.sportsmanship}</p>
+                </div>
+              )}
+
+              {/* Certified by */}
+              {myReport.isCertified && myReport.certifiedByName && (
+                <p className="text-xs text-green-600 flex items-center gap-1.5 pt-1 border-t">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Certified by {myReport.certifiedByName}
+                  {myReport.certifiedAt ? (() => { try { return ` on ${new Date(myReport.certifiedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`; } catch { return ''; } })() : ''}
+                </p>
+              )}
+            </div>
+          )}
+
+          <p className="text-center text-xs text-muted-foreground pb-4">
+            Logged in as {currentUser.phoneNumber || currentUser.email}
+          </p>
+        </div>
       </div>
     );
   }
