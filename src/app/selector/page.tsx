@@ -80,11 +80,25 @@ export default function SelectorDashboard() {
         setGames(assignedGames);
 
         if (scorecardsResult.success) {
-          // Show recent scorecards — most recent 10
-          const sorted = (scorecardsResult.scorecards || [])
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-            .slice(0, 10);
-          setScorecards(sorted);
+          // Only show scorecards linked to this selector's assigned games
+          const assignedGameIds = new Set(assignedGames.map(g => g.id));
+          const linked = (scorecardsResult.scorecards || []).filter(sc =>
+            sc.linkedGameId && assignedGameIds.has(sc.linkedGameId)
+          );
+          // Also include scorecards whose team+date matches an assigned game
+          // (for scorecards imported before linkedGameId was set)
+          const linkedIds = new Set(linked.map(sc => sc.id));
+          const byTeamDate = (scorecardsResult.scorecards || []).filter(sc => {
+            if (linkedIds.has(sc.id)) return false;
+            return assignedGames.some(g =>
+              g.date?.slice(0, 10) === sc.date?.slice(0, 10) &&
+              ((g.team1 === sc.team1 && g.team2 === sc.team2) ||
+               (g.team1 === sc.team2 && g.team2 === sc.team1))
+            );
+          });
+          const all = [...linked, ...byTeamDate]
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setScorecards(all);
         }
       } catch (e) {
         console.error('Selector dashboard load error:', e);
@@ -196,12 +210,12 @@ export default function SelectorDashboard() {
         {/* ── Recent Scorecards ── */}
         <section>
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-            <FileText className="h-4 w-4" /> Recent Scorecards
+            <FileText className="h-4 w-4" /> Match Reports
           </h2>
 
           {scorecards.length === 0 ? (
             <div className="bg-card border rounded-xl p-6 text-center text-muted-foreground text-sm">
-              No scorecards available.
+              No scorecards found for your assigned games.
             </div>
           ) : (
             <div className="space-y-2">
@@ -224,7 +238,7 @@ export default function SelectorDashboard() {
                     </div>
                   </div>
                   <Link href={reportHref(sc.id)}>
-                    <Button size="sm" variant="outline" className="shrink-0 border-primary text-primary hover:bg-primary/10 h-9 px-3 text-xs">
+                    <Button size="sm" className="shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground h-9 px-3 text-xs">
                       <FileText className="h-3.5 w-3.5 mr-1.5" /> Report
                     </Button>
                   </Link>
