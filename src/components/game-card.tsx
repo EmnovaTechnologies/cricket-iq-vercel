@@ -1,5 +1,8 @@
 
+'use client';
+
 import * as React from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import type { Game, PermissionKey } from '@/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -65,6 +68,12 @@ const GameCard: React.FC<GameCardProps> = ({ game }) => {
 
   const displayStatus = getGameDisplayStatus(game, currentUserProfile?.uid);
 
+  // Detect mobile for Step 2: redirect selector Rate button to mobile-optimized page
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    setIsMobile(window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
+  }, []);
+
   const canRatePlayers = !isFutureGame && (
     !!effectivePermissions[PERMISSIONS.GAMES_RATE_ANY] ||
     (!!effectivePermissions[PERMISSIONS.GAMES_RATE_ASSIGNED] && !!game.selectorUserIds?.includes(currentUserProfile?.uid || ''))
@@ -113,7 +122,11 @@ const GameCard: React.FC<GameCardProps> = ({ game }) => {
                 size="sm" 
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm"
             >
-                <Link href={`/games/${game.id}/rate-enhanced?from=game-list`}>
+                <Link href={
+                  isMobile && currentUserProfile?.uid
+                    ? `/rate/${game.id}?uid=${currentUserProfile.uid}`
+                    : `/games/${game.id}/rate-enhanced?from=game-list`
+                }>
                     <span className="flex items-center justify-center gap-1">
                     <Edit3 className="h-3.5 w-3.5" /> Rate Players
                     </span>

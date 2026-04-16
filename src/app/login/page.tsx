@@ -79,8 +79,21 @@ function LoginForm() {
   useEffect(() => {
     if (!isAuthLoading && userProfile) {
       const redirectParam = searchParams.get('redirect');
-      const redirectPath = redirectParam || '/';
-      router.push(redirectPath);
+      if (redirectParam) {
+        router.push(redirectParam);
+        return;
+      }
+      // Step 4: on mobile, redirect selector-role users to their mobile dashboard
+      const isMobile = typeof window !== 'undefined' &&
+        (window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
+      const isSelector = userProfile.roles?.includes('selector') ||
+        userProfile.roles?.includes('Series Admin') ||
+        userProfile.roles?.includes('Organization Admin');
+      if (isMobile && isSelector) {
+        router.push('/selector');
+      } else {
+        router.push('/');
+      }
     }
   }, [isAuthLoading, userProfile, router, searchParams]);
 

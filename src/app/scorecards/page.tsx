@@ -22,13 +22,13 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import {
   Table, PlusCircle, Loader2, ShieldAlert, Info,
-  CalendarFold, ArrowRight, Trash2, Filter, AlertCircle, Link2
+  CalendarFold, ArrowRight, Trash2, Filter, AlertCircle, Link2, FileText
 } from 'lucide-react';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 
 export default function ScorecardsPage() {
-  const { activeOrganizationId, loading: authLoading, effectivePermissions, isPermissionsLoading } = useAuth();
+  const { activeOrganizationId, loading: authLoading, effectivePermissions, isPermissionsLoading, userProfile, currentUser } = useAuth();
   const { toast } = useToast();
   const [scorecards, setScorecards] = useState<MatchScorecard[]>([]);
   const [allSeries, setAllSeries] = useState<Series[]>([]);
@@ -39,6 +39,11 @@ export default function ScorecardsPage() {
   const [mounted, setMounted] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedSeries, setSelectedSeries] = useState<string>('all');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMobile(window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
+  }, []);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -56,6 +61,7 @@ export default function ScorecardsPage() {
   };
 
   const canImport = effectivePermissions[PERMISSIONS.SCORECARDS_IMPORT];
+  const isSelector = userProfile?.roles?.includes('selector') || userProfile?.roles?.includes('Series Admin') || userProfile?.roles?.includes('Organization Admin');
 
   const fetchScorecards = useCallback(async () => {
     if (!activeOrganizationId) { setScorecards([]); setAllSeries([]); setIsLoading(false); return; }
@@ -276,11 +282,19 @@ export default function ScorecardsPage() {
                             </div>
                           </CardContent>
                           <CardFooter className="grid grid-cols-2 gap-1.5 p-2 pt-1">
-                            <Button asChild variant="outline" size="sm" className="w-full border-primary text-primary hover:bg-primary/10 text-sm">
-                              <Link href={`/scorecards/${sc.id}`}>
-                                <span className="flex items-center justify-center gap-1">View Details <ArrowRight className="h-3.5 w-3.5" /></span>
-                              </Link>
-                            </Button>
+                            {isMobile && isSelector && currentUser ? (
+                              <Button asChild variant="default" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm">
+                                <Link href={`/match-report/${sc.id}?uid=${currentUser.uid}`}>
+                                  <span className="flex items-center justify-center gap-1"><FileText className="h-3.5 w-3.5" /> Match Report</span>
+                                </Link>
+                              </Button>
+                            ) : (
+                              <Button asChild variant="outline" size="sm" className="w-full border-primary text-primary hover:bg-primary/10 text-sm">
+                                <Link href={`/scorecards/${sc.id}`}>
+                                  <span className="flex items-center justify-center gap-1">View Details <ArrowRight className="h-3.5 w-3.5" /></span>
+                                </Link>
+                              </Button>
+                            )}
                             {canImport && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>

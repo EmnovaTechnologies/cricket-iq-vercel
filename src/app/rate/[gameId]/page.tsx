@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Phone, ChevronLeft, ChevronRight, CheckCircle, ShieldAlert, Send, ChevronDown, MessageSquare, Search, X, ShieldCheck } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, CheckCircle, ShieldAlert, Send, ChevronDown, MessageSquare, Search, X, ShieldCheck } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -20,34 +20,22 @@ import { collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { CricketBatIcon, CricketBallIcon, WicketKeeperGloves } from '@/components/custom-icons';
 
-// Exact rating values matching web app
 const NUMERIC_RATINGS: RatingValue[] = ['0.5', '1.0', '1.5', '2.0', '2.5', '3.0', '3.5', '4.0', '4.5', '5.0'];
 const SPECIAL_RATINGS: RatingValue[] = ['Not Rated', 'Not Applicable'];
-
-// All 4 skills always shown for every player
 const ALL_SKILLS: SkillKey[] = ['batting', 'bowling', 'fielding', 'wicketKeeping'];
 
 type SkillKey = 'batting' | 'bowling' | 'fielding' | 'wicketKeeping';
 
-interface PlayerWithTeam extends Player {
-  teamName: string;
-}
-
+interface PlayerWithTeam extends Player { teamName: string; }
 interface PlayerRatings {
-  batting: RatingValue;
-  bowling: RatingValue;
-  fielding: RatingValue;
-  wicketKeeping: RatingValue;
+  batting: RatingValue; bowling: RatingValue;
+  fielding: RatingValue; wicketKeeping: RatingValue;
 }
 
 function getDefaultRatings(player: Player): PlayerRatings {
-  if (player.primarySkill === 'Batting') {
-    return { batting: 'Not Rated', bowling: 'Not Applicable', fielding: 'Not Rated', wicketKeeping: 'Not Applicable' };
-  } else if (player.primarySkill === 'Bowling') {
-    return { batting: 'Not Rated', bowling: 'Not Rated', fielding: 'Not Rated', wicketKeeping: 'Not Applicable' };
-  } else {
-    return { batting: 'Not Rated', bowling: 'Not Applicable', fielding: 'Not Applicable', wicketKeeping: 'Not Rated' };
-  }
+  if (player.primarySkill === 'Batting') return { batting: 'Not Rated', bowling: 'Not Applicable', fielding: 'Not Rated', wicketKeeping: 'Not Applicable' };
+  if (player.primarySkill === 'Bowling') return { batting: 'Not Rated', bowling: 'Not Rated', fielding: 'Not Rated', wicketKeeping: 'Not Applicable' };
+  return { batting: 'Not Rated', bowling: 'Not Applicable', fielding: 'Not Applicable', wicketKeeping: 'Not Rated' };
 }
 
 function isPrimarySkill(player: Player, skill: SkillKey): boolean {
@@ -69,17 +57,18 @@ function MobileRatePage() {
   const searchParams = useSearchParams();
   const gameId = params.gameId;
   const selectorUidFromUrl = searchParams.get('uid');
+
   const { signInWithPhoneNumberFlow, confirmPhoneNumberCode, isAuthLoading, currentUser, userProfile } = useAuth();
   const { toast } = useToast();
 
-  // Auth state
+  // ── Auth state (only used when currentUser is null) ──────────────────────
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [isCodeSent, setIsCodeSent] = useState(false);
   const [authInProgress, setAuthInProgress] = useState(false);
 
-  // Game state
+  // ── Game / data state ────────────────────────────────────────────────────
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<PlayerWithTeam[]>([]);
   const [existingRatings, setExistingRatings] = useState<PlayerRating[]>([]);
@@ -88,7 +77,7 @@ function MobileRatePage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [resolvedSelectorUid, setResolvedSelectorUid] = useState<string | null>(null);
 
-  // Rating state
+  // ── Rating state ─────────────────────────────────────────────────────────
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const [ratings, setRatings] = useState<Record<string, PlayerRatings>>({});
   const [notes, setNotes] = useState<Record<string, Record<SkillKey, string>>>({});
@@ -102,40 +91,29 @@ function MobileRatePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
-  // Swipe handling
+  // ── Swipe handling ───────────────────────────────────────────────────────
   const [swipeTouchStart, setSwipeTouchStart] = useState<number | null>(null);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setSwipeTouchStart(e.touches[0].clientX);
-  };
-
+  const handleTouchStart = (e: React.TouchEvent) => setSwipeTouchStart(e.touches[0].clientX);
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (swipeTouchStart === null) return;
     const diff = swipeTouchStart - e.changedTouches[0].clientX;
     if (Math.abs(diff) > 50) {
-      if (diff > 0 && currentPlayerIndex < players.length - 1) {
-        setCurrentPlayerIndex(prev => prev + 1);
-      } else if (diff < 0 && currentPlayerIndex > 0) {
-        setCurrentPlayerIndex(prev => prev - 1);
-      }
+      if (diff > 0 && currentPlayerIndex < players.length - 1) setCurrentPlayerIndex(prev => prev + 1);
+      else if (diff < 0 && currentPlayerIndex > 0) setCurrentPlayerIndex(prev => prev - 1);
     }
     setSwipeTouchStart(null);
   };
 
   const toggleSkillExpanded = (playerId: string, skill: SkillKey) => {
     setExpandedSkills(prev => {
-      // On first toggle for this player, initialize with all non-NA skills expanded
       let current: Set<SkillKey>;
       if (!prev[playerId]) {
         const playerRatingsNow = ratings[playerId] || {};
-        current = new Set(
-          ALL_SKILLS.filter(s => (playerRatingsNow as any)[s] !== 'Not Applicable')
-        );
+        current = new Set(ALL_SKILLS.filter(s => (playerRatingsNow as any)[s] !== 'Not Applicable'));
       } else {
         current = new Set(prev[playerId]);
       }
-      if (current.has(skill)) current.delete(skill);
-      else current.add(skill);
+      if (current.has(skill)) current.delete(skill); else current.add(skill);
       return { ...prev, [playerId]: current };
     });
   };
@@ -143,22 +121,34 @@ function MobileRatePage() {
   const toggleNoteExpanded = (playerId: string, skill: SkillKey) => {
     setExpandedNotes(prev => {
       const current = new Set(prev[playerId] || []);
-      if (current.has(skill)) current.delete(skill);
-      else current.add(skill);
+      if (current.has(skill)) current.delete(skill); else current.add(skill);
       return { ...prev, [playerId]: current };
     });
   };
 
   const handleNoteChange = (playerId: string, skill: SkillKey, value: string) => {
-    setNotes(prev => ({
-      ...prev,
-      [playerId]: { ...(prev[playerId] || {}), [skill]: value },
-    }));
+    setNotes(prev => ({ ...prev, [playerId]: { ...(prev[playerId] || {}), [skill]: value } }));
   };
 
-  // Load game data once user is authenticated
+  // ── Authorization helper ─────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // STEP 1 CHANGE: Two auth paths now supported:
+  //
+  //  A) Web login (Google/email): currentUser.uid is set, phoneNumber is null.
+  //     → Trust currentUser.uid directly. If ?uid= is present, accept if
+  //       currentUser.uid === selectorUidFromUrl. No phone matching needed.
+  //
+  //  B) QR + phone OTP: currentUser.phoneNumber is set.
+  //     → Original phone-matching logic (unchanged).
+  //
+  // Both paths then fall through to the same selectorUserIds check.
+  // ─────────────────────────────────────────────────────────────────────────
+  const isWebLogin = currentUser && !currentUser.phoneNumber;
+
+  // ── Load game + authorize ────────────────────────────────────────────────
   useEffect(() => {
     if (!currentUser || !gameId || isLoadingGame) return;
+
     const load = async () => {
       setIsLoadingGame(true);
       try {
@@ -166,72 +156,61 @@ function MobileRatePage() {
         if (!g) { setIsLoadingGame(false); return; }
         setGame(g);
 
-        // ── Authorization ────────────────────────────────────────────────
-        // If URL has ?uid=, validate that the logged-in phone matches that user's profile
         let authorizedUid: string | null = null;
 
         if (selectorUidFromUrl) {
-          // Look up the expected selector's profile to get their phone number
-          const expectedUserDoc = await getDocs(
-            query(collection(db, 'users'), where('uid', '==', selectorUidFromUrl), limit(1))
-          );
-
-          if (!expectedUserDoc.empty) {
-            const expectedProfile = expectedUserDoc.docs[0].data();
-            const expectedPhone = expectedProfile.phoneNumber;
-
-            // Check phone match
-            if (currentUser.phoneNumber && expectedPhone && currentUser.phoneNumber === expectedPhone) {
-              // Phone matches — check this uid is actually a selector for this game
-              if (g.selectorUserIds?.includes(selectorUidFromUrl)) {
-                authorizedUid = selectorUidFromUrl;
-              } else {
-                // Phone matched but uid not a selector
-                setAuthChecked(true);
-                setIsAuthorized(false);
-                setIsLoadingGame(false);
-                return;
-              }
-            } else {
-              // Phone doesn't match — wrong person scanned the QR
+          if (isWebLogin) {
+            // ── Path A: web login — trust uid directly ──────────────────
+            if (currentUser.uid === selectorUidFromUrl && g.selectorUserIds?.includes(selectorUidFromUrl)) {
+              authorizedUid = selectorUidFromUrl;
+            } else if (currentUser.uid !== selectorUidFromUrl) {
+              // Logged-in user is not the selector this link was for
               setAuthChecked(true);
               setIsAuthorized(false);
               setIsLoadingGame(false);
               return;
             }
-          }
-        }
-
-        // Fallback: no uid in URL — use direct UID or phone lookup
-        if (!authorizedUid) {
-          if (g.selectorUserIds?.includes(currentUser.uid)) {
-            authorizedUid = currentUser.uid;
-          } else if (currentUser.phoneNumber) {
-            const usersQuery = query(
-              collection(db, 'users'),
-              where('phoneNumber', '==', currentUser.phoneNumber),
-              limit(5)
+          } else {
+            // ── Path B: phone OTP — match phone to expected selector ────
+            const expectedUserDoc = await getDocs(
+              query(collection(db, 'users'), where('uid', '==', selectorUidFromUrl), limit(1))
             );
-            const usersSnap = await getDocs(usersQuery);
-            for (const userDoc of usersSnap.docs) {
-              if (g.selectorUserIds?.includes(userDoc.id)) {
-                authorizedUid = userDoc.id;
-                break;
+            if (!expectedUserDoc.empty) {
+              const expectedProfile = expectedUserDoc.docs[0].data();
+              const expectedPhone = expectedProfile.phoneNumber;
+              if (currentUser.phoneNumber && expectedPhone && currentUser.phoneNumber === expectedPhone) {
+                if (g.selectorUserIds?.includes(selectorUidFromUrl)) {
+                  authorizedUid = selectorUidFromUrl;
+                } else {
+                  setAuthChecked(true); setIsAuthorized(false); setIsLoadingGame(false); return;
+                }
+              } else {
+                setAuthChecked(true); setIsAuthorized(false); setIsLoadingGame(false); return;
               }
             }
           }
         }
 
-        // Save phone to profile for future use
+        // Fallback: no ?uid= in URL — check by uid directly, then by phone
+        if (!authorizedUid) {
+          if (g.selectorUserIds?.includes(currentUser.uid)) {
+            authorizedUid = currentUser.uid;
+          } else if (currentUser.phoneNumber) {
+            const usersSnap = await getDocs(
+              query(collection(db, 'users'), where('phoneNumber', '==', currentUser.phoneNumber), limit(5))
+            );
+            for (const userDoc of usersSnap.docs) {
+              if (g.selectorUserIds?.includes(userDoc.id)) { authorizedUid = userDoc.id; break; }
+            }
+          }
+        }
+
+        // Save phone to profile for future cross-linking (phone OTP path only)
         if (!authorizedUid && currentUser.phoneNumber) {
           try {
             const { doc: firestoreDoc, updateDoc } = await import('firebase/firestore');
-            await updateDoc(firestoreDoc(db, 'users', currentUser.uid), {
-              phoneNumber: currentUser.phoneNumber
-            });
-          } catch (e) {
-            console.warn('Could not save phone number to profile:', e);
-          }
+            await updateDoc(firestoreDoc(db, 'users', currentUser.uid), { phoneNumber: currentUser.phoneNumber });
+          } catch (e) { console.warn('Could not save phone number to profile:', e); }
         }
 
         const authorized = !!authorizedUid;
@@ -240,7 +219,6 @@ function MobileRatePage() {
         setAuthChecked(true);
 
         if (authorized) {
-          // Load players
           const loaded: PlayerWithTeam[] = [];
           for (const pid of (g.team1Players || [])) {
             const p = await getPlayerByIdFromDB(pid);
@@ -253,11 +231,9 @@ function MobileRatePage() {
           loaded.sort((a, b) => a.teamName.localeCompare(b.teamName) || a.name.localeCompare(b.name));
           setPlayers(loaded);
 
-          // Load existing ratings
           const existing = await getRatingsForGameFromDB(gameId);
           setExistingRatings(existing);
 
-          // Pre-populate ratings from existing data
           const initialRatings: Record<string, PlayerRatings> = {};
           const initialNotes: Record<string, Record<SkillKey, string>> = {};
           loaded.forEach(player => {
@@ -282,8 +258,17 @@ function MobileRatePage() {
           setRatings(initialRatings);
           setNotes(initialNotes);
 
-          // Check if current selector already certified
-          // Use authorizedUid directly — resolvedSelectorUid state not yet updated
+          // Pre-populate savedPlayers from existing ratings so returning users can certify
+          const alreadySaved = new Set(
+            loaded.filter(p => {
+              const er = existing.find(r => r.playerId === p.id);
+              return er && NUMERIC_RATINGS.some(v =>
+                er.batting === v || er.bowling === v || er.fielding === v || er.wicketKeeping === v
+              );
+            }).map(p => p.id)
+          );
+          setSavedPlayers(alreadySaved);
+
           const uidToCheck = authorizedUid || currentUser.uid;
           const cert = g.selectorCertifications?.[uidToCheck];
           const lastModified = g.ratingsLastModifiedAt ? new Date(g.ratingsLastModifiedAt) : null;
@@ -297,14 +282,15 @@ function MobileRatePage() {
         setIsLoadingGame(false);
       }
     };
+
     load();
   }, [currentUser, gameId]);
 
+  // ── OTP handlers (only used when currentUser is null) ────────────────────
   const handleSendOtp = async () => {
     if (!phone.trim()) return;
     setAuthInProgress(true);
     try {
-      // Always prepend +1 for US numbers, strip any non-digits first
       const digits = phone.replace(/\D/g, '');
       const formatted = digits.startsWith('1') ? `+${digits}` : `+1${digits}`;
       const result = await signInWithPhoneNumberFlow(formatted, 'recaptcha-container-rate');
@@ -313,9 +299,7 @@ function MobileRatePage() {
       toast({ title: 'Code sent!', description: `Verification code sent to +1 ${phone}` });
     } catch (err: any) {
       toast({ title: 'Failed to send code', description: err.message || 'Please try again.', variant: 'destructive' });
-    } finally {
-      setAuthInProgress(false);
-    }
+    } finally { setAuthInProgress(false); }
   };
 
   const handleVerifyOtp = async () => {
@@ -325,16 +309,11 @@ function MobileRatePage() {
       await confirmPhoneNumberCode(confirmationResult, otp);
     } catch (err: any) {
       toast({ title: 'Invalid code', description: 'Please check the code and try again.', variant: 'destructive' });
-    } finally {
-      setAuthInProgress(false);
-    }
+    } finally { setAuthInProgress(false); }
   };
 
   const handleRatingChange = (playerId: string, skill: SkillKey, value: RatingValue) => {
-    setRatings(prev => ({
-      ...prev,
-      [playerId]: { ...prev[playerId], [skill]: value },
-    }));
+    setRatings(prev => ({ ...prev, [playerId]: { ...prev[playerId], [skill]: value } }));
   };
 
   const handleCertify = async () => {
@@ -343,23 +322,22 @@ function MobileRatePage() {
     setIsCertifying(true);
     setShowCertifyConfirm(false);
     try {
-      const displayName = userProfile?.displayName || currentUser.phoneNumber || currentUser.email || 'Selector';
+      const displayName = userProfile?.displayName || currentUser.email || currentUser.phoneNumber || 'Selector';
       const result = await certifyMobileRatingAction(gameId, uidToUse, displayName);
       if (!result.success) {
         toast({ title: 'Certification failed', description: result.error, variant: 'destructive' });
       } else {
         setIsCertified(true);
-        if (result.autoFinalized) {
-          toast({ title: '✅ Ratings certified & finalized!', description: 'All selectors have certified. Ratings are now finalized.' });
-        } else {
-          toast({ title: '✅ Ratings certified!', description: 'Your ratings have been certified successfully.' });
-        }
+        toast({
+          title: result.autoFinalized ? '✅ Ratings certified & finalized!' : '✅ Ratings certified!',
+          description: result.autoFinalized
+            ? 'All selectors have certified. Ratings are now finalized.'
+            : 'Your ratings have been certified successfully.',
+        });
       }
     } catch (e: any) {
       toast({ title: 'Error', description: e.message || 'Please try again.', variant: 'destructive' });
-    } finally {
-      setIsCertifying(false);
-    }
+    } finally { setIsCertifying(false); }
   };
 
   const handleSaveAndNext = async () => {
@@ -370,48 +348,34 @@ function MobileRatePage() {
     try {
       const playerRating = ratings[player.id];
       const playerNotes = notes[player.id] || {};
-
       const result = await saveMobileRatingAction({
         gameId,
         playerId: player.id,
         rating: {
-          batting: playerRating.batting,
-          bowling: playerRating.bowling,
-          fielding: playerRating.fielding,
-          wicketKeeping: playerRating.wicketKeeping,
-          battingComment: playerNotes.batting || '',
-          bowlingComment: playerNotes.bowling || '',
-          fieldingComment: playerNotes.fielding || '',
-          wicketKeepingComment: playerNotes.wicketKeeping || '',
+          batting: playerRating.batting, bowling: playerRating.bowling,
+          fielding: playerRating.fielding, wicketKeeping: playerRating.wicketKeeping,
+          battingComment: playerNotes.batting || '', bowlingComment: playerNotes.bowling || '',
+          fieldingComment: playerNotes.fielding || '', wicketKeepingComment: playerNotes.wicketKeeping || '',
         },
         savingUid: uidToUse,
       });
-
       if (!result.success) {
         toast({ title: 'Save failed', description: result.error || 'Please try again.', variant: 'destructive' });
         return;
       }
-
       setSavedPlayers(prev => new Set([...prev, player.id]));
       toast({ title: `${player.name} rated ✓`, description: 'Rating saved successfully.' });
-      if (currentPlayerIndex < players.length - 1) {
-        setCurrentPlayerIndex(prev => prev + 1);
-      }
+      if (currentPlayerIndex < players.length - 1) setCurrentPlayerIndex(prev => prev + 1);
     } catch (e: any) {
       toast({ title: 'Save failed', description: e.message || 'Please try again.', variant: 'destructive' });
-    } finally {
-      setIsSaving(false);
-    }
+    } finally { setIsSaving(false); }
   };
 
-  // ── Loading states ──────────────────────────────────────────────────────────
+  // ── Render guards ────────────────────────────────────────────────────────
 
-  if (isAuthLoading) {
-    return <LoadingScreen message="Loading..." />;
-  }
+  if (isAuthLoading) return <LoadingScreen message="Loading..." />;
 
-  // ── Auth screen ─────────────────────────────────────────────────────────────
-
+  // ── Auth screen — only shown when NOT already logged in ──────────────────
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
@@ -421,7 +385,6 @@ function MobileRatePage() {
             <h1 className="text-2xl font-bold text-primary">Cricket IQ</h1>
             <p className="text-muted-foreground mt-1">Player Rating</p>
           </div>
-
           <div className="bg-card border rounded-xl p-6 space-y-4 shadow-sm">
             {!isCodeSent ? (
               <>
@@ -431,15 +394,8 @@ function MobileRatePage() {
                     <div className="flex items-center justify-center h-12 px-3 rounded-md border bg-muted text-sm font-medium text-muted-foreground shrink-0">
                       🇺🇸 +1
                     </div>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="310 555 1234"
-                      value={phone}
-                      onChange={e => setPhone(e.target.value)}
-                      className="h-12 text-base"
-                      disabled={authInProgress}
-                    />
+                    <Input id="phone" type="tel" placeholder="310 555 1234" value={phone}
+                      onChange={e => setPhone(e.target.value)} className="h-12 text-base" disabled={authInProgress} />
                   </div>
                   <p className="text-xs text-muted-foreground">Enter your 10-digit US phone number</p>
                 </div>
@@ -453,25 +409,26 @@ function MobileRatePage() {
               <>
                 <div className="space-y-2">
                   <Label htmlFor="otp">Verification Code</Label>
-                  <Input
-                    id="otp"
-                    type="number"
-                    placeholder="Enter 6-digit code"
-                    value={otp}
+                  <Input id="otp" type="number" autoFocus placeholder="Enter 6-digit code" value={otp}
                     onChange={e => setOtp(e.target.value)}
                     className="h-12 text-base text-center tracking-widest text-lg"
-                    maxLength={6}
-                    disabled={authInProgress}
-                  />
+                    maxLength={6} disabled={authInProgress} />
                   <p className="text-xs text-muted-foreground">Code sent to +1 {phone}</p>
                 </div>
                 <Button onClick={handleVerifyOtp} disabled={authInProgress || otp.length < 6} className="w-full h-12 text-base">
                   {authInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                   {authInProgress ? 'Verifying...' : 'Verify & Continue'}
                 </Button>
-                <button onClick={() => { setIsCodeSent(false); setOtp(''); }} className="w-full text-sm text-muted-foreground hover:text-foreground text-center">
-                  ← Use a different number
-                </button>
+                <div className="flex gap-3">
+                  <button onClick={() => { setIsCodeSent(false); setOtp(''); }}
+                    className="flex-1 text-sm text-muted-foreground hover:text-foreground text-center">
+                    ← Different number
+                  </button>
+                  <button onClick={handleSendOtp} disabled={authInProgress}
+                    className="flex-1 text-sm text-primary hover:underline text-center disabled:opacity-50">
+                    Resend code
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -480,59 +437,35 @@ function MobileRatePage() {
     );
   }
 
-  // ── Loading game ────────────────────────────────────────────────────────────
-
-  if (isLoadingGame || !authChecked) {
-    return <LoadingScreen message="Loading game..." />;
-  }
-
-  if (!game) {
-    return <ErrorScreen message="Game not found. Please check the link and try again." />;
-  }
-
-  // ── Not authorized ──────────────────────────────────────────────────────────
+  if (isLoadingGame || !authChecked) return <LoadingScreen message="Loading game..." />;
+  if (!game) return <ErrorScreen message="Game not found. Please check the link and try again." />;
 
   if (!isAuthorized) {
-    const isPhoneMismatch = selectorUidFromUrl && currentUser?.phoneNumber;
+    // Web login: uid mismatch means wrong user is logged in
+    // Phone login: phone mismatch means wrong person scanned
+    const mismatchMsg = isWebLogin
+      ? `You are logged in as ${currentUser.email}, but this link was generated for a different selector.`
+      : `This QR code was generated for a different selector. The phone number you used (${currentUser.phoneNumber}) does not match.`;
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-xl font-bold mb-2">Access Denied</h2>
-        {isPhoneMismatch ? (
-          <p className="text-muted-foreground max-w-xs">
-            This QR code was generated for a different selector. The phone number you used (<span className="font-medium">{currentUser.phoneNumber}</span>) does not match the selector this link was created for.
-          </p>
-        ) : (
-          <p className="text-muted-foreground max-w-xs">
-            You are not assigned as a selector for this game. Please contact your series administrator.
-          </p>
-        )}
-        <p className="text-xs text-muted-foreground mt-4">Logged in as: {currentUser?.phoneNumber || currentUser?.email}</p>
+        <p className="text-muted-foreground max-w-xs">
+          {selectorUidFromUrl ? mismatchMsg : 'You are not assigned as a selector for this game. Please contact your series administrator.'}
+        </p>
+        <p className="text-xs text-muted-foreground mt-4">
+          Logged in as: {currentUser.email || currentUser.phoneNumber}
+        </p>
       </div>
     );
   }
 
-  // ── All rated ───────────────────────────────────────────────────────────────
-
-  if (players.length === 0) {
-    return <ErrorScreen message="No players found for this game." />;
-  }
+  if (players.length === 0) return <ErrorScreen message="No players found for this game." />;
 
   const allSaved = players.every(p => savedPlayers.has(p.id));
-  if (allSaved) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
-        <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
-        <h2 className="text-2xl font-bold text-green-600 mb-2">All Done! 🎉</h2>
-        <p className="text-muted-foreground max-w-xs">
-          You've rated all {players.length} players for {game.team1} vs {game.team2}.
-        </p>
-        <p className="text-sm text-muted-foreground mt-2">You can now close this page.</p>
-      </div>
-    );
+  if (allSaved && !isCertified) {
+    // Don't redirect to done screen — show certify prompt instead (bug fix from review)
   }
-
-  // ── Rating UI ───────────────────────────────────────────────────────────────
 
   const player = players[currentPlayerIndex];
   const playerRatings = ratings[player?.id] || getDefaultRatings(player);
@@ -548,18 +481,13 @@ function MobileRatePage() {
   };
 
   const ratedCount = players.filter(p => hasAnyNumericRating(p.id)).length;
-
   const skillLabels: Record<SkillKey, string> = {
-    batting: 'Batting',
-    bowling: 'Bowling',
-    fielding: 'Fielding',
-    wicketKeeping: 'Wicket Keeping',
+    batting: 'Batting', bowling: 'Bowling', fielding: 'Fielding', wicketKeeping: 'Wicket Keeping',
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-lg mx-auto">
-
-      {/* Header — two lines fitting all key details */}
+      {/* Header */}
       <div className="bg-primary text-primary-foreground px-4 py-2.5 sticky top-0 z-10">
         <p className="text-xs font-medium leading-snug truncate">
           {game.team1} vs {game.team2}
@@ -571,12 +499,8 @@ function MobileRatePage() {
             {game.venue ? <span> · {game.venue}</span> : ''}
           </p>
           {(game as any).externalScoreUrl && (
-            <a
-              href={(game as any).externalScoreUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs opacity-90 hover:opacity-100 underline whitespace-nowrap shrink-0 flex items-center gap-1"
-            >
+            <a href={(game as any).externalScoreUrl} target="_blank" rel="noopener noreferrer"
+              className="text-xs opacity-90 hover:opacity-100 underline whitespace-nowrap shrink-0 flex items-center gap-1">
               📋 Scorecard
             </a>
           )}
@@ -590,76 +514,48 @@ function MobileRatePage() {
           <span>{ratedCount} rated</span>
         </div>
         <div className="w-full bg-muted rounded-full h-2">
-          <div
-            className="bg-primary rounded-full h-2 transition-all"
-            style={{ width: `${((currentPlayerIndex) / players.length) * 100}%` }}
-          />
+          <div className="bg-primary rounded-full h-2 transition-all"
+            style={{ width: `${((currentPlayerIndex + 1) / players.length) * 100}%` }} />
         </div>
-
-        {/* Player dots */}
         <div className="flex gap-1 mt-2 flex-wrap">
           {players.map((p, i) => (
-            <button
-              key={p.id}
-              onClick={() => setCurrentPlayerIndex(i)}
-              className={cn(
-                "w-6 h-6 rounded-full text-xs font-medium transition-colors",
+            <button key={p.id} onClick={() => setCurrentPlayerIndex(i)}
+              className={cn("w-6 h-6 rounded-full text-xs font-medium transition-colors",
                 i === currentPlayerIndex ? "bg-primary text-primary-foreground" :
-                hasAnyNumericRating(p.id) ? "bg-green-500 text-white" :
-                "bg-muted text-muted-foreground"
-              )}
-            >
+                hasAnyNumericRating(p.id) ? "bg-green-500 text-white" : "bg-muted text-muted-foreground")}>
               {i + 1}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Player card with swipe + nav arrows */}
       <div className="flex-1 px-4 pb-4 space-y-4">
-
-        {/* Search bar */}
+        {/* Search */}
         {showSearch ? (
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              autoFocus
-              placeholder="Search player name..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9 pr-9 h-10"
-            />
-            <button
-              onClick={() => { setShowSearch(false); setSearchQuery(''); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            >
+            <Input autoFocus placeholder="Search player name..." value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)} className="pl-9 pr-9 h-10" />
+            <button onClick={() => { setShowSearch(false); setSearchQuery(''); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
               <X className="h-4 w-4" />
             </button>
             {searchQuery && (
               <div className="absolute top-full left-0 right-0 bg-card border rounded-xl shadow-lg z-20 mt-1 max-h-48 overflow-y-auto">
-                {players
-                  .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                  .map((p, i) => (
-                    <button
-                      key={p.id}
-                      onClick={() => {
-                        setCurrentPlayerIndex(players.indexOf(p));
-                        setShowSearch(false);
-                        setSearchQuery('');
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left border-b last:border-0"
-                    >
-                      <Avatar className="h-8 w-8 shrink-0">
-                        <AvatarImage src={p.avatarUrl || 'https://placehold.co/32x32.png'} alt={p.name} />
-                        <AvatarFallback className="text-xs">{p.name.substring(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{p.teamName} · {p.primarySkill}</p>
-                      </div>
-                      {savedPlayers.has(p.id) && <CheckCircle className="h-4 w-4 text-green-500 ml-auto shrink-0" />}
-                    </button>
-                  ))}
+                {players.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).map(p => (
+                  <button key={p.id} onClick={() => { setCurrentPlayerIndex(players.indexOf(p)); setShowSearch(false); setSearchQuery(''); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left border-b last:border-0">
+                    <Avatar className="h-8 w-8 shrink-0">
+                      <AvatarImage src={p.avatarUrl || 'https://placehold.co/32x32.png'} alt={p.name} />
+                      <AvatarFallback className="text-xs">{p.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">{p.teamName} · {p.primarySkill}</p>
+                    </div>
+                    {savedPlayers.has(p.id) && <CheckCircle className="h-4 w-4 text-green-500 ml-auto shrink-0" />}
+                  </button>
+                ))}
                 {players.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-4">No players found</p>
                 )}
@@ -668,22 +564,14 @@ function MobileRatePage() {
           </div>
         ) : null}
 
-        {/* Player card with swipe gestures and nav arrows */}
-        <div
-          className="bg-card border rounded-xl overflow-hidden"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          {/* Nav arrows + player info row */}
+        {/* Player card */}
+        <div className="bg-card border rounded-xl overflow-hidden" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           <div className="flex items-center gap-2 p-3">
-            <button
-              onClick={() => setCurrentPlayerIndex(prev => Math.max(0, prev - 1))}
+            <button onClick={() => setCurrentPlayerIndex(prev => Math.max(0, prev - 1))}
               disabled={currentPlayerIndex === 0}
-              className="h-10 w-10 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-30 hover:bg-muted transition-colors"
-            >
+              className="h-10 w-10 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-30 hover:bg-muted transition-colors">
               <ChevronLeft className="h-5 w-5" />
             </button>
-
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <Avatar className="h-14 w-14 shrink-0">
                 <AvatarImage src={player.avatarUrl || 'https://placehold.co/56x56.png'} alt={player.name} />
@@ -698,26 +586,18 @@ function MobileRatePage() {
                 <p className="text-xs text-muted-foreground mt-0.5">{player.teamName}</p>
               </div>
             </div>
-
             <div className="flex flex-col items-center gap-1 shrink-0">
-              <button
-                onClick={() => setCurrentPlayerIndex(prev => Math.min(players.length - 1, prev + 1))}
+              <button onClick={() => setCurrentPlayerIndex(prev => Math.min(players.length - 1, prev + 1))}
                 disabled={currentPlayerIndex === players.length - 1}
-                className="h-10 w-10 rounded-full border flex items-center justify-center disabled:opacity-30 hover:bg-muted transition-colors"
-              >
+                className="h-10 w-10 rounded-full border flex items-center justify-center disabled:opacity-30 hover:bg-muted transition-colors">
                 <ChevronRight className="h-5 w-5" />
               </button>
               {isSaved && <CheckCircle className="h-5 w-5 text-green-500" />}
             </div>
           </div>
-
-          {/* Swipe hint + search button */}
           <div className="flex items-center justify-between px-3 pb-2">
             <p className="text-xs text-muted-foreground">← swipe to navigate →</p>
-            <button
-              onClick={() => setShowSearch(true)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
+            <button onClick={() => setShowSearch(true)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
               <Search className="h-3.5 w-3.5" /> Find player
             </button>
           </div>
@@ -729,90 +609,57 @@ function MobileRatePage() {
           </div>
         )}
         {!isFinalized && isCertified && (
-          <button
-            className="w-full bg-blue-50 border border-blue-200 rounded-xl p-3 text-center text-blue-700 text-sm font-medium active:bg-blue-100 transition-colors"
-            onClick={() => setIsCertified(false)}
-          >
+          <button className="w-full bg-blue-50 border border-blue-200 rounded-xl p-3 text-center text-blue-700 text-sm font-medium active:bg-blue-100 transition-colors"
+            onClick={() => setIsCertified(false)}>
             🔒 You have certified your ratings — tap here to edit and re-certify
           </button>
         )}
 
-        {/* Rating sections — all 4 skills */}
+        {/* Skill rating cards */}
         {ALL_SKILLS.map(skill => {
           const currentRating = playerRatings[skill];
           const isNA = currentRating === 'Not Applicable';
-          // NA skills start collapsed, all others start expanded
-          // expandedSkills overrides the default when user has toggled
-          const hasBeenToggled = player.id in expandedSkills && expandedSkills[player.id] !== undefined;
           const isSkillExpanded = expandedSkills[player.id]?.has(skill) ?? !isNA;
           const isNoteExpanded = expandedNotes[player.id]?.has(skill) ?? false;
           const noteValue = notes[player.id]?.[skill] || '';
           const isPrimary = isPrimarySkill(player, skill);
 
           return (
-            <div key={skill} className={cn(
-              "bg-card border rounded-xl overflow-hidden transition-all",
-              isNA && !isSkillExpanded ? "opacity-60" : ""
-            )}>
-              {/* Skill header — always visible, tap to expand/collapse */}
-              <button
-                type="button"
-                className="w-full flex items-center gap-2 px-4 py-3 text-left"
-                onClick={() => toggleSkillExpanded(player.id, skill)}
-                disabled={isReadOnly}
-              >
+            <div key={skill} className={cn("bg-card border rounded-xl overflow-hidden transition-all", isNA && !isSkillExpanded ? "opacity-60" : "")}>
+              <button type="button" className="w-full flex items-center gap-2 px-4 py-3 text-left"
+                onClick={() => toggleSkillExpanded(player.id, skill)} disabled={isReadOnly}>
                 <span className="font-semibold text-sm text-muted-foreground uppercase tracking-wide flex-1">
                   {skillLabels[skill]}
                   {isPrimary && <span className="ml-2 text-primary text-xs normal-case">★ Primary</span>}
                 </span>
-                <span className={cn(
-                  "text-sm font-bold",
+                <span className={cn("text-sm font-bold",
                   isNA ? "text-muted-foreground text-xs font-normal" :
-                  currentRating === 'Not Rated' ? "text-muted-foreground text-xs font-normal" :
-                  "text-primary"
-                )}>
+                  currentRating === 'Not Rated' ? "text-muted-foreground text-xs font-normal" : "text-primary")}>
                   {currentRating}
                 </span>
-                <ChevronDown className={cn(
-                  "h-4 w-4 text-muted-foreground transition-transform ml-1",
-                  isSkillExpanded && "rotate-180"
-                )} />
+                <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform ml-1", isSkillExpanded && "rotate-180")} />
               </button>
 
-              {/* Rating content — shown when not NA or when expanded */}
               {isSkillExpanded && (
                 <div className="px-4 pb-4 space-y-3 border-t pt-3">
-                  {/* Numeric ratings 0.5–5.0 */}
                   <div className="grid grid-cols-5 gap-1.5">
                     {NUMERIC_RATINGS.map(val => (
-                      <button
-                        key={val}
-                        type="button"
-                        disabled={isReadOnly}
+                      <button key={val} type="button" disabled={isReadOnly}
                         onClick={() => handleRatingChange(player.id, skill, val)}
-                        className={cn(
-                          "h-11 rounded-lg text-sm font-bold border-2 transition-all",
+                        className={cn("h-11 rounded-lg text-sm font-bold border-2 transition-all",
                           currentRating === val
                             ? "bg-primary text-primary-foreground border-primary scale-105 shadow-sm"
-                            : "bg-background border-border hover:border-primary hover:text-primary"
-                        )}
-                      >
+                            : "bg-background border-border hover:border-primary hover:text-primary")}>
                         {val}
                       </button>
                     ))}
                   </div>
-
-                  {/* Not Rated / Not Applicable */}
                   <div className="grid grid-cols-2 gap-2">
                     {SPECIAL_RATINGS.map(val => (
-                      <button
-                        key={val}
-                        type="button"
-                        disabled={isReadOnly}
+                      <button key={val} type="button" disabled={isReadOnly}
                         onClick={() => {
                           handleRatingChange(player.id, skill, val);
                           if (val === 'Not Applicable') {
-                            // collapse when set to NA
                             setExpandedSkills(prev => {
                               const current = new Set(prev[player.id] || []);
                               current.delete(skill);
@@ -820,41 +667,26 @@ function MobileRatePage() {
                             });
                           }
                         }}
-                        className={cn(
-                          "h-9 rounded-lg text-xs font-medium border-2 transition-all",
+                        className={cn("h-9 rounded-lg text-xs font-medium border-2 transition-all",
                           currentRating === val
                             ? "bg-muted text-foreground border-muted-foreground"
-                            : "bg-background border-border hover:border-muted-foreground text-muted-foreground"
-                        )}
-                      >
+                            : "bg-background border-border hover:border-muted-foreground text-muted-foreground")}>
                         {val}
                       </button>
                     ))}
                   </div>
-
-                  {/* Notes — always available when skill is not NA */}
                   <div>
-                    <button
-                      type="button"
-                      onClick={() => toggleNoteExpanded(player.id, skill)}
+                    <button type="button" onClick={() => toggleNoteExpanded(player.id, skill)}
                       className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                      disabled={isReadOnly}
-                    >
+                      disabled={isReadOnly}>
                       <MessageSquare className="h-3.5 w-3.5" />
                       {isNoteExpanded ? 'Hide note' : noteValue ? `Note: "${noteValue.slice(0, 30)}${noteValue.length > 30 ? '...' : ''}"` : 'Add note'}
                       <ChevronDown className={cn("h-3 w-3 transition-transform", isNoteExpanded && "rotate-180")} />
                     </button>
-
                     {isNoteExpanded && (
-                      <Textarea
-                        placeholder={`Notes on ${skillLabels[skill].toLowerCase()}...`}
-                        value={noteValue}
-                        onChange={e => handleNoteChange(player.id, skill, e.target.value)}
-                        rows={2}
-                        className="mt-2 text-sm resize-none"
-                        disabled={isReadOnly}
-                        maxLength={200}
-                      />
+                      <Textarea placeholder={`Notes on ${skillLabels[skill].toLowerCase()}...`}
+                        value={noteValue} onChange={e => handleNoteChange(player.id, skill, e.target.value)}
+                        rows={2} className="mt-2 text-sm resize-none" disabled={isReadOnly} maxLength={200} />
                     )}
                   </div>
                 </div>
@@ -863,23 +695,15 @@ function MobileRatePage() {
           );
         })}
 
-        {/* Save & navigation */}
+        {/* Save button */}
         {!isReadOnly && (
-          <Button
-            onClick={handleSaveAndNext}
-            disabled={isSaving}
-            className="w-full h-14 text-base font-semibold"
-          >
-            {isSaving ? (
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            ) : isSaved ? (
-              <CheckCircle className="mr-2 h-5 w-5" />
-            ) : null}
+          <Button onClick={handleSaveAndNext} disabled={isSaving} className="w-full h-14 text-base font-semibold">
+            {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : isSaved ? <CheckCircle className="mr-2 h-5 w-5" /> : null}
             {isSaving ? 'Saving...' : isSaved ? 'Update & Next' : 'Save & Next →'}
           </Button>
         )}
 
-        {/* Certify section — always visible unless fully finalized */}
+        {/* Certify section */}
         {!isFinalized && (
           <div className="border rounded-xl p-4 space-y-3 bg-card">
             <div className="flex items-center justify-between">
@@ -901,11 +725,9 @@ function MobileRatePage() {
                 <div className="text-xs text-muted-foreground bg-muted rounded-lg p-2">
                   ⚠️ Certifying confirms all ratings are final. Any rating change after certification will reset your certification status.
                 </div>
-                <Button
-                  onClick={() => setShowCertifyConfirm(true)}
+                <Button onClick={() => setShowCertifyConfirm(true)}
                   disabled={isCertifying || savedPlayers.size === 0}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white h-12"
-                >
+                  className="w-full bg-green-600 hover:bg-green-700 text-white h-12">
                   {isCertifying
                     ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Certifying...</>
                     : <><ShieldCheck className="mr-2 h-4 w-4" /> Certify My Ratings ({ratedCount}/{players.length} rated)</>}
@@ -915,7 +737,7 @@ function MobileRatePage() {
           </div>
         )}
 
-        {/* Certify confirmation dialog */}
+        {/* Certify confirmation */}
         {showCertifyConfirm && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
             <div className="bg-card rounded-xl p-6 w-full max-w-sm space-y-4 shadow-xl">
@@ -930,19 +752,15 @@ function MobileRatePage() {
                 This confirms your ratings are accurate and complete. If all selectors certify, ratings will be automatically finalized.
               </p>
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={() => setShowCertifyConfirm(false)}>
-                  Cancel
-                </Button>
-                <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleCertify}>
-                  Confirm & Certify
-                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => setShowCertifyConfirm(false)}>Cancel</Button>
+                <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleCertify}>Confirm & Certify</Button>
               </div>
             </div>
           </div>
         )}
 
         <p className="text-center text-xs text-muted-foreground pb-4">
-          Logged in as {currentUser.phoneNumber || currentUser.email}
+          Logged in as {currentUser.email || currentUser.phoneNumber}
         </p>
       </div>
     </div>

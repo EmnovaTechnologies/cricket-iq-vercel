@@ -137,21 +137,12 @@ function MobileMatchReportPage() {
         const linkedGameId = sc.linkedGameId;
         let authorizedUid: string | null = null;
 
-        if (selectorUidFromUrl) {
-          // Look up the expected selector's phone from their Firestore profile
-          const expectedUserSnap = await getDocs(
-            query(collection(db, 'users'), where('uid', '==', selectorUidFromUrl), limit(1))
-          );
-          if (!expectedUserSnap.empty) {
-            const expectedProfile = expectedUserSnap.docs[0].data();
-            const expectedPhone = expectedProfile.phoneNumber;
+        const isWebLogin = !currentUser.phoneNumber;
 
-            if (
-              currentUser.phoneNumber &&
-              expectedPhone &&
-              currentUser.phoneNumber === expectedPhone
-            ) {
-              // Phone matched — check if this uid is a selector for the linked game
+        if (selectorUidFromUrl) {
+          if (isWebLogin) {
+            // Path A: web login (Google/email) — trust currentUser.uid directly
+            if (currentUser.uid === selectorUidFromUrl) {
               if (linkedGameId) {
                 const { getGameByIdFromDB } = await import('@/lib/db');
                 const game = await getGameByIdFromDB(linkedGameId);
@@ -159,14 +150,45 @@ function MobileMatchReportPage() {
                   authorizedUid = selectorUidFromUrl;
                 }
               } else {
-                // No linked game — fall back to checking selector role on user profile
-                if (
-                  expectedProfile.roles?.includes('selector') ||
-                  expectedProfile.roles?.includes('Series Admin') ||
-                  expectedProfile.roles?.includes('Organization Admin') ||
-                  expectedProfile.roles?.includes('admin')
-                ) {
-                  authorizedUid = selectorUidFromUrl;
+                // No linked game — check roles on profile
+                const profileSnap = await getDocs(
+                  query(collection(db, 'users'), where('uid', '==', currentUser.uid), limit(1))
+                );
+                if (!profileSnap.empty) {
+                  const profile = profileSnap.docs[0].data();
+                  if (profile.roles?.includes('selector') || profile.roles?.includes('Series Admin') ||
+                      profile.roles?.includes('Organization Admin') || profile.roles?.includes('admin')) {
+                    authorizedUid = selectorUidFromUrl;
+                  }
+                }
+              }
+            } else {
+              // Wrong user logged in — reject immediately
+              setAuthChecked(true);
+              setIsAuthorized(false);
+              setIsLoadingData(false);
+              return;
+            }
+          } else {
+            // Path B: phone OTP — match phone to expected selector profile
+            const expectedUserSnap = await getDocs(
+              query(collection(db, 'users'), where('uid', '==', selectorUidFromUrl), limit(1))
+            );
+            if (!expectedUserSnap.empty) {
+              const expectedProfile = expectedUserSnap.docs[0].data();
+              const expectedPhone = expectedProfile.phoneNumber;
+              if (currentUser.phoneNumber && expectedPhone && currentUser.phoneNumber === expectedPhone) {
+                if (linkedGameId) {
+                  const { getGameByIdFromDB } = await import('@/lib/db');
+                  const game = await getGameByIdFromDB(linkedGameId);
+                  if (game?.selectorUserIds?.includes(selectorUidFromUrl)) {
+                    authorizedUid = selectorUidFromUrl;
+                  }
+                } else {
+                  if (expectedProfile.roles?.includes('selector') || expectedProfile.roles?.includes('Series Admin') ||
+                      expectedProfile.roles?.includes('Organization Admin') || expectedProfile.roles?.includes('admin')) {
+                    authorizedUid = selectorUidFromUrl;
+                  }
                 }
               }
             }
@@ -428,12 +450,16 @@ function MobileMatchReportPage() {
 
   // Not authorized
   if (!isAuthorized) {
-    const isPhoneMismatch = selectorUidFromUrl && currentUser?.phoneNumber;
+    const isWebLogin = !currentUser?.phoneNumber;
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-xl font-bold mb-2">Access Denied</h2>
-        {isPhoneMismatch ? (
+        {selectorUidFromUrl && isWebLogin ? (
+          <p className="text-muted-foreground max-w-xs">
+            You are logged in as <span className="font-medium">{currentUser.email}</span>, but this link was generated for a different selector.
+          </p>
+        ) : selectorUidFromUrl && !isWebLogin ? (
           <p className="text-muted-foreground max-w-xs">
             This QR code was generated for a different selector. The phone number you used (
             <span className="font-medium">{currentUser.phoneNumber}</span>) does not match.
