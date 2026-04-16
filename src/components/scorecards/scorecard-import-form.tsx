@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Loader2, CheckCircle, ArrowRight, ArrowLeft, ImageIcon, Info,
   Table, X, Sparkles, ExternalLink, HelpCircle, FileSpreadsheet,
@@ -26,7 +25,7 @@ import type { ScorecardInnings, Series, Team } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-type Step = 'details' | 'uploads' | 'review';
+type Step = 'choose' | 'upload' | 'details' | 'review';
 type ImportMode = 'screenshot' | 'excel';
 
 interface ImageSlot {
@@ -70,7 +69,7 @@ export function ScorecardImportForm() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [step, setStep] = useState<Step>('details');
+  const [step, setStep] = useState<Step>('choose');
   const [importMode, setImportMode] = useState<ImportMode>('screenshot');
   const [isSaving, setIsSaving] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -367,8 +366,15 @@ export function ScorecardImportForm() {
   };
 
   // ─── Step labels ──────────────────────────────────────────────────────────
-  const stepKeys: Step[] = ['details', 'uploads', 'review'];
-  const stepLabels: Record<Step, string> = { details: 'Match Details', uploads: importMode === 'excel' ? 'Upload File' : 'Upload Screenshots', review: 'Review & Save' };
+  const stepKeys: Step[] = importMode === 'excel'
+    ? ['choose', 'upload', 'details', 'review']
+    : ['choose', 'details', 'upload', 'review'];
+  const stepLabels: Record<Step, string> = {
+    choose: 'Import Method',
+    upload: importMode === 'excel' ? 'Upload File' : 'Upload Screenshots',
+    details: 'Match Details',
+    review: 'Review & Save',
+  };
   const currentIdx = stepKeys.indexOf(step);
 
   // ─── Validation ───────────────────────────────────────────────────────────
@@ -400,6 +406,41 @@ export function ScorecardImportForm() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+
+          {/* ── Step: Choose method ────────────────────────────────────────── */}
+          {step === 'choose' && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground text-center">How would you like to import this scorecard?</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button
+                  onClick={() => { setImportMode('excel'); setStep('upload'); }}
+                  className="flex flex-col items-center gap-3 p-6 border-2 rounded-xl hover:border-primary hover:bg-primary/5 transition-colors text-left group"
+                >
+                  <FileSpreadsheet className="h-10 w-10 text-primary" />
+                  <div>
+                    <p className="font-semibold text-sm">Excel / CSV</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Upload the CricClubs Excel export. Teams, date and result are extracted automatically.
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-xs border-green-400 text-green-700">Recommended</Badge>
+                </button>
+                <button
+                  onClick={() => { setImportMode('screenshot'); setStep('details'); }}
+                  className="flex flex-col items-center gap-3 p-6 border-2 rounded-xl hover:border-primary hover:bg-primary/5 transition-colors text-left group"
+                >
+                  <ImageIcon className="h-10 w-10 text-primary" />
+                  <div>
+                    <p className="font-semibold text-sm">Screenshots (AI)</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Take screenshots from CricClubs. Claude reads all images together for accurate extraction.
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="text-xs">AI-powered</Badge>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* ── Step: Details ──────────────────────────────────────────────── */}
           {step === 'details' && (
@@ -501,38 +542,29 @@ export function ScorecardImportForm() {
                 </div>
               )}
 
-              <Button
-                onClick={() => setStep('uploads')}
-                disabled={!team1.trim() || !team2.trim() || !date || (!linkedGameId && !seriesId)}
-                className="w-full"
-              >
-                Next: {importMode === 'excel' ? 'Upload File' : 'Upload Screenshots'} <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              {!linkedGameId && !seriesId && (
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setStep(importMode === 'excel' ? 'upload' : 'choose')}>
+                  <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                </Button>
+                <Button
+                  onClick={() => setStep(importMode === 'excel' ? 'review' : 'upload')}
+                  disabled={!team1.trim() || !team2.trim() || !date || (!linkedGameId && !seriesId && importMode === 'screenshot')}
+                  className="flex-1"
+                >
+                  {importMode === 'excel' ? 'Review & Save' : 'Next: Upload Screenshots'} <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+              {!linkedGameId && !seriesId && importMode === 'screenshot' && (
                 <p className="text-xs text-center text-muted-foreground">Select a series to continue.</p>
               )}
             </div>
           )}
 
           {/* ── Step: Uploads ──────────────────────────────────────────────── */}
-          {step === 'uploads' && (
+          {step === 'upload' && importMode === 'screenshot' && (
             <div className="space-y-6">
-              {/* Mode tabs */}
-              <Tabs value={importMode} onValueChange={v => {
-                setImportMode(v as ImportMode);
-                setParsedInnings([]);
-              }}>
-                <TabsList className="w-full">
-                  <TabsTrigger value="screenshot" className="flex-1 flex items-center gap-1.5">
-                    <ImageIcon className="h-3.5 w-3.5" /> Screenshot (AI)
-                  </TabsTrigger>
-                  <TabsTrigger value="excel" className="flex-1 flex items-center gap-1.5">
-                    <FileSpreadsheet className="h-3.5 w-3.5" /> Excel / CSV
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* ── Screenshot tab ── */}
-                <TabsContent value="screenshot" className="space-y-5 mt-4">
+              {/* Screenshot upload content */}
+              <div className="space-y-5">
                   <Alert className="border-blue-200 bg-blue-50">
                     <Info className="h-4 w-4 text-blue-600" />
                     <AlertTitle className="text-blue-700">How to capture screenshots</AlertTitle>
@@ -616,7 +648,7 @@ export function ScorecardImportForm() {
                     </div>
                   )}
 
-                  {hasExtracted && importMode === 'screenshot' && (
+                  {hasExtracted && (
                     <Alert className="border-green-200 bg-green-50">
                       <CheckCircle className="h-4 w-4 text-green-600" />
                       <AlertTitle className="text-green-700">Extraction complete</AlertTitle>
@@ -625,11 +657,21 @@ export function ScorecardImportForm() {
                       </AlertDescription>
                     </Alert>
                   )}
-                </TabsContent>
+              </div>
 
-                {/* ── Excel/CSV tab ── */}
-                <TabsContent value="excel" className="space-y-5 mt-4">
-                  <Alert className="border-blue-200 bg-blue-50">
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setStep('details')}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
+                <Button onClick={() => setStep('review')} disabled={!hasExtracted} className="flex-1">
+                  Review & Save <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step: Upload (Excel mode) ───────────────────────────────────── */}
+          {step === 'upload' && importMode === 'excel' && (
+            <div className="space-y-5">
+              <Alert className="border-blue-200 bg-blue-50">
                     <Info className="h-4 w-4 text-blue-600" />
                     <AlertTitle className="text-blue-700">How to get the CricClubs Excel file</AlertTitle>
                     <AlertDescription className="text-blue-600 text-sm">
@@ -751,21 +793,19 @@ export function ScorecardImportForm() {
                       <CheckCircle className="h-4 w-4 text-green-600" />
                       <AlertTitle className="text-green-700">File parsed successfully</AlertTitle>
                       <AlertDescription className="text-green-600 text-sm">
-                        {parsedInnings.length} innings ready. Confirm the matches above then click Review.
+                        {parsedInnings.length} innings ready. Confirm the matches above, then continue to review details.
                       </AlertDescription>
                     </Alert>
                   )}
-                </TabsContent>
-              </Tabs>
 
               <div className="flex gap-3 pt-2">
-                <Button variant="outline" onClick={() => setStep('details')}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
+                <Button variant="outline" onClick={() => setStep('choose')}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
                 <Button
-                  onClick={() => setStep('review')}
-                  disabled={importMode === 'screenshot' ? !hasExtracted : !xlsReadyToReview}
+                  onClick={() => setStep('details')}
+                  disabled={!xlsReadyToReview}
                   className="flex-1"
                 >
-                  Review & Save <ArrowRight className="ml-2 h-4 w-4" />
+                  Confirm Details <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -835,7 +875,7 @@ export function ScorecardImportForm() {
               )}
 
               <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setStep('uploads')}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
+                <Button variant="outline" onClick={() => setStep('details')}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
                 <Button onClick={handleSave} disabled={isSaving} className="flex-1">
                   {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                   {isSaving ? 'Saving...' : 'Save Scorecard'}
