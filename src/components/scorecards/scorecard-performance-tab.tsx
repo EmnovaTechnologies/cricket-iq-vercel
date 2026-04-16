@@ -47,19 +47,19 @@ function PlayerScoreCard({ player, rank, scoreType = 'total' }: { player: Player
         </div>
         <p className="text-xs text-muted-foreground mb-1.5">{player.team}</p>
         <div className="flex flex-wrap gap-1.5">
-          {player.battingScore > 0 && (
+          {(scoreType === 'total' || scoreType === 'batting') && player.battingScore > 0 && (
             <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
               Bat: +{player.battingScore}
               {player.batting && ` (${player.batting.runs}r, ${player.batting.balls}b)`}
             </span>
           )}
-          {player.bowlingScore > 0 && (
+          {(scoreType === 'total' || scoreType === 'bowling') && player.bowlingScore > 0 && (
             <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
               Bowl: +{player.bowlingScore}
               {player.bowling && ` (${player.bowling.wickets}w, ${player.bowling.economy} econ)`}
             </span>
           )}
-          {player.fieldingScore > 0 && (
+          {(scoreType === 'total' || scoreType === 'fielding') && player.fieldingScore > 0 && (
             <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
               Field: +{player.fieldingScore}
             </span>
