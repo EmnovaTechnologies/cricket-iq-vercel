@@ -153,9 +153,19 @@ export async function updateMatchReportAction(
     if (data.isSelectorCertified) return { success: false, error: 'Unlock your report before editing.' };
     if (data.isCertified) return { success: false, error: 'Report has been admin-certified and cannot be edited.' };
 
+    // reportingTeam is the opposite of opposingTeam — derive from existing data
+    const reportingTeam = updates.opposingTeam === data.reportingTeam
+      ? data.opposingTeam  // swapped — use existing opposing as reporting
+      : data.reportingTeam; // same opposing team — keep existing reporting team
     await adminDb.collection(COLLECTION).doc(reportId).update({
-      ...updates,
-      reportingTeam: updates.opposingTeam === data.team1 ? data.team2 : data.team1,
+      opposingTeam: updates.opposingTeam,
+      reportingTeam,
+      top3Players: updates.top3Players,
+      highlights: updates.highlights,
+      missedCatches: updates.missedCatches,
+      missedRunOuts: updates.missedRunOuts,
+      greatCatchesRunOuts: updates.greatCatchesRunOuts,
+      sportsmanship: updates.sportsmanship,
     });
     return { success: true };
   } catch (error: any) {
