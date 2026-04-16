@@ -24,6 +24,7 @@ import {
   Star, Heart, FileText, CheckCircle2, Clock, Lock, LockOpen
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { MentionTextarea, MentionText } from '@/components/ui/mention-textarea';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 
 interface MatchReportTabProps {
@@ -73,6 +74,9 @@ export function MatchReportTab({
   const [sportsmanship, setSportsmanship] = useState('');
 
   const [isSelector, setIsSelector] = useState(isAssignedSelector);
+
+  // Flat list of all players for @mention autocomplete
+  const allPlayers = Object.values(playersByTeam).flat();
 
   const canViewAdmin = effectivePermissions[PERMISSIONS.SERIES_MANAGE_ADMINS_ANY] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
@@ -311,11 +315,13 @@ export function MatchReportTab({
               <Label className="flex items-center gap-1.5">
                 <Star className="h-3.5 w-3.5 text-primary" /> Game Highlights
               </Label>
-              <Textarea
-                placeholder="Describe key moments, standout performances, and overall game quality..."
+              <MentionTextarea
+                placeholder="Describe key moments, standout performances, and overall game quality... (type @ to tag a player)"
                 value={highlights}
-                onChange={e => setHighlights(e.target.value)}
-                className="min-h-[80px] text-sm"
+                onChange={setHighlights}
+                players={allPlayers}
+                rows={3}
+                className="min-h-[80px]"
               />
             </div>
 
@@ -325,22 +331,24 @@ export function MatchReportTab({
                 <Label className="flex items-center gap-1.5">
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Missed Catches
                 </Label>
-                <Textarea
-                  placeholder="Describe any missed catches — player names and situation..."
+                <MentionTextarea
+                  placeholder="Describe any missed catches... (type @ to tag a player)"
                   value={missedCatches}
-                  onChange={e => setMissedCatches(e.target.value)}
-                  className="min-h-[60px] text-sm"
+                  onChange={setMissedCatches}
+                  players={allPlayers}
+                  rows={2}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="flex items-center gap-1.5">
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Missed Run-Outs
                 </Label>
-                <Textarea
-                  placeholder="Describe any missed run-out opportunities — player names and situation..."
+                <MentionTextarea
+                  placeholder="Describe any missed run-out opportunities... (type @ to tag a player)"
                   value={missedRunOuts}
-                  onChange={e => setMissedRunOuts(e.target.value)}
-                  className="min-h-[60px] text-sm"
+                  onChange={setMissedRunOuts}
+                  players={allPlayers}
+                  rows={2}
                 />
               </div>
             </div>
@@ -350,11 +358,12 @@ export function MatchReportTab({
               <Label className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> Great Catches / Run-Outs
               </Label>
-              <Textarea
-                placeholder="Name specific players and describe the effort..."
+              <MentionTextarea
+                placeholder="Name specific players and describe the effort... (type @ to tag a player)"
                 value={greatCatchesRunOuts}
-                onChange={e => setGreatCatchesRunOuts(e.target.value)}
-                className="min-h-[60px] text-sm"
+                onChange={setGreatCatchesRunOuts}
+                players={allPlayers}
+                rows={2}
               />
             </div>
 
@@ -363,11 +372,12 @@ export function MatchReportTab({
               <Label className="flex items-center gap-1.5">
                 <Heart className="h-3.5 w-3.5 text-rose-500" /> Overall Sportsmanship
               </Label>
-              <Textarea
-                placeholder="Comment on attitude, conduct, and team spirit..."
+              <MentionTextarea
+                placeholder="Comment on attitude, conduct, and team spirit... (type @ to tag a player)"
                 value={sportsmanship}
-                onChange={e => setSportsmanship(e.target.value)}
-                className="min-h-[60px] text-sm"
+                onChange={setSportsmanship}
+                players={allPlayers}
+                rows={2}
               />
             </div>
 
@@ -545,7 +555,7 @@ export function MatchReportTab({
                       <p className="text-xs font-medium text-muted-foreground flex items-center gap-1 mb-1">
                         <Star className="h-3 w-3 text-primary" /> Highlights
                       </p>
-                      <p className="text-sm">{report.highlights}</p>
+                      <MentionText text={report.highlights} knownPlayers={allPlayers} className="text-sm" />
                     </div>
                   )}
 
@@ -557,7 +567,7 @@ export function MatchReportTab({
                           <p className="text-xs font-medium text-muted-foreground flex items-center gap-1 mb-1">
                             <AlertTriangle className="h-3 w-3 text-amber-500" /> Missed Catches
                           </p>
-                          <p className="text-sm">{report.missedCatches}</p>
+                          <MentionText text={report.missedCatches} knownPlayers={allPlayers} className="text-sm" />
                         </div>
                       )}
                       {report.missedRunOuts && (
@@ -565,7 +575,7 @@ export function MatchReportTab({
                           <p className="text-xs font-medium text-muted-foreground flex items-center gap-1 mb-1">
                             <AlertTriangle className="h-3 w-3 text-amber-500" /> Missed Run-Outs
                           </p>
-                          <p className="text-sm">{report.missedRunOuts}</p>
+                          <MentionText text={report.missedRunOuts} knownPlayers={allPlayers} className="text-sm" />
                         </div>
                       )}
                     </div>
@@ -577,7 +587,7 @@ export function MatchReportTab({
                       <p className="text-xs font-medium text-muted-foreground flex items-center gap-1 mb-1">
                         <CheckCircle2 className="h-3 w-3 text-green-500" /> Great Catches / Run-Outs
                       </p>
-                      <p className="text-sm">{report.greatCatchesRunOuts}</p>
+                      <MentionText text={report.greatCatchesRunOuts} knownPlayers={allPlayers} className="text-sm" />
                     </div>
                   )}
 
@@ -587,7 +597,7 @@ export function MatchReportTab({
                       <p className="text-xs font-medium text-muted-foreground flex items-center gap-1 mb-1">
                         <Heart className="h-3 w-3 text-rose-500" /> Sportsmanship
                       </p>
-                      <p className="text-sm">{report.sportsmanship}</p>
+                      <MentionText text={report.sportsmanship} knownPlayers={allPlayers} className="text-sm" />
                     </div>
                   )}
 

@@ -34,6 +34,7 @@ import {
   Star, AlertTriangle, Heart, CheckCircle2, ShieldCheck, FileText, Lock, LockOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MentionTextarea, MentionText } from '@/components/ui/mention-textarea';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -593,7 +594,7 @@ function MobileMatchReportPage() {
                   <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
                     <Star className="h-3.5 w-3.5 text-primary" /> Highlights
                   </p>
-                  <p className="text-sm">{myReport.highlights}</p>
+                  <MentionText text={myReport.highlights} knownPlayers={allPlayers} className="text-sm" />
                 </div>
               )}
 
@@ -603,7 +604,7 @@ function MobileMatchReportPage() {
                   <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
                     <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Missed Catches
                   </p>
-                  <p className="text-sm">{myReport.missedCatches}</p>
+                  <MentionText text={myReport.missedCatches} knownPlayers={allPlayers} className="text-sm" />
                 </div>
               )}
 
@@ -613,7 +614,7 @@ function MobileMatchReportPage() {
                   <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
                     <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Missed Run-Outs
                   </p>
-                  <p className="text-sm">{myReport.missedRunOuts}</p>
+                  <MentionText text={myReport.missedRunOuts} knownPlayers={allPlayers} className="text-sm" />
                 </div>
               )}
 
@@ -623,7 +624,7 @@ function MobileMatchReportPage() {
                   <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
                     <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> Great Catches / Run-Outs
                   </p>
-                  <p className="text-sm">{myReport.greatCatchesRunOuts}</p>
+                  <MentionText text={myReport.greatCatchesRunOuts} knownPlayers={allPlayers} className="text-sm" />
                 </div>
               )}
 
@@ -633,7 +634,7 @@ function MobileMatchReportPage() {
                   <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
                     <Heart className="h-3.5 w-3.5 text-rose-500" /> Sportsmanship
                   </p>
-                  <p className="text-sm">{myReport.sportsmanship}</p>
+                  <MentionText text={myReport.sportsmanship} knownPlayers={allPlayers} className="text-sm" />
                 </div>
               )}
 
@@ -659,6 +660,7 @@ function MobileMatchReportPage() {
   // ── Match report form ────────────────────────────────────────────────────────
   const playersByTeam = buildPlayersByTeam(scorecard);
   const opposingPlayers = playersByTeam[selectedOpposingTeam] || [];
+  const allPlayers = Object.values(playersByTeam).flat();
 
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-lg mx-auto">
@@ -754,8 +756,8 @@ function MobileMatchReportPage() {
             <Star className="h-4 w-4 text-primary" /> Game Highlights
             <span className="text-destructive text-xs ml-1">*</span>
           </Label>
-          <Textarea
-            placeholder="Key moments, standout performances, overall game quality..."
+          <MentionTextarea
+            placeholder="Key moments, standout performances... (type @ to tag a player)"
             value={highlights}
             onChange={e => setHighlights(e.target.value)}
             rows={3}
@@ -772,10 +774,11 @@ function MobileMatchReportPage() {
 
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground uppercase tracking-wide">Missed Catches</Label>
-            <Textarea
-              placeholder="Player names and situation..."
+            <MentionTextarea
+              placeholder="Player names and situation... (@ to tag)"
               value={missedCatches}
-              onChange={e => setMissedCatches(e.target.value)}
+              onChange={setMissedCatches}
+              players={allPlayers}
               rows={2}
               className="text-sm resize-none"
               maxLength={500}
@@ -784,10 +787,11 @@ function MobileMatchReportPage() {
 
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground uppercase tracking-wide">Missed Run-Outs</Label>
-            <Textarea
-              placeholder="Player names and situation..."
+            <MentionTextarea
+              placeholder="Player names and situation... (@ to tag)"
               value={missedRunOuts}
-              onChange={e => setMissedRunOuts(e.target.value)}
+              onChange={setMissedRunOuts}
+              players={allPlayers}
               rows={2}
               className="text-sm resize-none"
               maxLength={500}
@@ -798,10 +802,11 @@ function MobileMatchReportPage() {
             <Label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
               <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> Great Catches / Run-Outs
             </Label>
-            <Textarea
-              placeholder="Name specific players and describe the effort..."
+            <MentionTextarea
+              placeholder="Name specific players... (@ to tag)"
               value={greatCatchesRunOuts}
-              onChange={e => setGreatCatchesRunOuts(e.target.value)}
+              onChange={setGreatCatchesRunOuts}
+              players={allPlayers}
               rows={2}
               className="text-sm resize-none"
               maxLength={500}
@@ -814,10 +819,11 @@ function MobileMatchReportPage() {
           <Label className="flex items-center gap-1.5 font-semibold">
             <Heart className="h-4 w-4 text-rose-500" /> Overall Sportsmanship
           </Label>
-          <Textarea
-            placeholder="Attitude, conduct, and team spirit..."
+          <MentionTextarea
+            placeholder="Attitude, conduct, and team spirit... (@ to tag)"
             value={sportsmanship}
-            onChange={e => setSportsmanship(e.target.value)}
+            onChange={setSportsmanship}
+              players={allPlayers}
             rows={2}
             className="text-sm resize-none"
             maxLength={500}
