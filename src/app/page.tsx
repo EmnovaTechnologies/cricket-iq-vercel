@@ -80,8 +80,13 @@ export default function DashboardPage() {
     );
   }
 
+  useEffect(() => {
+    if (!currentUser && !isAuthLoading) {
+      router.push('/login');
+    }
+  }, [currentUser, isAuthLoading, router]);
+
   if (!currentUser && !isAuthLoading) {
-    router.push('/login');
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
