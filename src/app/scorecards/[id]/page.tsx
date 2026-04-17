@@ -228,19 +228,13 @@ export default function ScorecardDetailsPage() {
     });
   }, [params.id, currentUser?.uid]);
 
-  // Fetch available selectors for assignment panel (admin/org admin/series admin only)
+  // Fetch available selectors — same logic as game details page
   useEffect(() => {
     if (!activeOrganizationId || !canEditLinks) return;
-    import('@/lib/actions/get-eligible-org-admins-action').then(({ getEligibleOrgAdminsAction }) => {
-      getEligibleOrgAdminsAction(activeOrganizationId).then(users => {
-        // Filter to selectors and series admins
-        const selectors = users.filter(u =>
-          u.roles?.includes('selector') ||
-          u.roles?.includes('Series Admin') ||
-          u.roles?.includes('Organization Admin') ||
-          u.roles?.includes('admin')
-        );
-        setAvailableSelectors(selectors);
+    import('@/lib/actions/user-actions').then(({ getPotentialSelectorsForOrg }) => {
+      getPotentialSelectorsForOrg(activeOrganizationId).then(users => {
+        // Exclude super admins (same filter as game details page)
+        setAvailableSelectors(users.filter(u => !u.roles?.includes('admin')));
       });
     });
   }, [activeOrganizationId, canEditLinks]);
