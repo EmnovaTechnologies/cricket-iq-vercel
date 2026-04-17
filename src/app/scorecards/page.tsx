@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { getScorecardsForOrgAction, deleteScorecardAction } from '@/lib/actions/scorecard-actions';
+import { getMatchReportsForScorecardAction } from '@/lib/actions/match-report-actions';
 import { getGamesForSeriesAction } from '@/lib/actions/series-actions';
 import { getAllSeriesFromDB } from '@/lib/db';
 import type { MatchScorecard, Game, Series } from '@/types';
@@ -36,6 +37,7 @@ export default function ScorecardsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingGames, setIsLoadingGames] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [scorecardsWithReports, setScorecardsWithReports] = useState<Set<string>>(new Set());
   const [mounted, setMounted] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedSeries, setSelectedSeries] = useState<string>('all');
@@ -70,8 +72,19 @@ export default function ScorecardsPage() {
       getScorecardsForOrgAction(activeOrganizationId),
       getAllSeriesFromDB('all', activeOrganizationId),
     ]);
-    if (result.success) setScorecards(result.scorecards || []);
+    const loadedScorecards = result.success ? result.scorecards || [] : [];
+    if (result.success) setScorecards(loadedScorecards);
     setAllSeries(series || []);
+    // Check which scorecards have match reports (for disabling delete)
+    if (loadedScorecards.length > 0) {
+      const reportChecks = await Promise.all(
+        loadedScorecards.map(async sc => {
+          const r = await getMatchReportsForScorecardAction(sc.id);
+          return { id: sc.id, hasReports: (r.reports?.length ?? 0) > 0 };
+        })
+      );
+      setScorecardsWithReports(new Set(reportChecks.filter(c => c.hasReports).map(c => c.id)));
+    }
     setIsLoading(false);
   }, [activeOrganizationId]);
 
@@ -298,9 +311,13 @@ export default function ScorecardsPage() {
                             {canImport && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                  <Button variant="destructive" size="sm" className="w-full text-sm" disabled={deletingId === sc.id}>
+                                  <Button
+                                    variant="destructive" size="sm" className="w-full text-sm"
+                                    disabled={deletingId === sc.id || scorecardsWithReports.has(sc.id)}
+                                    title={scorecardsWithReports.has(sc.id) ? 'Cannot delete — match reports exist' : undefined}
+                                  >
                                     {deletingId === sc.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />}
-                                    {deletingId === sc.id ? 'Deleting...' : 'Delete'}
+                                    {deletingId === sc.id ? 'Deleting...' : scorecardsWithReports.has(sc.id) ? 'Has Reports' : 'Delete'}
                                   </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
