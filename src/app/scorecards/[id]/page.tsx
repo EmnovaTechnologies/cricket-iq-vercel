@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { getScorecardByIdAction, deleteScorecardAction } from '@/lib/actions/scorecard-actions';
+import { getMatchReportsForScorecardAction } from '@/lib/actions/match-report-actions';
 import { ScorecardSelectorAssignmentPanel } from '@/components/scorecards/scorecard-selector-assignment';
 import type { MatchScorecard, ScorecardInnings, ScorecardSelectorAssignment, UserProfile } from '@/types';
 import { ScorecardPerformanceTab } from '@/components/scorecards/scorecard-performance-tab';
@@ -175,6 +176,7 @@ export default function ScorecardDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [hasMatchReports, setHasMatchReports] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [isAssignedSelector, setIsAssignedSelector] = useState(false);
@@ -208,6 +210,10 @@ export default function ScorecardDetailsPage() {
     getScorecardByIdAction(params.id).then(async res => {
       if (res.success && res.scorecard) {
         setScorecard(res.scorecard);
+        // Check if match reports exist (to disable delete)
+        getMatchReportsForScorecardAction(res.scorecard.id).then(rRes => {
+          if (rRes.success) setHasMatchReports((rRes.reports?.length ?? 0) > 0);
+        });
         // Set selector assignments from scorecard
         const assignments = res.scorecard.selectorAssignments || [];
         setSelectorAssignments(assignments);
@@ -346,11 +352,24 @@ export default function ScorecardDetailsPage() {
             </DialogContent>
           </Dialog>
           <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-            {canDelete && <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10">
-                <Trash2 className="mr-2 h-4 w-4" /> Delete
-              </Button>
-            </DialogTrigger>}
+            {canDelete && (
+              hasMatchReports ? (
+                <span className="relative group cursor-not-allowed">
+                  <Button variant="outline" size="sm" className="border-destructive text-destructive opacity-50 pointer-events-none" disabled>
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  </Button>
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block whitespace-nowrap bg-gray-900 text-white text-xs rounded px-2 py-1 z-50">
+                    Match reports exist
+                  </span>
+                </span>
+              ) : (
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10">
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  </Button>
+                </DialogTrigger>
+              )
+            )}
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Delete Scorecard</DialogTitle>
