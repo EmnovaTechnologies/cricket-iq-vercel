@@ -770,7 +770,7 @@ function MobileMatchReportPage() {
           <MentionTextarea
             placeholder="Key moments, standout performances... (type @ to tag a player)"
             value={highlights}
-            onChange={e => setHighlights(e.target.value)}
+            onChange={setHighlights}
             rows={3}
             className="text-sm resize-none"
             maxLength={1000}
