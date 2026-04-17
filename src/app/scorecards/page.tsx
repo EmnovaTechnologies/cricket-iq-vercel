@@ -117,7 +117,15 @@ export default function ScorecardsPage() {
   // Series filtered by selected year
   const filteredSeriesOptions = useMemo(() => {
     if (selectedYear === 'all') return allSeries;
-    return allSeries.filter(s => s.year.toString() === selectedYear);
+    // Show series whose defined year matches, OR series that have scorecards
+    // with dates in the selected year (cross-year series)
+    const scorecardsInYear = scorecards.filter(sc => {
+      try { return sc.date && parseISO(sc.date).getFullYear().toString() === selectedYear; } catch { return false; }
+    });
+    const seriesIdsWithScorecards = new Set(scorecardsInYear.map(sc => sc.seriesId).filter(Boolean));
+    return allSeries.filter(s =>
+      s.year.toString() === selectedYear || seriesIdsWithScorecards.has(s.id)
+    );
   }, [allSeries, selectedYear]);
 
   useEffect(() => {
@@ -131,9 +139,13 @@ export default function ScorecardsPage() {
 
   const filteredScorecards = useMemo(() => {
     return scorecards.filter(sc => {
-      const yearMatch = selectedYear === 'all' || (sc.date && (() => {
-        try { return parseISO(sc.date).getFullYear().toString() === selectedYear; } catch { return false; }
-      })());
+      // When a specific series is selected, skip year filter —
+      // a series may have games crossing year boundaries
+      const yearMatch = (selectedSeries !== 'all' && selectedSeries !== 'none')
+        ? true
+        : selectedYear === 'all' || (sc.date && (() => {
+            try { return parseISO(sc.date).getFullYear().toString() === selectedYear; } catch { return false; }
+          })());
       const seriesMatch = selectedSeries === 'all'
         || (selectedSeries === 'none' && !sc.seriesId)
         || sc.seriesId === selectedSeries;
