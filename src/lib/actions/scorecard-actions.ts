@@ -137,11 +137,19 @@ export async function getScorecardsForOrgAction(
       .limit(50)
       .get();
 
-    const scorecards: MatchScorecard[] = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      importedAt: d.data().importedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-    })) as MatchScorecard[];
+    const scorecards: MatchScorecard[] = snap.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        importedAt: data.importedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        // Serialize any Timestamps inside selectorAssignments
+        selectorAssignments: (data.selectorAssignments || []).map((a: any) => ({
+          ...a,
+          assignedAt: a.assignedAt?.toDate?.()?.toISOString() || a.assignedAt || undefined,
+        })),
+      };
+    }) as MatchScorecard[];
 
     return { success: true, scorecards };
   } catch (error: any) {
@@ -230,11 +238,18 @@ export async function getScorecardsBySeriesAction(
       .orderBy('date', 'asc')
       .get();
 
-    const scorecards: MatchScorecard[] = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      importedAt: d.data().importedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-    })) as MatchScorecard[];
+    const scorecards: MatchScorecard[] = snap.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        importedAt: data.importedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        selectorAssignments: (data.selectorAssignments || []).map((a: any) => ({
+          ...a,
+          assignedAt: a.assignedAt?.toDate?.()?.toISOString() || a.assignedAt || undefined,
+        })),
+      };
+    }) as MatchScorecard[];
 
     return { success: true, scorecards };
   } catch (error: any) {
@@ -503,11 +518,18 @@ export async function getScorecardsForSelectorAction(
       .get();
 
     const scorecards = snap.docs
-      .map(d => ({
-        id: d.id,
-        ...d.data(),
-        importedAt: d.data().importedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-      }))
+      .map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          importedAt: data.importedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+          selectorAssignments: (data.selectorAssignments || []).map((a: any) => ({
+            ...a,
+            assignedAt: a.assignedAt?.toDate?.()?.toISOString() || a.assignedAt || undefined,
+          })),
+        };
+      })
       .filter((sc: any) =>
         sc.selectorAssignments?.some((a: any) => a.uid === uid)
       );
