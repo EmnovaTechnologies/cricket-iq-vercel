@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import type { Organization, UserProfile } from '@/types';
+import { OrgSelectionSettings } from '@/components/admin/org-selection-settings';
 
 export default function EditOrganizationPage() {
   const params = useParams<{ id: string }>();
@@ -96,7 +97,7 @@ export default function EditOrganizationPage() {
         </div>
       }
     >
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-2xl mx-auto space-y-6">
         <div className="mb-4">
           <Button variant="outline" size="sm" asChild>
             <Link href={orgId ? `/admin/organizations/${orgId}/details` : '/admin/organizations'}>
@@ -115,6 +116,12 @@ export default function EditOrganizationPage() {
           </CardHeader>
           <CardContent>{renderContent()}</CardContent>
         </Card>
+        {organization && (
+          <OrgSelectionSettings
+            org={organization}
+            onSaved={(updates) => setOrganization(prev => prev ? { ...prev, ...updates } : prev)}
+          />
+        )}
       </div>
     </AuthProviderClientComponent>
   );

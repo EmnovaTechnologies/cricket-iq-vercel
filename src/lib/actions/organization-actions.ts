@@ -4,6 +4,8 @@ import type { Organization, OrganizationStatus, OrganizationBranding, UserProfil
 import {
   getOrganizationsByIdsFromDB,
 } from '../db';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 // Note: Create and Update actions were moved to the client-side component (OrganizationForm)
 // to resolve authentication context issues with server actions using the client Firebase SDK.
@@ -16,6 +18,29 @@ export async function getOrganizationsByIdsAction(orgIds: string[]): Promise<Org
   } catch (error) {
     console.error("Error in getOrganizationsByIdsAction:", error);
     return [];
+  }
+}
+
+export async function updateOrgSelectionSettingsAction(
+  orgId: string,
+  settings: {
+    selectionModel?: 'rating' | 'performance' | 'hybrid';
+    ratingScope?: 'opposing_only' | 'own_team' | 'both_teams';
+    ratingVisibility?: 'admin_only' | 'selectors_own' | 'all_selectors';
+    ratingAggregation?: 'average' | 'latest';
+    selectorReportScope?: 'opposing_only' | 'both_teams' | 'own_team_only';
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const updates: Record<string, any> = {};
+    for (const [k, v] of Object.entries(settings)) {
+      if (v !== undefined) updates[k] = v;
+    }
+    await updateDoc(doc(db, 'organizations', orgId), updates);
+    return { success: true };
+  } catch (error: any) {
+    console.error('[updateOrgSelectionSettingsAction]', error);
+    return { success: false, error: error.message };
   }
 }
 

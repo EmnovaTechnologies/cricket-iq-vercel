@@ -91,14 +91,14 @@ const Navbar = () => {
   const mainNavLinks = [
     { href: '/', label: 'Dashboard', icon: <Leaf className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_DASHBOARD },
     { href: '/series', label: 'Series', icon: <Layers className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SERIES_LIST },
-    { href: '/games', label: 'Games', icon: <Gamepad2 className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_GAMES_LIST },
+    { href: '/games', label: 'Games', icon: <Gamepad2 className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_GAMES_LIST, selectionModels: ['rating', 'hybrid'] },
     { href: '/teams', label: 'Teams', icon: <Users className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAMS_LIST },
     { href: '/players', label: 'Players', icon: <Users className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_PLAYERS_LIST },
     { href: '/venues', label: 'Venues', icon: <MapPinned className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_VENUES_LIST },
-    { href: '/team-composition', label: 'Team AI', icon: <Target className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAM_COMPOSITION },
+    { href: '/team-composition', label: 'Team AI', icon: <Target className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAM_COMPOSITION, selectionModels: ['rating', 'hybrid'] },
     { href: '/export', label: 'Export', icon: <Download className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_EXPORT },
-    { href: '/scorecards', label: 'Scorecards', icon: <Table className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SCORECARDS },
-    { href: '/scorecard-selection', label: 'XI Selector', icon: <ClipboardCheck className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_XI_SELECTOR },
+    { href: '/scorecards', label: 'Scorecards', icon: <Table className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SCORECARDS, selectionModels: ['performance', 'hybrid'] },
+    { href: '/scorecard-selection', label: 'XI Selector', icon: <ClipboardCheck className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_XI_SELECTOR, selectionModels: ['performance', 'hybrid'] },
   ];
 
   const loggedInUserLinks = [
@@ -180,7 +180,9 @@ const Navbar = () => {
         <nav className="hidden md:flex items-center gap-1">
           {currentUser && !isAuthLoading && !isEffectivelyUnassigned && mainNavLinks.map((link) => {
             const canViewLink = userProfile?.roles?.includes('admin') || (link.permission && effectivePermissions[link.permission]);
-            if (canViewLink) {
+            const selectionModel = activeOrganizationDetails?.selectionModel;
+            const modelAllowed = !link.selectionModels || !selectionModel || link.selectionModels.includes(selectionModel);
+            if (canViewLink && modelAllowed) {
               return (
                 <Button key={link.href} variant="ghost" asChild className="text-foreground hover:bg-primary/10 hover:text-primary text-sm px-3">
                   <Link href={link.href} className="flex items-center gap-2">

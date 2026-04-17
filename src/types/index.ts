@@ -40,6 +40,12 @@ export interface Organization {
   status: OrganizationStatus;
   clubs?: string[];
   createdAt?: string | null;
+  // Selection model settings
+  selectionModel?: 'rating' | 'performance' | 'hybrid';
+  ratingScope?: 'opposing_only' | 'own_team' | 'both_teams';
+  ratingVisibility?: 'admin_only' | 'selectors_own' | 'all_selectors';
+  ratingAggregation?: 'average' | 'latest';
+  selectorReportScope?: 'opposing_only' | 'both_teams' | 'own_team_only';
   // Stripe Subscription Fields
   stripeCustomerId?: string;
   subscriptionTier?: 'free' | 'pro' | 'enterprise';
