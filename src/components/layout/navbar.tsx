@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Leaf, Users, UserSquare2, Gamepad2, Target, Menu, Layers, MapPinned, LogIn, LogOut, UserPlus, UserCog, ShieldCheck, Building, ChevronsUpDown, Check, Hourglass, ListFilter, ImageIcon, User, Download, ChevronRight, BarChart3, Table, ClipboardCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import type { Organization, PermissionKey } from '@/types';
@@ -360,6 +360,7 @@ const Navbar = () => {
               <Menu className="h-6 w-6 text-primary" />
             </Button></SheetTrigger>
             <SheetContent side="right" className="w-[280px] bg-card p-4">
+              <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
               <div className="flex flex-col gap-2 mt-8">
                 {currentUser && mobileLinks.map((link) => (
                   <Button key={link.href} variant="ghost" asChild className={cn("justify-start text-foreground hover:bg-primary/10 hover:text-primary text-base py-3")}>
