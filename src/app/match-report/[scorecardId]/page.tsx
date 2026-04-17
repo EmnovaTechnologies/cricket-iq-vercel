@@ -492,7 +492,7 @@ function MobileMatchReportPage() {
             {scorecard.cricClubsLeague ? <span className="opacity-70"> · {scorecard.cricClubsLeague}</span> : ''}
           </p>
           <p className="text-xs opacity-75 leading-snug truncate">
-            {scorecard.date ? (() => { try { return new Date(scorecard.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); } catch { return ''; } })() : ''}
+            {scorecard.date ? (() => { try { return new Date(scorecard.date.replace(/-/g, '/')).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); } catch { return ''; } })() : ''}
             {scorecard.venue ? <span> · {scorecard.venue}</span> : ''}
           </p>
         </div>
@@ -676,7 +676,7 @@ function MobileMatchReportPage() {
           {scorecard.date
             ? (() => {
                 try {
-                  return new Date(scorecard.date).toLocaleDateString('en-US', {
+                  return new Date(scorecard.date.replace(/-/g, '/')).toLocaleDateString('en-US', {
                     weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
                   });
                 } catch { return ''; }

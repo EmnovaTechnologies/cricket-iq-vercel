@@ -113,8 +113,10 @@ export function MentionTextarea({
       e.preventDefault();
       setSelectedIdx(i => Math.max(i - 1, 0));
     } else if (e.key === 'Enter' || e.key === 'Tab') {
-      e.preventDefault();
-      if (filtered[selectedIdx]) insertMention(filtered[selectedIdx]);
+      if (filtered[selectedIdx]) {
+        e.preventDefault();
+        insertMention(filtered[selectedIdx]);
+      }
     } else if (e.key === 'Escape') {
       setMentionQuery(null);
     }
@@ -133,7 +135,11 @@ export function MentionTextarea({
       }
     };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler as any);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler as any);
+    };
   }, []);
 
   return (
@@ -162,6 +168,7 @@ export function MentionTextarea({
           ref={dropdownRef}
           className="absolute left-0 right-0 z-50 bg-card border rounded-xl shadow-lg py-1 mt-1"
           style={{ top: '100%' }}
+          onTouchMove={e => e.stopPropagation()}
         >
           <p className="text-xs text-muted-foreground px-3 py-1 border-b">
             Tag a player
@@ -172,6 +179,10 @@ export function MentionTextarea({
               type="button"
               onMouseDown={e => {
                 e.preventDefault(); // prevent textarea blur
+                insertMention(player);
+              }}
+              onTouchEnd={e => {
+                e.preventDefault();
                 insertMention(player);
               }}
               className={cn(

@@ -374,7 +374,7 @@ export function MatchReportTab({
             {/* Highlights */}
             <div className="space-y-1.5">
               <Label className="flex items-center gap-1.5">
-                <Star className="h-3.5 w-3.5 text-primary" /> Game Highlights
+                <Star className="h-3.5 w-3.5 text-primary" /> Game Highlights <span className="text-destructive">*</span>
               </Label>
               <MentionTextarea
                 placeholder="Describe key moments, standout performances, and overall game quality... (type @ to tag a player)"
