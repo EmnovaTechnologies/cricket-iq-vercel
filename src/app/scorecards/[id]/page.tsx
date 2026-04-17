@@ -459,6 +459,7 @@ export default function ScorecardDetailsPage() {
               isAssignedSelector={isAssignedSelector}
               scorecardMode={true}
             />
+          </TabsContent>
           <TabsContent value="links" className="mt-4">
             <PlayerLinkTab
               scorecardId={scorecard.id}
