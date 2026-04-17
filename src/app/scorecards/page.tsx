@@ -323,14 +323,24 @@ export default function ScorecardsPage() {
                             {canImport && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="destructive" size="sm" className="w-full text-sm"
-                                    disabled={deletingId === sc.id || scorecardsWithReports.has(sc.id)}
-                                    title={scorecardsWithReports.has(sc.id) ? 'Cannot delete — match reports exist' : undefined}
-                                  >
-                                    {deletingId === sc.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />}
-                                    {deletingId === sc.id ? 'Deleting...' : 'Delete'}
-                                  </Button>
+                                  {scorecardsWithReports.has(sc.id) ? (
+                                    <span title="Cannot delete — match reports exist" className="w-full cursor-not-allowed">
+                                      <Button
+                                        variant="destructive" size="sm" className="w-full text-sm pointer-events-none opacity-50"
+                                        disabled
+                                      >
+                                        <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
+                                      </Button>
+                                    </span>
+                                  ) : (
+                                    <Button
+                                      variant="destructive" size="sm" className="w-full text-sm"
+                                      disabled={deletingId === sc.id}
+                                    >
+                                      {deletingId === sc.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />}
+                                      {deletingId === sc.id ? 'Deleting...' : 'Delete'}
+                                    </Button>
+                                  )}
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                   <AlertDialogHeader>
