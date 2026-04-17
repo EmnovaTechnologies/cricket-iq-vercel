@@ -771,6 +771,7 @@ function MobileMatchReportPage() {
             placeholder="Key moments, standout performances... (type @ to tag a player)"
             value={highlights}
             onChange={setHighlights}
+            players={allPlayers}
             rows={3}
             className="text-sm resize-none"
             maxLength={1000}
