@@ -61,17 +61,14 @@ export default function SelectorDashboard() {
     const load = async () => {
       setIsLoading(true);
       try {
+        // Always fetch both — selectionModel only affects display, not fetching
+        // (activeOrganizationDetails may not be loaded yet when this runs)
         const [gamesResult, scorecardsResult, directScorecardsResult] = await Promise.all([
-          // Only fetch games for rating/hybrid models
-          showGames
-            ? getGamesForUserViewAction(userProfile, activeOrganizationId)
-            : Promise.resolve([]),
-          // Org scorecards for game-linking (performance/hybrid)
-          showScorecards && activeOrganizationId
+          getGamesForUserViewAction(userProfile, activeOrganizationId),
+          activeOrganizationId
             ? getScorecardsForOrgAction(activeOrganizationId)
             : Promise.resolve({ success: true, scorecards: [] }),
-          // Directly assigned scorecards (performance/hybrid)
-          showScorecards && activeOrganizationId
+          activeOrganizationId
             ? getScorecardsForSelectorAction(currentUser.uid, activeOrganizationId)
             : Promise.resolve({ success: true, scorecards: [] }),
         ]);
@@ -92,25 +89,17 @@ export default function SelectorDashboard() {
         });
         setGames(assignedGames);
 
-        if (showScorecards) {
-          const assignedGameIds = new Set(assignedGames.map(g => g.id));
-
-          // 1. Scorecards linked to assigned games
-          const gameLinked = (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
-            .filter((sc: any) => sc.linkedGameId && assignedGameIds.has(sc.linkedGameId));
-
-          // 2. Directly assigned scorecards
-          const direct = directScorecardsResult.success ? directScorecardsResult.scorecards || [] : [];
-
-          // 3. Merge, deduplicate, sort
-          const seenIds = new Set(gameLinked.map((sc: any) => sc.id));
-          const merged = [
-            ...gameLinked,
-            ...direct.filter((sc: any) => !seenIds.has(sc.id)),
-          ].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-          setScorecards(merged);
-        }
+        // Merge game-linked + directly assigned scorecards
+        const assignedGameIds = new Set(assignedGames.map(g => g.id));
+        const gameLinked = (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
+          .filter((sc: any) => sc.linkedGameId && assignedGameIds.has(sc.linkedGameId));
+        const direct = directScorecardsResult.success ? directScorecardsResult.scorecards || [] : [];
+        const seenIds = new Set(gameLinked.map((sc: any) => sc.id));
+        const merged = [
+          ...gameLinked,
+          ...direct.filter((sc: any) => !seenIds.has(sc.id)),
+        ].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setScorecards(merged);
       } catch (e) {
         console.error('Selector dashboard load error:', e);
       } finally {
