@@ -8,6 +8,7 @@ import { getScorecardByIdAction, deleteScorecardAction } from '@/lib/actions/sco
 import type { MatchScorecard, ScorecardInnings } from '@/types';
 import { ScorecardPerformanceTab } from '@/components/scorecards/scorecard-performance-tab';
 import { MatchReportTab } from '@/components/match-report-tab';
+import { PlayerLinkTab } from '@/components/scorecards/player-link-tab';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +18,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import { ArrowLeft, Loader2, ShieldAlert, Table, CalendarFold, MapPin, ExternalLink, Trash2, FileText, QrCode } from 'lucide-react';
+import { ArrowLeft, Loader2, ShieldAlert, Table, CalendarFold, MapPin, ExternalLink, Trash2, FileText, QrCode, Link2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
@@ -233,6 +234,10 @@ export default function ScorecardDetailsPage() {
     );
   }
 
+  const canEditLinks = effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
+    effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
+    userProfile?.roles?.includes('admin');
+
   const formatDate = (d: string) => {
     try { return format(parseISO(d), 'PPP'); } catch { return d; }
   };
@@ -386,6 +391,8 @@ export default function ScorecardDetailsPage() {
             <TabsTrigger value="performance" className="flex-1">Performance</TabsTrigger>
             <TabsTrigger value="report" className="flex-1 flex items-center gap-1.5">
               <FileText className="h-3.5 w-3.5" /> Match Report
+            <TabsTrigger value="links" className="flex-1 flex items-center gap-1.5">
+              <Link2 className="h-3.5 w-3.5" /> Player Links
             </TabsTrigger>
           </TabsList>
           <TabsContent value="innings1" className="mt-4">
@@ -406,6 +413,12 @@ export default function ScorecardDetailsPage() {
               isAssignedSelector={isAssignedSelector}
               scorecardMode={true}
             />
+          <TabsContent value="links" className="mt-4">
+            <PlayerLinkTab
+              scorecardId={scorecard.id}
+              organizationId={scorecard.organizationId}
+              canEdit={canEditLinks}
+            />
           </TabsContent>
         </Tabs>
       ) : (
@@ -419,6 +432,9 @@ export default function ScorecardDetailsPage() {
             <TabsTrigger value="performance" className="flex-1">Performance</TabsTrigger>
             <TabsTrigger value="report" className="flex-1 flex items-center gap-1.5">
               <FileText className="h-3.5 w-3.5" /> Match Report
+            </TabsTrigger>
+            <TabsTrigger value="links" className="flex-1 flex items-center gap-1.5">
+              <Link2 className="h-3.5 w-3.5" /> Player Links
             </TabsTrigger>
           </TabsList>
           {scorecard.innings.map((inn, i) => (
@@ -440,6 +456,12 @@ export default function ScorecardDetailsPage() {
               playersByTeam={buildPlayersByTeam(scorecard)}
               isAssignedSelector={isAssignedSelector}
               scorecardMode={true}
+            />
+          <TabsContent value="links" className="mt-4">
+            <PlayerLinkTab
+              scorecardId={scorecard.id}
+              organizationId={scorecard.organizationId}
+              canEdit={canEditLinks}
             />
           </TabsContent>
         </Tabs>

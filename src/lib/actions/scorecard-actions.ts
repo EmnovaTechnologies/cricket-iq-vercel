@@ -309,6 +309,136 @@ export async function checkDuplicateScorecardAction(params: {
   }
 }
 
+
+// ─── Get ScorecardPlayers for Scorecard (with link status) ───────────────────
+
+export async function getScorecardPlayersForScorecardAction(
+  scorecardId: string,
+  organizationId: string
+): Promise<{ success: boolean; players?: (ScorecardPlayer & { id: string })[]; error?: string }> {
+  try {
+    // Get all unique player names from this scorecard
+    const scorecardDoc = await adminDb.collection('matchScorecards').doc(scorecardId).get();
+    if (!scorecardDoc.exists) return { success: false, error: 'Scorecard not found.' };
+    const scorecard = scorecardDoc.data()!;
+    const nameSet = new Set<string>();
+    (scorecard.innings || []).forEach((inn: any) => {
+      (inn.batting || []).forEach((b: any) => { if (b.name) nameSet.add(b.name); });
+      (inn.bowling || []).forEach((b: any) => { if (b.name) nameSet.add(b.name); });
+      (inn.didNotBat || []).forEach((n: any) => { if (n) nameSet.add(n); });
+    });
+
+    // Fetch scorecardPlayer docs for these names
+    const players: (ScorecardPlayer & { id: string })[] = [];
+    for (const name of nameSet) {
+      const snap = await adminDb.collection('scorecardPlayers')
+        .where('organizationId', '==', organizationId)
+        .where('name', '==', name)
+        .limit(1)
+        .get();
+      if (!snap.empty) {
+        players.push({ id: snap.docs[0].id, ...snap.docs[0].data() } as ScorecardPlayer & { id: string });
+      }
+    }
+
+    players.sort((a, b) => a.name.localeCompare(b.name));
+    return { success: true, players };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── Suggest Player Links (fuzzy match against players collection) ─────────────
+
+export async function suggestPlayerLinksAction(
+  organizationId: string,
+  scorecardPlayerNames: string[]
+): Promise<{ success: boolean; suggestions?: Record<string, { playerId: string; playerName: string; score: number }[]>; error?: string }> {
+  try {
+    // Fetch all org players from admin SDK
+    const playersSnap = await adminDb.collection('players')
+      .where('organizationId', '==', organizationId)
+      .get();
+
+    const orgPlayers = playersSnap.docs.map(d => ({ id: d.id, name: (d.data().name || '') as string }));
+
+    const suggestions: Record<string, { playerId: string; playerName: string; score: number }[]> = {};
+
+    for (const scName of scorecardPlayerNames) {
+      const matches: { playerId: string; playerName: string; score: number }[] = [];
+      const scLower = scName.toLowerCase().trim();
+      const scWords = scLower.split(/\s+/);
+
+      for (const p of orgPlayers) {
+        const pLower = p.name.toLowerCase().trim();
+        const pWords = pLower.split(/\s+/);
+
+        let score = 0;
+        if (scLower === pLower) {
+          score = 1.0; // exact
+        } else if (pLower.startsWith(scLower) || scLower.startsWith(pLower)) {
+          score = 0.9;
+        } else {
+          // Word overlap
+          const shared = scWords.filter(w => w.length > 1 && pWords.some(pw => pw.startsWith(w) || w.startsWith(pw))).length;
+          score = shared / Math.max(scWords.length, pWords.length);
+          // Boost if last name matches exactly
+          const scLast = scWords[scWords.length - 1];
+          const pLast = pWords[pWords.length - 1];
+          if (scLast && pLast && scLast === pLast && scLast.length > 2) score = Math.max(score, 0.75);
+          // Boost if first name initial matches
+          if (scWords[0]?.[0] === pWords[0]?.[0]) score += 0.05;
+        }
+
+        if (score >= 0.5) matches.push({ playerId: p.id, playerName: p.name, score });
+      }
+
+      matches.sort((a, b) => b.score - a.score);
+      suggestions[scName] = matches.slice(0, 3);
+    }
+
+    return { success: true, suggestions };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── Link ScorecardPlayer to Player ──────────────────────────────────────────
+
+export async function linkScorecardPlayerAction(
+  scorecardPlayerId: string,
+  playerId: string,
+  playerName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await adminDb.collection('scorecardPlayers').doc(scorecardPlayerId).update({
+      linkedPlayerId: playerId,
+      linkedPlayerName: playerName,
+      linkedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── Unlink ScorecardPlayer from Player ──────────────────────────────────────
+
+export async function unlinkScorecardPlayerAction(
+  scorecardPlayerId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await adminDb.collection('scorecardPlayers').doc(scorecardPlayerId).update({
+      linkedPlayerId: admin.firestore.FieldValue.delete(),
+      linkedPlayerName: admin.firestore.FieldValue.delete(),
+      linkedAt: admin.firestore.FieldValue.delete(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 // ─── Get Scorecard for Game ───────────────────────────────────────────────────
 
 export async function getScorecardForGameAction(
