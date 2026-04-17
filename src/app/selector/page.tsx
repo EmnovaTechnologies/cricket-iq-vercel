@@ -38,6 +38,7 @@ export default function SelectorDashboard() {
 
   const [games, setGames] = useState<Game[]>([]);
   const [scorecards, setScorecards] = useState<MatchScorecard[]>([]);
+  const [assignedScorecardIds, setAssignedScorecardIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -89,17 +90,34 @@ export default function SelectorDashboard() {
         });
         setGames(assignedGames);
 
-        // Merge game-linked + directly assigned scorecards
+        // Build scorecard list:
+        // 1. Directly assigned (via selectorAssignments)
+        // 2. Game-linked (via assigned games)
+        // 3. All org scorecards (fallback — matching web behavior)
         const assignedGameIds = new Set(assignedGames.map(g => g.id));
-        const gameLinked = (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
-          .filter((sc: any) => sc.linkedGameId && assignedGameIds.has(sc.linkedGameId));
         const direct = directScorecardsResult.success ? directScorecardsResult.scorecards || [] : [];
-        const seenIds = new Set(gameLinked.map((sc: any) => sc.id));
+        const directIds = new Set(direct.map((sc: any) => sc.id));
+        const gameLinked = (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
+          .filter((sc: any) => sc.linkedGameId && assignedGameIds.has(sc.linkedGameId) && !directIds.has(sc.id));
+        const gameLinkedIds = new Set(gameLinked.map((sc: any) => sc.id));
+        // All remaining org scorecards
+        const allOthers = (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
+          .filter((sc: any) => !directIds.has(sc.id) && !gameLinkedIds.has(sc.id));
+        // Merge: assigned first, then game-linked, then all others
         const merged = [
+          ...direct,
           ...gameLinked,
-          ...direct.filter((sc: any) => !seenIds.has(sc.id)),
-        ].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          ...allOthers,
+        ].sort((a: any, b: any) => {
+          // Assigned scorecards sort first
+          const aAssigned = directIds.has(a.id);
+          const bAssigned = directIds.has(b.id);
+          if (aAssigned && !bAssigned) return -1;
+          if (!aAssigned && bAssigned) return 1;
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
         setScorecards(merged);
+        setAssignedScorecardIds(directIds);
       } catch (e) {
         console.error('Selector dashboard load error:', e);
       } finally {
@@ -230,6 +248,11 @@ export default function SelectorDashboard() {
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1">
+                      {assignedScorecardIds.has(sc.id) && (
+                        <Badge className="text-xs h-4 px-1.5 bg-primary/10 text-primary border border-primary/20">
+                          Assigned
+                        </Badge>
+                      )}
                       {sc.innings.map((inn, i) => (
                         <Badge key={i} variant="secondary" className="text-xs h-4 px-1.5">
                           {inn.battingTeam}: {inn.totalRuns}/{inn.wickets}
