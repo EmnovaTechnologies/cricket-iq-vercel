@@ -304,31 +304,42 @@ export default function TeamDetailsPage() {
               <CardDescription>Team Details and Roster for Organization: {organizationName || 'N/A'}</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              {canDelete && canDeletePermission && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" disabled={isDeleting}>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      {isDeleting ? 'Deleting...' : 'Delete Team'}
+              {canDeletePermission && (
+                canDelete === true ? (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm" disabled={isDeleting}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {isDeleting ? 'Deleting...' : 'Delete Team'}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Team</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to permanently delete "{team.name}"? This cannot be undone.
+                          The team has no players or associated games so it is safe to delete.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteTeam} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                          {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          Confirm Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                ) : (
+                  <span className="relative group cursor-not-allowed">
+                    <Button variant="destructive" size="sm" className="pointer-events-none opacity-50" disabled>
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete Team
                     </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Team</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to permanently delete "{team.name}"? This cannot be undone.
-                        The team has no players or associated games so it is safe to delete.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDeleteTeam} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                        {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Confirm Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block whitespace-nowrap bg-gray-900 text-white text-xs rounded px-2 py-1 z-50">
+                      {canDelete === null ? 'Checking...' : 'Has players or games — cannot delete'}
+                    </span>
+                  </span>
+                )
               )}
               <Button asChild variant="outline" size="sm"><Link href="/teams"><ArrowLeft className="mr-2 h-4 w-4" />Back</Link></Button>
             </div>

@@ -112,9 +112,21 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, onDeleted, canDelete: canDele
               </AlertDialogContent>
             </AlertDialog>
           ) : (
-            <Button variant="destructive" size="sm" className="w-full flex-1 text-sm opacity-50" disabled>
-              <Trash2 className="mr-1.5 h-4 w-4" /> Delete
-            </Button>
+            <span className="relative group cursor-not-allowed w-full flex-1">
+              <Button variant="destructive" size="sm" className="w-full text-sm pointer-events-none opacity-50" disabled>
+                <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+              </Button>
+              {canDelete === false && (
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block whitespace-nowrap bg-gray-900 text-white text-xs rounded px-2 py-1 z-50">
+                  Has players or games — cannot delete
+                </span>
+              )}
+              {canDelete === null && (
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block whitespace-nowrap bg-gray-900 text-white text-xs rounded px-2 py-1 z-50">
+                  Checking...
+                </span>
+              )}
+            </span>
           )
         )}
       </CardFooter>
