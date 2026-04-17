@@ -32,11 +32,30 @@ export async function deleteScorecardAction(
   organizationId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // 1. Get scorecard to find all player names
+    // 0. Block deletion if any match reports exist for this scorecard
+    const reportsSnap = await adminDb.collection('matchReports')
+      .where('scorecardId', '==', scorecardId)
+      .limit(1)
+      .get();
+    if (!reportsSnap.empty) {
+      return { success: false, error: 'This scorecard has match reports submitted and cannot be deleted. Remove the match reports first.' };
+    }
+
+    // Also check by linkedGameId if scorecard has one
     const scorecardDoc = await adminDb.collection('matchScorecards').doc(scorecardId).get();
     if (!scorecardDoc.exists) return { success: false, error: 'Scorecard not found.' };
+    const scData = scorecardDoc.data()!;
+    if (scData.linkedGameId) {
+      const gameReportsSnap = await adminDb.collection('matchReports')
+        .where('gameId', '==', scData.linkedGameId)
+        .limit(1)
+        .get();
+      if (!gameReportsSnap.empty) {
+        return { success: false, error: 'This scorecard has match reports submitted via its linked game and cannot be deleted.' };
+      }
+    }
 
-    const scorecard = scorecardDoc.data() as MatchScorecard;
+    const scorecard = scData as MatchScorecard;
 
     // 2. Collect all unique player names from this scorecard
     const playerNames = new Set<string>();
