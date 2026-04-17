@@ -45,7 +45,7 @@ export function MentionTextarea({
   const [mentionQuery, setMentionQuery] = useState<string | null>(null); // null = not in mention mode
   const [mentionStart, setMentionStart] = useState<number>(0);           // cursor pos of the @
   const [selectedIdx, setSelectedIdx] = useState(0);
-  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 }); // kept for compatibility
 
   // Filtered players based on query
   const filtered = mentionQuery !== null
@@ -68,44 +68,17 @@ export function MentionTextarea({
       setMentionQuery(atMatch[1]);
       setMentionStart(cursor - atMatch[0].length);
       setSelectedIdx(0);
-      positionDropdown(e.target, cursor);
     } else {
       setMentionQuery(null);
     }
   };
 
-  // ── Position dropdown near the cursor ────────────────────────────────────
-  const positionDropdown = (textarea: HTMLTextAreaElement, cursor: number) => {
-    // Use a mirror div to estimate caret position
-    const style = window.getComputedStyle(textarea);
-    const mirror = document.createElement('div');
-    mirror.style.cssText = `
-      position: absolute; visibility: hidden; white-space: pre-wrap; word-wrap: break-word;
-      font: ${style.font}; padding: ${style.padding}; border: ${style.border};
-      width: ${textarea.clientWidth}px; box-sizing: border-box;
-    `;
-    const textBefore = textarea.value.slice(0, cursor);
-    mirror.textContent = textBefore;
-    const span = document.createElement('span');
-    span.textContent = '|';
-    mirror.appendChild(span);
-    document.body.appendChild(mirror);
-
-    const rect = textarea.getBoundingClientRect();
-    const spanRect = span.getBoundingClientRect();
-    document.body.removeChild(mirror);
-
-    // Clamp dropdown within viewport
-    const dropdownWidth = 240;
-    let left = spanRect.left - rect.left;
-    if (left + dropdownWidth > textarea.clientWidth) {
-      left = Math.max(0, textarea.clientWidth - dropdownWidth);
-    }
-
-    setDropdownPos({
-      top: spanRect.bottom - rect.top + textarea.scrollTop,
-      left,
-    });
+  // ── Position dropdown below textarea ─────────────────────────────────────
+  // Simple and reliable: always appears just below the textarea, left-aligned
+  const positionDropdown = (_textarea: HTMLTextAreaElement, _cursor: number) => {
+    // Position is handled via CSS — dropdown is absolutely positioned
+    // relative to the wrapper div, appearing below the textarea
+    setDropdownPos({ top: 0, left: 0 }); // unused — CSS handles it
   };
 
   // ── Insert mention on selection ───────────────────────────────────────────
@@ -183,12 +156,12 @@ export function MentionTextarea({
         )}
       />
 
-      {/* Mention dropdown */}
+      {/* Mention dropdown — appears below the textarea, full width */}
       {mentionQuery !== null && filtered.length > 0 && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 bg-card border rounded-xl shadow-lg py-1 min-w-[200px] max-w-[280px]"
-          style={{ top: dropdownPos.top + 4, left: dropdownPos.left }}
+          className="absolute left-0 right-0 z-50 bg-card border rounded-xl shadow-lg py-1 mt-1"
+          style={{ top: '100%' }}
         >
           <p className="text-xs text-muted-foreground px-3 py-1 border-b">
             Tag a player
