@@ -194,7 +194,7 @@ export default function SelectorDashboard() {
                       <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <CalendarDays className="h-3 w-3" />
-                          {format(parseISO(game.date), 'PP')}
+                          {format(new Date(game.date.replace(/-/g, '/')), 'PP')}
                         </span>
                         {game.venue && (
                           <span className="flex items-center gap-1 truncate">
@@ -244,7 +244,7 @@ export default function SelectorDashboard() {
                     <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <CalendarDays className="h-3 w-3" />
-                        {sc.date ? (() => { try { return format(parseISO(sc.date), 'PP'); } catch { return sc.date; } })() : ''}
+                        {sc.date ? (() => { try { return format(new Date(sc.date.replace(/-/g, '/')), 'PP'); } catch { return sc.date; } })() : ''}
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1">

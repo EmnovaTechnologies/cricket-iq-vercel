@@ -167,10 +167,15 @@ export async function getScorecardByIdAction(
     const doc = await adminDb.collection('matchScorecards').doc(scorecardId).get();
     if (!doc.exists) return { success: false, error: 'Scorecard not found.' };
 
+    const data = doc.data()!;
     const scorecard = {
       id: doc.id,
-      ...doc.data(),
-      importedAt: doc.data()?.importedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      ...data,
+      importedAt: data.importedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      selectorAssignments: (data.selectorAssignments || []).map((a: any) => ({
+        ...a,
+        assignedAt: a.assignedAt?.toDate?.()?.toISOString() || a.assignedAt || undefined,
+      })),
     } as MatchScorecard;
 
     return { success: true, scorecard };
