@@ -324,13 +324,16 @@ export default function ScorecardsPage() {
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   {scorecardsWithReports.has(sc.id) ? (
-                                    <span title="Cannot delete — match reports exist" className="w-full cursor-not-allowed">
+                                    <span className="w-full relative group cursor-not-allowed">
                                       <Button
                                         variant="destructive" size="sm" className="w-full text-sm pointer-events-none opacity-50"
                                         disabled
                                       >
                                         <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
                                       </Button>
+                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block whitespace-nowrap bg-gray-900 text-white text-xs rounded px-2 py-1 z-50">
+                                        Match reports exist
+                                      </span>
                                     </span>
                                   ) : (
                                     <Button
