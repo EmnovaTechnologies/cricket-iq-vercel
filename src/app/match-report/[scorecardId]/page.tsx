@@ -462,6 +462,10 @@ function MobileMatchReportPage() {
   if (isLoadingData || !authChecked) return <LoadingScreen message="Loading match data..." />;
   if (!scorecard) return <ErrorScreen message="Scorecard not found. Please check the link and try again." />;
 
+  // Define early so all render paths can use it
+  const playersByTeam = buildPlayersByTeam(scorecard);
+  const allPlayers = Object.values(playersByTeam).flat();
+
   // Not authorized
   if (!isAuthorized) {
     const isWebLogin = !currentUser?.phoneNumber;
@@ -667,9 +671,7 @@ function MobileMatchReportPage() {
   }
 
   // ── Match report form ────────────────────────────────────────────────────────
-  const playersByTeam = buildPlayersByTeam(scorecard);
   const opposingPlayers = playersByTeam[selectedOpposingTeam] || [];
-  const allPlayers = Object.values(playersByTeam).flat();
 
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-lg mx-auto">
