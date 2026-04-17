@@ -337,7 +337,12 @@ export async function getScorecardPlayersForScorecardAction(
         .limit(1)
         .get();
       if (!snap.empty) {
-        players.push({ id: snap.docs[0].id, ...snap.docs[0].data() } as ScorecardPlayer & { id: string });
+        const d = snap.docs[0].data();
+        players.push({
+          id: snap.docs[0].id,
+          ...d,
+          linkedAt: d.linkedAt?.toDate?.()?.toISOString() || d.linkedAt || undefined,
+        } as ScorecardPlayer & { id: string });
       }
     }
 
