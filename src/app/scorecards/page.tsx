@@ -329,7 +329,7 @@ export default function ScorecardsPage() {
                                     title={scorecardsWithReports.has(sc.id) ? 'Cannot delete — match reports exist' : undefined}
                                   >
                                     {deletingId === sc.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />}
-                                    {deletingId === sc.id ? 'Deleting...' : scorecardsWithReports.has(sc.id) ? 'Has Reports' : 'Delete'}
+                                    {deletingId === sc.id ? 'Deleting...' : 'Delete'}
                                   </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
