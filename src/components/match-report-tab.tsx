@@ -12,7 +12,7 @@ import {
   selectorUncertifyMatchReportAction,
   getUserReportForGameAction,
 } from '@/lib/actions/match-report-actions';
-import type { MatchReport } from '@/types';
+import type { MatchReport, ScorecardSelectorAssignment } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -40,6 +40,10 @@ interface MatchReportTabProps {
   userTeam?: string;
   /** Whether this user is an assigned selector for this game */
   isAssignedSelector: boolean;
+  /** Direct selector assignments on this scorecard (optional) */
+  selectorAssignments?: ScorecardSelectorAssignment[];
+  /** Org-level report scope policy */
+  selectorReportScope?: 'opposing_only' | 'both_teams' | 'own_team_only';
 }
 
 export function MatchReportTab({
@@ -52,6 +56,8 @@ export function MatchReportTab({
   playersByTeam,
   userTeam,
   isAssignedSelector,
+  selectorAssignments = [],
+  selectorReportScope = 'opposing_only',
 }: MatchReportTabProps) {
   const { currentUser, userProfile, effectivePermissions } = useAuth();
   const { toast } = useToast();
@@ -77,6 +83,31 @@ export function MatchReportTab({
 
   // Flat list of all players for @mention autocomplete
   const allPlayers = Object.values(playersByTeam).flat();
+
+  // Find this selector's direct assignment (if any)
+  const myAssignment = selectorAssignments.find(a => a.uid === currentUser?.uid);
+  const myTeamAssociation = myAssignment?.teamAssociation; // team name, 'neutral', or undefined
+
+  // Derive what teams this selector can report on based on assignment + org policy
+  const getReportableTeams = (): string[] => {
+    if (myTeamAssociation && myTeamAssociation !== 'neutral') {
+      // Directly assigned to a team — scope determines what they report on
+      if (selectorReportScope === 'own_team_only') return [myTeamAssociation];
+      if (selectorReportScope === 'both_teams') return [team1, team2];
+      // Default opposing_only: report on the other team
+      return [myTeamAssociation === team1 ? team2 : team1];
+    }
+    // Neutral or no direct assignment — use org policy
+    if (selectorReportScope === 'both_teams') return [team1, team2];
+    if (selectorReportScope === 'own_team_only') return [team1, team2]; // no team known, show both
+    return [team1, team2]; // opposing_only with no team association — let them pick
+  };
+  const reportableTeams = getReportableTeams();
+  const reportingIsLocked = reportableTeams.length === 1;
+  // Auto-set opposing team when locked to single option
+  const effectiveOpposingTeam = reportingIsLocked
+    ? reportableTeams[0]
+    : (userTeam ? (userTeam === team1 ? team2 : team1) : selectedOpposingTeam);
 
   const canViewAdmin = effectivePermissions[PERMISSIONS.SERIES_MANAGE_ADMINS_ANY] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
@@ -117,7 +148,7 @@ export function MatchReportTab({
     ? (userTeam === team1 ? team2 : team1)
     : selectedOpposingTeam;
 
-  const opposingPlayers = playersByTeam[opposingTeam] || [];
+  const opposingPlayers = playersByTeam[effectiveOpposingTeam] || playersByTeam[selectedOpposingTeam] || playersByTeam[team2] || [];
 
   useEffect(() => {
     if (!gameId || !currentUser) return;
@@ -137,11 +168,11 @@ export function MatchReportTab({
 
   const handleSubmit = async () => {
     if (!currentUser || !userProfile) return;
-    const reportingTeam = userTeam || (selectedOpposingTeam === team1 ? team2 : team1);
-    const submittedOpposingTeam = opposingTeam;
+    const submittedOpposingTeam = effectiveOpposingTeam || selectedOpposingTeam || team2;
+    const reportingTeam = submittedOpposingTeam === team1 ? team2 : team1;
 
     if (!submittedOpposingTeam) {
-      toast({ title: 'Select opposing team', variant: 'destructive' }); return;
+      toast({ title: 'Select the team to report on', variant: 'destructive' }); return;
     }
     const filledTop3 = top3.filter(p => p.trim());
     if (filledTop3.length === 0) {
@@ -238,6 +269,32 @@ export function MatchReportTab({
   return (
     <div className="space-y-6">
 
+      {/* ── Assigned Selectors — admin view ── */}
+      {canViewAdmin && selectorAssignments.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+            <FileText className="h-4 w-4" /> Assigned Selectors
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {selectorAssignments.map(a => (
+              <div key={a.uid} className="flex items-center gap-1.5 bg-muted/40 border rounded-lg px-2.5 py-1.5 text-xs">
+                <span className="font-medium">{a.name}</span>
+                <Badge
+                  variant="outline"
+                  className={`text-xs h-4 px-1.5 ${
+                    a.teamAssociation === team1 ? 'border-blue-300 text-blue-700 bg-blue-50' :
+                    a.teamAssociation === team2 ? 'border-green-300 text-green-700 bg-green-50' :
+                    'border-muted-foreground/30 text-muted-foreground'
+                  }`}
+                >
+                  {a.teamAssociation === 'neutral' ? 'Neutral' : a.teamAssociation}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Submit/Edit form — shown when no report yet, OR when editing an unlocked report ── */}
       {isSelector && (!myReport || (isEditing && !myReport.isSelectorCertified && !myReport.isCertified)) && (
         <Card>
@@ -251,17 +308,27 @@ export function MatchReportTab({
           </CardHeader>
           <CardContent className="space-y-5">
 
-            {/* Team selection — only if userTeam is not known */}
-            {!userTeam && (
+            {/* Team selection — locked if scope forces single team */}
+            {reportingIsLocked ? (
+              <div className="flex items-center gap-2 text-sm bg-muted/40 rounded-lg px-3 py-2">
+                <FileText className="h-4 w-4 text-primary shrink-0" />
+                <span>Reporting on: <strong>{effectiveOpposingTeam}</strong></span>
+                {myTeamAssociation && myTeamAssociation !== 'neutral' && (
+                  <Badge variant="outline" className="ml-auto text-xs">
+                    {myTeamAssociation} selector
+                  </Badge>
+                )}
+              </div>
+            ) : (
               <div className="space-y-1.5">
                 <Label>You are reporting on</Label>
                 <div className="flex gap-2">
-                  {[team1, team2].map(t => (
+                  {reportableTeams.map(t => (
                     <button
                       key={t}
                       onClick={() => setSelectedOpposingTeam(t)}
                       className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
-                        selectedOpposingTeam === t
+                        (selectedOpposingTeam || team2) === t
                           ? 'bg-primary text-white border-primary'
                           : 'border-muted-foreground/30 hover:border-primary'
                       }`}
@@ -270,12 +337,6 @@ export function MatchReportTab({
                     </button>
                   ))}
                 </div>
-              </div>
-            )}
-            {userTeam && (
-              <div className="flex items-center gap-2 text-sm bg-muted/40 rounded-lg px-3 py-2">
-                <FileText className="h-4 w-4 text-primary shrink-0" />
-                <span>Reporting on: <strong>{opposingTeam}</strong></span>
               </div>
             )}
 

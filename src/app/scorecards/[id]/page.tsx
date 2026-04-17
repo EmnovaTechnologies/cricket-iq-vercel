@@ -168,7 +168,7 @@ function buildPlayersByTeam(scorecard: MatchScorecard): Record<string, string[]>
 export default function ScorecardDetailsPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { effectivePermissions, activeOrganizationId, currentUser, userProfile } = useAuth();
+  const { effectivePermissions, activeOrganizationId, activeOrganizationDetails, currentUser, userProfile } = useAuth();
   const { toast } = useToast();
 
   const [scorecard, setScorecard] = useState<MatchScorecard | null>(null);
@@ -452,6 +452,8 @@ export default function ScorecardDetailsPage() {
               team2={scorecard.team2}
               playersByTeam={buildPlayersByTeam(scorecard)}
               isAssignedSelector={isAssignedSelector}
+              selectorAssignments={selectorAssignments}
+              selectorReportScope={activeOrganizationDetails?.selectorReportScope}
               scorecardMode={true}
             />
           </TabsContent>
@@ -497,6 +499,8 @@ export default function ScorecardDetailsPage() {
               team2={scorecard.team2}
               playersByTeam={buildPlayersByTeam(scorecard)}
               isAssignedSelector={isAssignedSelector}
+              selectorAssignments={selectorAssignments}
+              selectorReportScope={activeOrganizationDetails?.selectorReportScope}
               scorecardMode={true}
             />
           </TabsContent>
