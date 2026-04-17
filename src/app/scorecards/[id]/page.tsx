@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { getScorecardByIdAction, deleteScorecardAction } from '@/lib/actions/scorecard-actions';
-import type { MatchScorecard, ScorecardInnings } from '@/types';
+import { ScorecardSelectorAssignmentPanel } from '@/components/scorecards/scorecard-selector-assignment';
+import type { MatchScorecard, ScorecardInnings, ScorecardSelectorAssignment, UserProfile } from '@/types';
 import { ScorecardPerformanceTab } from '@/components/scorecards/scorecard-performance-tab';
 import { MatchReportTab } from '@/components/match-report-tab';
 import { PlayerLinkTab } from '@/components/scorecards/player-link-tab';
@@ -177,6 +178,8 @@ export default function ScorecardDetailsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [isAssignedSelector, setIsAssignedSelector] = useState(false);
+  const [selectorAssignments, setSelectorAssignments] = useState<ScorecardSelectorAssignment[]>([]);
+  const [availableSelectors, setAvailableSelectors] = useState<UserProfile[]>([]);
 
   const handleDelete = async () => {
     if (!scorecard || !activeOrganizationId) return;
@@ -197,11 +200,20 @@ export default function ScorecardDetailsPage() {
     getScorecardByIdAction(params.id).then(async res => {
       if (res.success && res.scorecard) {
         setScorecard(res.scorecard);
-        if (currentUser?.uid && res.scorecard.linkedGameId) {
-          const { getGameByIdFromDB } = await import('@/lib/db');
-          const game = await getGameByIdFromDB(res.scorecard.linkedGameId);
-          if (game?.selectorUserIds?.includes(currentUser.uid)) {
+        // Set selector assignments from scorecard
+        const assignments = res.scorecard.selectorAssignments || [];
+        setSelectorAssignments(assignments);
+        // Check if current user is assigned (via game OR directly)
+        if (currentUser?.uid) {
+          const directlyAssigned = assignments.some((a: ScorecardSelectorAssignment) => a.uid === currentUser.uid);
+          if (directlyAssigned) {
             setIsAssignedSelector(true);
+          } else if (res.scorecard.linkedGameId) {
+            const { getGameByIdFromDB } = await import('@/lib/db');
+            const game = await getGameByIdFromDB(res.scorecard.linkedGameId);
+            if (game?.selectorUserIds?.includes(currentUser.uid)) {
+              setIsAssignedSelector(true);
+            }
           }
         }
       } else {
@@ -210,6 +222,23 @@ export default function ScorecardDetailsPage() {
       setIsLoading(false);
     });
   }, [params.id, currentUser?.uid]);
+
+  // Fetch available selectors for assignment panel (admin/org admin/series admin only)
+  useEffect(() => {
+    if (!activeOrganizationId || !canEditLinks) return;
+    import('@/lib/actions/get-eligible-org-admins-action').then(({ getEligibleOrgAdminsAction }) => {
+      getEligibleOrgAdminsAction(activeOrganizationId).then(users => {
+        // Filter to selectors and series admins
+        const selectors = users.filter(u =>
+          u.roles?.includes('selector') ||
+          u.roles?.includes('Series Admin') ||
+          u.roles?.includes('Organization Admin') ||
+          u.roles?.includes('admin')
+        );
+        setAvailableSelectors(selectors);
+      });
+    });
+  }, [activeOrganizationId, canEditLinks]);
 
   if (isLoading) {
     return (
@@ -381,6 +410,20 @@ export default function ScorecardDetailsPage() {
               </div>
             ))}
           </div>
+
+          {/* Selector assignment — admin/series admin only */}
+          {canEditLinks && (
+            <div className="mt-3">
+              <ScorecardSelectorAssignmentPanel
+                scorecardId={scorecard.id}
+                team1={scorecard.team1}
+                team2={scorecard.team2}
+                assignments={selectorAssignments}
+                availableSelectors={availableSelectors}
+                onAssignmentsChanged={setSelectorAssignments}
+              />
+            </div>
+          )}
         </CardHeader>
       </Card>
 

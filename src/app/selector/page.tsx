@@ -15,7 +15,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { getGamesForUserViewAction } from '@/lib/actions/game-actions';
-import { getScorecardsForOrgAction } from '@/lib/actions/scorecard-actions';
+import { getScorecardsForOrgAction, getScorecardsForSelectorAction } from '@/lib/actions/scorecard-actions';
 import type { Game, MatchScorecard } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -79,27 +79,27 @@ export default function SelectorDashboard() {
         });
         setGames(assignedGames);
 
-        if (scorecardsResult.success) {
-          // Only show scorecards linked to this selector's assigned games
-          const assignedGameIds = new Set(assignedGames.map(g => g.id));
-          const linked = (scorecardsResult.scorecards || []).filter(sc =>
-            sc.linkedGameId && assignedGameIds.has(sc.linkedGameId)
-          );
-          // Also include scorecards whose team+date matches an assigned game
-          // (for scorecards imported before linkedGameId was set)
-          const linkedIds = new Set(linked.map(sc => sc.id));
-          const byTeamDate = (scorecardsResult.scorecards || []).filter(sc => {
-            if (linkedIds.has(sc.id)) return false;
-            return assignedGames.some(g =>
-              g.date?.slice(0, 10) === sc.date?.slice(0, 10) &&
-              ((g.team1 === sc.team1 && g.team2 === sc.team2) ||
-               (g.team1 === sc.team2 && g.team2 === sc.team1))
-            );
-          });
-          const all = [...linked, ...byTeamDate]
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          setScorecards(all);
-        }
+        // Scorecards: combine game-linked + directly assigned
+        const assignedGameIds = new Set(assignedGames.map(g => g.id));
+
+        // 1. Scorecards linked to assigned games
+        const gameLinked = (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
+          .filter(sc => sc.linkedGameId && assignedGameIds.has(sc.linkedGameId));
+
+        // 2. Scorecards where selector is directly assigned via selectorAssignments
+        const directResult = activeOrganizationId
+          ? await getScorecardsForSelectorAction(currentUser.uid, activeOrganizationId)
+          : { success: true, scorecards: [] };
+        const direct = directResult.success ? directResult.scorecards || [] : [];
+
+        // 3. Merge, deduplicate, sort
+        const seenIds = new Set(gameLinked.map((sc: any) => sc.id));
+        const merged = [
+          ...gameLinked,
+          ...direct.filter((sc: any) => !seenIds.has(sc.id)),
+        ].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        setScorecards(merged);
       } catch (e) {
         console.error('Selector dashboard load error:', e);
       } finally {
@@ -215,7 +215,7 @@ export default function SelectorDashboard() {
 
           {scorecards.length === 0 ? (
             <div className="bg-card border rounded-xl p-6 text-center text-muted-foreground text-sm">
-              No scorecards found for your assigned games.
+              No scorecards assigned to you yet.
             </div>
           ) : (
             <div className="space-y-2">

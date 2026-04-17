@@ -454,6 +454,13 @@ export interface ScorecardInnings {
   didNotBat: string[];
 }
 
+export interface ScorecardSelectorAssignment {
+  uid: string;
+  name: string;
+  teamAssociation: string | 'neutral'; // team name from the scorecard or 'neutral'
+  assignedAt?: string;
+}
+
 export interface MatchScorecard {
   id: string;
   organizationId: string;
@@ -474,6 +481,8 @@ export interface MatchScorecard {
   linkedGameId?: string;
   seriesId?: string;
   seriesName?: string;
+  // Selector assignments (direct, not via game)
+  selectorAssignments?: ScorecardSelectorAssignment[];
   // Innings data
   innings: ScorecardInnings[];
 }

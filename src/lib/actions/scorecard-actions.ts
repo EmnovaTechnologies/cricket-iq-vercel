@@ -444,6 +444,80 @@ export async function unlinkScorecardPlayerAction(
   }
 }
 
+
+// ─── Scorecard Selector Assignments ──────────────────────────────────────────
+
+export async function assignSelectorToScorecardAction(
+  scorecardId: string,
+  assignment: { uid: string; name: string; teamAssociation: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const ref = adminDb.collection('matchScorecards').doc(scorecardId);
+    const doc = await ref.get();
+    if (!doc.exists) return { success: false, error: 'Scorecard not found.' };
+
+    const existing: any[] = doc.data()?.selectorAssignments || [];
+    if (existing.some((a: any) => a.uid === assignment.uid)) {
+      return { success: false, error: 'Selector already assigned to this scorecard.' };
+    }
+
+    await ref.update({
+      selectorAssignments: admin.firestore.FieldValue.arrayUnion({
+        ...assignment,
+        assignedAt: new Date().toISOString(),
+      }),
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function removeSelectorFromScorecardAction(
+  scorecardId: string,
+  uid: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const ref = adminDb.collection('matchScorecards').doc(scorecardId);
+    const snap = await ref.get();
+    if (!snap.exists) return { success: false, error: 'Scorecard not found.' };
+
+    const existing: any[] = snap.data()?.selectorAssignments || [];
+    const updated = existing.filter((a: any) => a.uid !== uid);
+    await ref.update({ selectorAssignments: updated });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getScorecardsForSelectorAction(
+  uid: string,
+  organizationId: string
+): Promise<{ success: boolean; scorecards?: any[]; error?: string }> {
+  try {
+    // Scorecards where this selector is directly assigned
+    const snap = await adminDb.collection('matchScorecards')
+      .where('organizationId', '==', organizationId)
+      .orderBy('date', 'desc')
+      .get();
+
+    const scorecards = snap.docs
+      .map(d => ({
+        id: d.id,
+        ...d.data(),
+        importedAt: d.data().importedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      }))
+      .filter((sc: any) =>
+        sc.selectorAssignments?.some((a: any) => a.uid === uid)
+      );
+
+    return { success: true, scorecards };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 // ─── Get Scorecard for Game ───────────────────────────────────────────────────
 
 export async function getScorecardForGameAction(
