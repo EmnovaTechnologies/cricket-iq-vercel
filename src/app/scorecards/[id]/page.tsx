@@ -186,6 +186,9 @@ export default function ScorecardDetailsPage() {
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
     userProfile?.roles?.includes('admin');
 
+  const canDelete = effectivePermissions[PERMISSIONS.SCORECARDS_DELETE] ||
+    userProfile?.roles?.includes('admin');
+
   const handleDelete = async () => {
     if (!scorecard || !activeOrganizationId) return;
     setIsDeleting(true);
@@ -343,11 +346,11 @@ export default function ScorecardDetailsPage() {
             </DialogContent>
           </Dialog>
           <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-            <DialogTrigger asChild>
+            {canDelete && <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10">
                 <Trash2 className="mr-2 h-4 w-4" /> Delete
               </Button>
-            </DialogTrigger>
+            </DialogTrigger>}
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Delete Scorecard</DialogTitle>
