@@ -391,6 +391,7 @@ export default function ScorecardDetailsPage() {
             <TabsTrigger value="performance" className="flex-1">Performance</TabsTrigger>
             <TabsTrigger value="report" className="flex-1 flex items-center gap-1.5">
               <FileText className="h-3.5 w-3.5" /> Match Report
+            </TabsTrigger>
             <TabsTrigger value="links" className="flex-1 flex items-center gap-1.5">
               <Link2 className="h-3.5 w-3.5" /> Player Links
             </TabsTrigger>
