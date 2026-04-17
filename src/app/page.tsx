@@ -28,6 +28,12 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!currentUser && !isAuthLoading) {
+      router.push('/login');
+    }
+  }, [currentUser, isAuthLoading, router]);
+
   const isAdmin = userProfile?.roles.includes('admin');
 
   const allQuickLinks = [
@@ -79,12 +85,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  useEffect(() => {
-    if (!currentUser && !isAuthLoading) {
-      router.push('/login');
-    }
-  }, [currentUser, isAuthLoading, router]);
 
   if (!currentUser && !isAuthLoading) {
     return (
