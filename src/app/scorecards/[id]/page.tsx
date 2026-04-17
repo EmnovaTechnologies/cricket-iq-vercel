@@ -181,6 +181,11 @@ export default function ScorecardDetailsPage() {
   const [selectorAssignments, setSelectorAssignments] = useState<ScorecardSelectorAssignment[]>([]);
   const [availableSelectors, setAvailableSelectors] = useState<UserProfile[]>([]);
 
+  // Derived permissions — defined before useEffects so they can be used as dependencies
+  const canEditLinks = effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
+    effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
+    userProfile?.roles?.includes('admin');
+
   const handleDelete = async () => {
     if (!scorecard || !activeOrganizationId) return;
     setIsDeleting(true);
@@ -263,9 +268,7 @@ export default function ScorecardDetailsPage() {
     );
   }
 
-  const canEditLinks = effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
-    effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
-    userProfile?.roles?.includes('admin');
+
 
   const formatDate = (d: string) => {
     try { return format(parseISO(d), 'PPP'); } catch { return d; }
