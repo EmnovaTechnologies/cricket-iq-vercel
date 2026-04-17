@@ -28,8 +28,13 @@ import { format, parseISO, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 export default function SelectorDashboard() {
-  const { currentUser, userProfile, activeOrganizationId, logout, isAuthLoading } = useAuth();
+  const { currentUser, userProfile, activeOrganizationId, activeOrganizationDetails, logout, isAuthLoading } = useAuth();
   const router = useRouter();
+
+  // Org selection model — drives what sections are shown
+  const selectionModel = activeOrganizationDetails?.selectionModel || 'hybrid';
+  const showGames = selectionModel === 'rating' || selectionModel === 'hybrid';
+  const showScorecards = selectionModel === 'performance' || selectionModel === 'hybrid';
 
   const [games, setGames] = useState<Game[]>([]);
   const [scorecards, setScorecards] = useState<MatchScorecard[]>([]);
@@ -56,10 +61,18 @@ export default function SelectorDashboard() {
     const load = async () => {
       setIsLoading(true);
       try {
-        const [gamesResult, scorecardsResult] = await Promise.all([
-          getGamesForUserViewAction(userProfile, activeOrganizationId),
-          activeOrganizationId
+        const [gamesResult, scorecardsResult, directScorecardsResult] = await Promise.all([
+          // Only fetch games for rating/hybrid models
+          showGames
+            ? getGamesForUserViewAction(userProfile, activeOrganizationId)
+            : Promise.resolve([]),
+          // Org scorecards for game-linking (performance/hybrid)
+          showScorecards && activeOrganizationId
             ? getScorecardsForOrgAction(activeOrganizationId)
+            : Promise.resolve({ success: true, scorecards: [] }),
+          // Directly assigned scorecards (performance/hybrid)
+          showScorecards && activeOrganizationId
+            ? getScorecardsForSelectorAction(currentUser.uid, activeOrganizationId)
             : Promise.resolve({ success: true, scorecards: [] }),
         ]);
 
@@ -79,27 +92,25 @@ export default function SelectorDashboard() {
         });
         setGames(assignedGames);
 
-        // Scorecards: combine game-linked + directly assigned
-        const assignedGameIds = new Set(assignedGames.map(g => g.id));
+        if (showScorecards) {
+          const assignedGameIds = new Set(assignedGames.map(g => g.id));
 
-        // 1. Scorecards linked to assigned games
-        const gameLinked = (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
-          .filter(sc => sc.linkedGameId && assignedGameIds.has(sc.linkedGameId));
+          // 1. Scorecards linked to assigned games
+          const gameLinked = (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
+            .filter((sc: any) => sc.linkedGameId && assignedGameIds.has(sc.linkedGameId));
 
-        // 2. Scorecards where selector is directly assigned via selectorAssignments
-        const directResult = activeOrganizationId
-          ? await getScorecardsForSelectorAction(currentUser.uid, activeOrganizationId)
-          : { success: true, scorecards: [] };
-        const direct = directResult.success ? directResult.scorecards || [] : [];
+          // 2. Directly assigned scorecards
+          const direct = directScorecardsResult.success ? directScorecardsResult.scorecards || [] : [];
 
-        // 3. Merge, deduplicate, sort
-        const seenIds = new Set(gameLinked.map((sc: any) => sc.id));
-        const merged = [
-          ...gameLinked,
-          ...direct.filter((sc: any) => !seenIds.has(sc.id)),
-        ].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          // 3. Merge, deduplicate, sort
+          const seenIds = new Set(gameLinked.map((sc: any) => sc.id));
+          const merged = [
+            ...gameLinked,
+            ...direct.filter((sc: any) => !seenIds.has(sc.id)),
+          ].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-        setScorecards(merged);
+          setScorecards(merged);
+        }
       } catch (e) {
         console.error('Selector dashboard load error:', e);
       } finally {
@@ -150,8 +161,8 @@ export default function SelectorDashboard() {
 
       <div className="px-4 py-5 space-y-6">
 
-        {/* ── Assigned Games ── */}
-        <section>
+        {/* ── Assigned Games — rating/hybrid models only ── */}
+        {showGames && <section>
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
             <Edit3 className="h-4 w-4" /> My Assigned Games
           </h2>
@@ -205,10 +216,10 @@ export default function SelectorDashboard() {
               })}
             </div>
           )}
-        </section>
+        </section>}
 
-        {/* ── Recent Scorecards ── */}
-        <section>
+        {/* ── Recent Scorecards — performance/hybrid models only ── */}
+        {showScorecards && <section>
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
             <FileText className="h-4 w-4" /> Match Reports
           </h2>
@@ -247,6 +258,8 @@ export default function SelectorDashboard() {
             </div>
           )}
         </section>
+
+        }
 
         {/* ── Full app link ── */}
         <div className="pb-4">
