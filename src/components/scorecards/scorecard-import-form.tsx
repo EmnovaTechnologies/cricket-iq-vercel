@@ -73,6 +73,8 @@ export function ScorecardImportForm() {
   const [importMode, setImportMode] = useState<ImportMode>('screenshot');
   const [isSaving, setIsSaving] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isCheckingDup, setIsCheckingDup] = useState(false);
+  const [dupWarning, setDupWarning] = useState<{ message: string; existingId?: string } | null>(null);
 
   // Pre-fill from URL params
   const rawDate = searchParams.get('date') || '';
@@ -366,6 +368,33 @@ export function ScorecardImportForm() {
   };
 
   // ─── Step labels ──────────────────────────────────────────────────────────
+  // Duplicate check before advancing from details step
+  const handleNextFromDetails = async () => {
+    if (!activeOrganizationId) return;
+    setIsCheckingDup(true);
+    setDupWarning(null);
+    try {
+      const dupCheck = await checkDuplicateScorecardAction({
+        organizationId: activeOrganizationId,
+        team1: team1.trim(),
+        team2: team2.trim(),
+        date,
+        seriesId: seriesId || undefined,
+        linkedGameId: linkedGameId || undefined,
+      });
+      if (dupCheck.isDuplicate) {
+        setDupWarning({
+          message: dupCheck.message || 'A scorecard already exists for this match.',
+          existingId: dupCheck.existingScorecardId,
+        });
+        setIsCheckingDup(false);
+        return;
+      }
+    } catch {}
+    setIsCheckingDup(false);
+    setStep(importMode === 'excel' ? 'review' : 'upload');
+  };
+
   const stepKeys: Step[] = importMode === 'excel'
     ? ['choose', 'upload', 'details', 'review']
     : ['choose', 'details', 'upload', 'review'];
@@ -542,16 +571,37 @@ export function ScorecardImportForm() {
                 </div>
               )}
 
+              {dupWarning && (
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertTitle className="text-amber-700">Scorecard already exists</AlertTitle>
+                  <AlertDescription className="text-amber-600 text-sm">
+                    {dupWarning.message}{' '}
+                    {dupWarning.existingId && (
+                      <button
+                        onClick={() => router.push(`/scorecards/${dupWarning.existingId}`)}
+                        className="underline font-medium"
+                      >
+                        View existing scorecard →
+                      </button>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => setStep(importMode === 'excel' ? 'upload' : 'choose')}>
                   <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
                 <Button
-                  onClick={() => setStep(importMode === 'excel' ? 'review' : 'upload')}
-                  disabled={!team1.trim() || !team2.trim() || !date || (!linkedGameId && !seriesId && importMode === 'screenshot')}
+                  onClick={handleNextFromDetails}
+                  disabled={!team1.trim() || !team2.trim() || !date || (!linkedGameId && !seriesId && importMode === 'screenshot') || isCheckingDup}
                   className="flex-1"
                 >
-                  {importMode === 'excel' ? 'Review & Save' : 'Next: Upload Screenshots'} <ArrowRight className="ml-2 h-4 w-4" />
+                  {isCheckingDup
+                    ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Checking...</>
+                    : <>{importMode === 'excel' ? 'Review & Save' : 'Next: Upload Screenshots'} <ArrowRight className="ml-2 h-4 w-4" /></>
+                  }
                 </Button>
               </div>
               {!linkedGameId && !seriesId && importMode === 'screenshot' && (
