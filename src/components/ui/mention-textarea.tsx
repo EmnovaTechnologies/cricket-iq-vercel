@@ -149,6 +149,11 @@ export function MentionTextarea({
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onFocus={() => {/* ensure focus on mobile */}}
+        onTouchStart={() => {
+          // Close any open dropdown on touch so it doesnt block input
+          if (mentionQuery !== null) setMentionQuery(null);
+        }}
         placeholder={placeholder}
         rows={rows}
         disabled={disabled}

@@ -145,7 +145,10 @@ function MobileMatchReportPage() {
           if (isWebLogin) {
             // Path A: web login (Google/email) — trust currentUser.uid directly
             if (currentUser.uid === selectorUidFromUrl) {
-              if (linkedGameId) {
+              // Check direct scorecard assignment first
+              if (sc.selectorAssignments?.some((a: any) => a.uid === selectorUidFromUrl)) {
+                authorizedUid = selectorUidFromUrl;
+              } else if (linkedGameId) {
                 const { getGameByIdFromDB } = await import('@/lib/db');
                 const game = await getGameByIdFromDB(linkedGameId);
                 if (game?.selectorUserIds?.includes(selectorUidFromUrl)) {
@@ -180,7 +183,10 @@ function MobileMatchReportPage() {
               const expectedProfile = expectedUserSnap.docs[0].data();
               const expectedPhone = expectedProfile.phoneNumber;
               if (currentUser.phoneNumber && expectedPhone && currentUser.phoneNumber === expectedPhone) {
-                if (linkedGameId) {
+                // Check direct scorecard assignment first
+                if (sc.selectorAssignments?.some((a: any) => a.uid === selectorUidFromUrl)) {
+                  authorizedUid = selectorUidFromUrl;
+                } else if (linkedGameId) {
                   const { getGameByIdFromDB } = await import('@/lib/db');
                   const game = await getGameByIdFromDB(linkedGameId);
                   if (game?.selectorUserIds?.includes(selectorUidFromUrl)) {
@@ -199,7 +205,10 @@ function MobileMatchReportPage() {
 
         // Fallback: no uid in URL — check directly
         if (!authorizedUid) {
-          if (linkedGameId) {
+          // Check direct scorecard assignment first
+          if (sc.selectorAssignments?.some((a: any) => a.uid === currentUser.uid)) {
+            authorizedUid = currentUser.uid;
+          } else if (linkedGameId) {
             const { getGameByIdFromDB } = await import('@/lib/db');
             const game = await getGameByIdFromDB(linkedGameId);
             if (game?.selectorUserIds?.includes(currentUser.uid)) {
