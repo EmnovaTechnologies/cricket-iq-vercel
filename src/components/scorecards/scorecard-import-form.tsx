@@ -542,8 +542,7 @@ export function ScorecardImportForm() {
                         <Label className="text-xs">Year</Label>
                         <Select value={selectedYear} onValueChange={v => {
                           setSelectedYear(v);
-                          const cur = availableSeries.find(s => s.id === seriesId);
-                          if (cur && cur.year.toString() !== v) { setSeriesId(''); setSeriesName(''); }
+                          // Don't clear series when year changes — series may span year boundaries
                         }}>
                           <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Year" /></SelectTrigger>
                           <SelectContent>{availableYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
@@ -559,7 +558,7 @@ export function ScorecardImportForm() {
                           <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select series" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">None</SelectItem>
-                            {availableSeries.filter(s => !selectedYear || s.year.toString() === selectedYear).map(s => (
+                            {availableSeries.filter(s => !selectedYear || s.year.toString() === selectedYear || s.id === seriesId).map(s => (
                               <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                             ))}
                           </SelectContent>
