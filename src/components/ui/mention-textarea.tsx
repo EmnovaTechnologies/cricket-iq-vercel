@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 interface MentionTextareaProps {
   value: string;
   onChange: (value: string) => void;
-  players: string[];           // flat list of player names
+  players?: string[];           // flat list of player names
   placeholder?: string;
   rows?: number;
   disabled?: boolean;
@@ -32,7 +32,7 @@ interface MentionTextareaProps {
 export function MentionTextarea({
   value,
   onChange,
-  players,
+  players = [],
   placeholder,
   rows = 2,
   disabled = false,
