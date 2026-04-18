@@ -96,6 +96,15 @@ export default function SeriesPage() {
     fetchSeries();
   }, [fetchSeries]);
 
+  // Re-fetch when page becomes visible again (e.g. navigating back from details)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') fetchSeries();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [fetchSeries]);
+
   const uniqueYears = useMemo(() => {
     const yearsSet = new Set(allSeries.map(s => s.year.toString()));
     if (!yearsSet.has(currentYearString)) {
