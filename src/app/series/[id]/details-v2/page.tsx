@@ -561,6 +561,7 @@ export default function SeriesDetailsPage() {
                         {series.maleCutoffDate && <InfoItem icon={<CalendarDays className="h-4 w-4" />} label="Male Cutoff DOB" value={format(parseISO(series.maleCutoffDate), 'PPP')} />}
                         {series.femaleCutoffDate && <InfoItem icon={<CalendarDays className="h-4 w-4" />} label="Female Cutoff DOB" value={format(parseISO(series.femaleCutoffDate), 'PPP')} />}
                       </div>
+                      <p className="text-xs text-muted-foreground mt-2">Players must be born on or after the respective cutoff date to be eligible for this series.</p>
                     )}
                   </div>
                 )}
@@ -814,7 +815,7 @@ export default function SeriesDetailsPage() {
                 )}
               </div>
               <CardDescription>
-                {isSeriesArchived ? 'This series is archived — games are not shown.' : `Active matches for ${series.name}.`}
+                {isSeriesArchived ? 'This series is archived — games are not shown.' : `Active matches scheduled or played as part of ${series.name}. Archived games are not shown here.`}
               </CardDescription>
             </CardHeader>
             {!isSeriesArchived && (
@@ -838,7 +839,7 @@ export default function SeriesDetailsPage() {
               <CardTitle className="text-xl font-headline text-primary flex items-center gap-2">
                 <Users className="h-5 w-5" /> Participating Teams
               </CardTitle>
-              <CardDescription>Teams registered for {series.name}.</CardDescription>
+              <CardDescription>Teams currently registered for {series.name}.</CardDescription>
             </CardHeader>
             <CardContent>
               {participatingTeams.length > 0 ? (
@@ -872,7 +873,7 @@ export default function SeriesDetailsPage() {
                       </Button>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No more teams available in {series.ageCategory}. <Link href={`/teams/add?seriesIdToLink=${series.id}&seriesAgeCategoryToEnforce=${encodeURIComponent(series.ageCategory)}`} className="underline text-primary">Add a new team</Link>.</p>
+                    <p className="text-sm text-muted-foreground">No more teams available in the {series.ageCategory} category to add to this series. You can <Link href={`/teams/add?seriesIdToLink=${series.id}&seriesAgeCategoryToEnforce=${encodeURIComponent(series.ageCategory)}`} className="underline text-primary">add a new team</Link>.</p>
                   )}
                 </div>
               </CardFooter>
@@ -887,7 +888,7 @@ export default function SeriesDetailsPage() {
               <CardTitle className="text-xl font-headline text-primary flex items-center gap-2">
                 <MapPin className="h-5 w-5" /> Series Venues
               </CardTitle>
-              <CardDescription>Venues for {series.name}.</CardDescription>
+              <CardDescription>Venues specified for {series.name}. Venues can be viewed even if series is archived.</CardDescription>
             </CardHeader>
             <CardContent>
               {seriesVenues.length > 0 ? (
@@ -937,7 +938,7 @@ export default function SeriesDetailsPage() {
                       </Button>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No more venues available. <Link href={`/venues/add?seriesIdToLink=${series.id}`} className="underline text-primary">Add a new venue</Link>.</p>
+                    <p className="text-sm text-muted-foreground">No more venues from this organization are available to add to this series. You can <Link href={`/venues/add?seriesIdToLink=${series.id}`} className="underline text-primary">add a new venue</Link> to the system (it will be associated with the active organization).</p>
                   )}
                 </div>
               </CardFooter>
