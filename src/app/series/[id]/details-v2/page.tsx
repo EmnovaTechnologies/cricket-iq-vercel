@@ -758,7 +758,7 @@ export default function SeriesDetailsPage() {
                 </CardTitle>
                 {canAddGame && !isSeriesArchived && (
                   <Button asChild size="sm" className="bg-primary hover:bg-primary/90" disabled={isPermissionsLoading}>
-                    <Link href={`/games/add?seriesId=${series.id}`}><PlusCircle className="mr-2 h-4 w-4" />Add Game</Link>
+                    <Link href={`/games/add?seriesId=${series.id}`}><PlusCircle className="mr-2 h-4 w-4" />Add Game to Series</Link>
                   </Button>
                 )}
               </div>
@@ -905,17 +905,17 @@ export default function SeriesDetailsPage() {
                 <div className="flex gap-2">
                   {canViewFitnessReport && !isSeriesArchived && isFitnessCriteriaDefinedForSeries && (
                     <Button asChild size="sm" variant="outline" className="border-primary text-primary hover:bg-primary/10">
-                      <Link href={`/series/${seriesId}/fitness-report`}><FileText className="mr-2 h-4 w-4" />View Report</Link>
+                      <Link href={`/series/${seriesId}/fitness-report`}><FileText className="mr-2 h-4 w-4" />View Series Fitness Report</Link>
                     </Button>
                   )}
                   {!!effectivePermissions[PERMISSIONS.FITNESS_TESTS_ADD] && !isSeriesArchived && (
                     isFitnessCriteriaDefinedForSeries ? (
                       <Button asChild size="sm" className="bg-primary hover:bg-primary/90" disabled={isPermissionsLoading}>
-                        <Link href={`/series/${seriesId}/fitness-tests/add`}><PlusCircle className="mr-2 h-4 w-4" />Add Test</Link>
+                        <Link href={`/series/${seriesId}/fitness-tests/add`}><PlusCircle className="mr-2 h-4 w-4" />Add New Fitness Test</Link>
                       </Button>
                     ) : (
                       <Button size="sm" className="bg-primary hover:bg-primary/90" disabled>
-                        <PlusCircle className="mr-2 h-4 w-4" />Add Test
+                        <PlusCircle className="mr-2 h-4 w-4" />Add New Fitness Test
                       </Button>
                     )
                   )}
