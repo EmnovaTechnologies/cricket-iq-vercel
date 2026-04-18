@@ -428,32 +428,6 @@ export default function SeriesDetailsPage() {
           </Link>
         </Button>
         <div className="flex flex-wrap gap-2 justify-end">
-          {canDelete && canDeletePermission && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" disabled={isDeleting}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {isDeleting ? 'Deleting...' : 'Delete Series'}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Series</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to permanently delete "{series?.name}"? This cannot be undone.
-                    The series has no games so it is safe to delete.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteSeries} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Confirm Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
           {canViewSavedTeam && series.savedAiTeam && series.savedAiTeam.length > 0 && !isSeriesArchived && (
             <Button asChild size="sm" variant="secondary">
               <Link href={`/series/${seriesId}/saved-team`}>
@@ -493,174 +467,116 @@ export default function SeriesDetailsPage() {
       <Tabs defaultValue="overview">
         <TabsList className="w-full grid grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="games">Games</TabsTrigger>
-          <TabsTrigger value="teams">Teams</TabsTrigger>
           <TabsTrigger value="venues">Venues</TabsTrigger>
-          <TabsTrigger value="fitness">Fitness</TabsTrigger>
+          <TabsTrigger value="teams">Teams</TabsTrigger>
+          <TabsTrigger value="games">Games</TabsTrigger>
+          <TabsTrigger value="fitness">Fitness Tests</TabsTrigger>
         </TabsList>
 
         {/* ══ OVERVIEW TAB ════════════════════════════════════════════ */}
-        <TabsContent value="overview" className="space-y-6 mt-4">
+        <TabsContent value="overview" className="space-y-4 mt-4">
           <Card className="shadow-lg">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl font-headline text-primary">Series Details</CardTitle>
-                {canEditBasicInfo && !isEditingBasicInfo && (
-                  <Button variant="outline" size="sm" onClick={() => {
-                    setEditName(series.name);
-                    setEditAgeCategory(series.ageCategory);
-                    setEditYear(series.year.toString());
-                    setEditMaleCutoff(series.maleCutoffDate || '');
-                    setEditFemaleCutoff(series.femaleCutoffDate || '');
-                    setIsEditingBasicInfo(true);
-                  }}>
-                    <Edit3 className="h-3.5 w-3.5 mr-1.5" /> Edit Info
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* ── Basic Info: read mode ── */}
-              {!isEditingBasicInfo && (
-                <>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <InfoItem icon={<Tag className="h-5 w-5" />} label="Age Category" value={series.ageCategory} />
-                    <InfoItem icon={<CalendarFold className="h-5 w-5" />} label="Year" value={series.year.toString()} />
-                    <div className="md:col-span-2 lg:col-span-1">
-                      <div className="p-3 bg-background rounded-md border h-full">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <UserCog className="h-5 w-5 text-primary" />
-                            <p className="text-sm text-muted-foreground">Series Administrators</p>
-                          </div>
-                          {canManageSeriesAdmins && !isEditingAdmins && !isSeriesArchived && (
-                            <Button variant="outline" size="sm" onClick={() => setIsEditingAdmins(true)} className="h-7 px-2" disabled={isPermissionsLoading}>
-                              <Edit3 className="h-3 w-3 mr-1" /> Edit
-                            </Button>
-                          )}
-                        </div>
-                        {seriesAdmins.length > 0 ? (
-                          <ul className="space-y-1">
-                            {seriesAdmins.map(admin => (
-                              <li key={admin.uid} className="text-sm font-medium text-foreground">{admin.displayName || admin.email}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">None Assigned</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  {(series.maleCutoffDate || series.femaleCutoffDate) && (
-                    <div className="pt-2">
-                      <h4 className="text-md font-semibold text-foreground mb-2">Age Eligibility Cutoff Dates</h4>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        {series.maleCutoffDate && <InfoItem icon={<CalendarDays className="h-5 w-5" />} label="Male Cutoff DOB" value={format(parseISO(series.maleCutoffDate), 'PPP')} />}
-                        {series.femaleCutoffDate && <InfoItem icon={<CalendarDays className="h-5 w-5" />} label="Female Cutoff DOB" value={format(parseISO(series.femaleCutoffDate), 'PPP')} />}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">Players must be born on or after the respective cutoff date to be eligible.</p>
-                    </div>
-                  )}
-                </>
-              )}
+            <CardContent className="pt-6 space-y-0 divide-y">
 
-              {/* ── Basic Info: edit mode ── */}
-              {isEditingBasicInfo && (
-                <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-                  <h4 className="text-sm font-semibold text-foreground">Edit Series Information</h4>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5 md:col-span-2">
-                      <Label className="text-xs text-muted-foreground">Series Name</Label>
-                      <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Series name" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Age Category</Label>
-                      <Select value={editAgeCategory} onValueChange={setEditAgeCategory}>
-                        <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                        <SelectContent>{AGE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Year</Label>
-                      <Input type="number" value={editYear} onChange={e => setEditYear(e.target.value)} placeholder="e.g. 2025" min={2000} max={2100} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Male Cutoff DOB</Label>
-                      <Input type="date" value={editMaleCutoff} onChange={e => setEditMaleCutoff(e.target.value)} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Female Cutoff DOB</Label>
-                      <Input type="date" value={editFemaleCutoff} onChange={e => setEditFemaleCutoff(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="flex gap-2 pt-1">
-                    <Button size="sm" onClick={handleSaveBasicInfo} disabled={isSavingBasicInfo}>
-                      {isSavingBasicInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                      {isSavingBasicInfo ? 'Saving...' : 'Save Changes'}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setIsEditingBasicInfo(false)} disabled={isSavingBasicInfo}>Cancel</Button>
-                  </div>
-                </div>
-              )}
-
-              {/* ── Fitness Test Criteria ── */}
-              <div className="pt-2 border-t">
-                <div className="flex items-center justify-between mb-3 mt-3">
-                  <h4 className="text-md font-semibold text-foreground flex items-center gap-2">
-                    <Dumbbell className="h-5 w-5 text-primary" /> Fitness Test Criteria
-                  </h4>
-                  {canEditFitnessCriteria && !isEditingFitnessCriteria && !isSeriesArchived && (
-                    <Button variant="outline" size="sm" onClick={() => setIsEditingFitnessCriteria(true)} className="h-7 px-2" disabled={isPermissionsLoading}>
+              {/* ── Section 1: Series Info ── */}
+              <div className="pb-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Series Information</h3>
+                  {canEditBasicInfo && !isEditingBasicInfo && (
+                    <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => {
+                      setEditName(series.name);
+                      setEditAgeCategory(series.ageCategory);
+                      setEditYear(series.year.toString());
+                      setEditMaleCutoff(series.maleCutoffDate || '');
+                      setEditFemaleCutoff(series.femaleCutoffDate || '');
+                      setIsEditingBasicInfo(true);
+                    }}>
                       <Edit3 className="h-3 w-3 mr-1" /> Edit
                     </Button>
                   )}
                 </div>
-                {!isEditingFitnessCriteria && (
-                  series.fitnessTestType ? (
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <InfoItem icon={<Activity className="h-5 w-5" />} label="Test Type" value={series.fitnessTestType} />
-                      <InfoItem icon={<Tag className="h-5 w-5" />} label="Passing Score" value={series.fitnessTestPassingScore || 'N/A'} />
+
+                {!isEditingBasicInfo && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <InfoItem icon={<Layers className="h-4 w-4" />} label="Series Name" value={series.name} />
+                      <InfoItem icon={<Tag className="h-4 w-4" />} label="Age Category" value={series.ageCategory} />
+                      <InfoItem icon={<CalendarFold className="h-4 w-4" />} label="Year" value={series.year.toString()} />
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No fitness test criteria defined.</p>
-                  )
+                    {(series.maleCutoffDate || series.femaleCutoffDate) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {series.maleCutoffDate && <InfoItem icon={<CalendarDays className="h-4 w-4" />} label="Male Cutoff DOB" value={format(parseISO(series.maleCutoffDate), 'PPP')} />}
+                        {series.femaleCutoffDate && <InfoItem icon={<CalendarDays className="h-4 w-4" />} label="Female Cutoff DOB" value={format(parseISO(series.femaleCutoffDate), 'PPP')} />}
+                      </div>
+                    )}
+                  </div>
                 )}
-                {isEditingFitnessCriteria && canEditFitnessCriteria && !isSeriesArchived && (
+
+                {isEditingBasicInfo && (
                   <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-                    <div>
-                      <Label htmlFor="fitnessTestTypeEdit">Fitness Test Type</Label>
-                      <Select value={currentFitnessTestTypeForEdit || NO_FITNESS_TEST_VALUE}
-                        onValueChange={(value) => { setCurrentFitnessTestTypeForEdit(value as FitnessTestType | typeof NO_FITNESS_TEST_VALUE | undefined); if (value === NO_FITNESS_TEST_VALUE) setCurrentFitnessPassingScoreForEdit(''); }}
-                        disabled={isLoadingFitnessUpdate}>
-                        <SelectTrigger id="fitnessTestTypeEdit"><SelectValue placeholder="Select a test type (optional)" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={NO_FITNESS_TEST_VALUE}>None</SelectItem>
-                          {FITNESS_TEST_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="fitnessPassingScoreEdit">Passing Score</Label>
-                      <Input id="fitnessPassingScoreEdit" type="text" placeholder="e.g. 14.5"
-                        value={currentFitnessPassingScoreForEdit}
-                        onChange={(e) => setCurrentFitnessPassingScoreForEdit(e.target.value)}
-                        disabled={isLoadingFitnessUpdate || currentFitnessTestTypeForEdit === NO_FITNESS_TEST_VALUE || !currentFitnessTestTypeForEdit} />
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5 md:col-span-2">
+                        <Label className="text-xs text-muted-foreground">Series Name</Label>
+                        <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Series name" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Age Category</Label>
+                        <Select value={editAgeCategory} onValueChange={setEditAgeCategory}>
+                          <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                          <SelectContent>{AGE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Year</Label>
+                        <Input type="number" value={editYear} onChange={e => setEditYear(e.target.value)} placeholder="e.g. 2025" min={2000} max={2100} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Male Cutoff DOB</Label>
+                        <Input type="date" value={editMaleCutoff} onChange={e => setEditMaleCutoff(e.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Female Cutoff DOB</Label>
+                        <Input type="date" value={editFemaleCutoff} onChange={e => setEditFemaleCutoff(e.target.value)} />
+                      </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="ghost" onClick={() => setIsEditingFitnessCriteria(false)} disabled={isLoadingFitnessUpdate}>Cancel</Button>
-                      <Button onClick={handleSaveFitnessCriteria} disabled={isLoadingFitnessUpdate}>
-                        {isLoadingFitnessUpdate ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Criteria
+                      <Button size="sm" onClick={handleSaveBasicInfo} disabled={isSavingBasicInfo}>
+                        {isSavingBasicInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        {isSavingBasicInfo ? 'Saving...' : 'Save Changes'}
                       </Button>
+                      <Button size="sm" variant="outline" onClick={() => setIsEditingBasicInfo(false)} disabled={isSavingBasicInfo}>Cancel</Button>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* ── Series Admins edit panel ── */}
-              {canManageSeriesAdmins && isEditingAdmins && !isSeriesArchived && (
-                <div className="pt-2 border-t">
-                  <div className="mt-3 space-y-3">
-                    <h4 className="text-md font-semibold">Manage Series Administrators</h4>
+              {/* ── Section 2: Administrators ── */}
+              <div className="py-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                    <UserCog className="h-4 w-4" /> Series Administrators
+                  </h3>
+                  {canManageSeriesAdmins && !isEditingAdmins && !isSeriesArchived && (
+                    <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => setIsEditingAdmins(true)} disabled={isPermissionsLoading}>
+                      <Edit3 className="h-3 w-3 mr-1" /> Edit
+                    </Button>
+                  )}
+                </div>
+                {!isEditingAdmins && (
+                  seriesAdmins.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {seriesAdmins.map(admin => (
+                        <Badge key={admin.uid} variant="secondary" className="text-sm py-1 px-3">
+                          {admin.displayName || admin.email}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">None assigned.</p>
+                  )
+                )}
+                {canManageSeriesAdmins && isEditingAdmins && !isSeriesArchived && (
+                  <div className="space-y-3">
                     {lockedSuperAdmins.length > 0 && (
                       <div className="rounded-md border bg-muted/30 p-2 space-y-1">
                         <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned)</p>
@@ -675,7 +591,7 @@ export default function SeriesDetailsPage() {
                     )}
                     <div className="relative">
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input type="search" placeholder="Search Series Admins..." value={adminSearchQuery} onChange={(e) => setAdminSearchQuery(e.target.value)} className="pl-8 h-9" />
+                      <Input type="search" placeholder="Search Series Admins..." value={adminSearchQuery} onChange={e => setAdminSearchQuery(e.target.value)} className="pl-8 h-9" />
                     </div>
                     {selectableAdmins.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No users with Series Admin role found.</p>
@@ -685,7 +601,7 @@ export default function SeriesDetailsPage() {
                           {filteredPotentialSeriesAdmins.map(user => (
                             <div key={user.uid} className="flex items-center space-x-2">
                               <Checkbox id={`admin-${user.uid}`} checked={selectedAdminUidsForUpdate.includes(user.uid)}
-                                onCheckedChange={(checked) => setSelectedAdminUidsForUpdate(prev => checked ? [...prev, user.uid] : prev.filter(uid => uid !== user.uid))} />
+                                onCheckedChange={checked => setSelectedAdminUidsForUpdate(prev => checked ? [...prev, user.uid] : prev.filter(uid => uid !== user.uid))} />
                               <label htmlFor={`admin-${user.uid}`} className="text-sm font-normal leading-none">
                                 {user.displayName || user.email}
                                 <span className="text-muted-foreground ml-1 text-xs">(Series Admin)</span>
@@ -696,60 +612,137 @@ export default function SeriesDetailsPage() {
                       </ScrollArea>
                     )}
                     <div className="flex gap-2">
-                      <Button variant="ghost" onClick={() => { setIsEditingAdmins(false); setSelectedAdminUidsForUpdate(series.seriesAdminUids || []); setAdminSearchQuery(''); }} disabled={isLoadingSeriesAdmins}>Cancel</Button>
-                      <Button onClick={handleSaveSeriesAdmins} disabled={isLoadingSeriesAdmins}>
-                        {isLoadingSeriesAdmins ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Administrators
+                      <Button variant="ghost" size="sm" onClick={() => { setIsEditingAdmins(false); setSelectedAdminUidsForUpdate(series.seriesAdminUids || []); setAdminSearchQuery(''); }} disabled={isLoadingSeriesAdmins}>Cancel</Button>
+                      <Button size="sm" onClick={handleSaveSeriesAdmins} disabled={isLoadingSeriesAdmins}>
+                        {isLoadingSeriesAdmins ? <Save className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />} Save Administrators
                       </Button>
                     </div>
                   </div>
-                </div>
-              )}
-            </CardContent>
-            {showArchiveButton && (
-              <CardFooter className="border-t pt-4">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant={isSeriesArchived ? "outline" : "destructive"} size="sm"
-                      className={`ml-auto ${isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'}`}
-                      disabled={isPermissionsLoading}>
-                      {isSeriesArchived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />}
-                      {isSeriesArchived ? "Unarchive Series" : "Archive Series"}
+                )}
+              </div>
+
+              {/* ── Section 3: Fitness Test Criteria ── */}
+              <div className="py-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                    <Dumbbell className="h-4 w-4" /> Fitness Test Criteria
+                  </h3>
+                  {canEditFitnessCriteria && !isEditingFitnessCriteria && !isSeriesArchived && (
+                    <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => setIsEditingFitnessCriteria(true)} disabled={isPermissionsLoading}>
+                      <Edit3 className="h-3 w-3 mr-1" /> Edit
                     </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure you want to {isSeriesArchived ? "unarchive" : "archive"} this series?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {isSeriesArchived ? "Unarchiving will make this series active again." : "Archiving will also archive all its games and prevent new additions."}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleArchiveToggle} className={cn(isSeriesArchived ? "" : "bg-destructive hover:bg-destructive/90")}>
-                        Confirm {isSeriesArchived ? "Unarchive" : "Archive"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                  )}
+                </div>
+                {!isEditingFitnessCriteria && (
+                  series.fitnessTestType ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <InfoItem icon={<Activity className="h-4 w-4" />} label="Test Type" value={series.fitnessTestType} />
+                      <InfoItem icon={<Tag className="h-4 w-4" />} label="Passing Score" value={series.fitnessTestPassingScore || 'N/A'} />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No fitness test criteria defined for this series.</p>
+                  )
+                )}
+                {isEditingFitnessCriteria && canEditFitnessCriteria && !isSeriesArchived && (
+                  <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+                    <div>
+                      <Label htmlFor="fitnessTestTypeEdit">Fitness Test Type</Label>
+                      <Select value={currentFitnessTestTypeForEdit || NO_FITNESS_TEST_VALUE}
+                        onValueChange={value => { setCurrentFitnessTestTypeForEdit(value as FitnessTestType | typeof NO_FITNESS_TEST_VALUE | undefined); if (value === NO_FITNESS_TEST_VALUE) setCurrentFitnessPassingScoreForEdit(''); }}
+                        disabled={isLoadingFitnessUpdate}>
+                        <SelectTrigger id="fitnessTestTypeEdit"><SelectValue placeholder="Select a test type (optional)" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_FITNESS_TEST_VALUE}>None</SelectItem>
+                          {FITNESS_TEST_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="fitnessPassingScoreEdit">Passing Score</Label>
+                      <Input id="fitnessPassingScoreEdit" type="text" placeholder="e.g. 14.5"
+                        value={currentFitnessPassingScoreForEdit}
+                        onChange={e => setCurrentFitnessPassingScoreForEdit(e.target.value)}
+                        disabled={isLoadingFitnessUpdate || currentFitnessTestTypeForEdit === NO_FITNESS_TEST_VALUE || !currentFitnessTestTypeForEdit} />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => setIsEditingFitnessCriteria(false)} disabled={isLoadingFitnessUpdate}>Cancel</Button>
+                      <Button size="sm" onClick={handleSaveFitnessCriteria} disabled={isLoadingFitnessUpdate}>
+                        {isLoadingFitnessUpdate ? <Save className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />} Save Criteria
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Section 4: Scoring Model ── */}
+              <div className="py-5">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2 mb-4">
+                  <BarChart3 className="h-4 w-4" /> Scoring Model
+                </h3>
+                {series && (
+                  <SeriesScoringModel seriesId={series.id} organizationId={series.organizationId} seriesAdminUids={series.seriesAdminUids}
+                    canEdit={!!currentAuthProfile?.roles?.includes('admin') || (isOrgAdmin && series.organizationId === activeOrganizationId) || (isUserASeriesAdminForThisSeries ?? false)} />
+                )}
+              </div>
+
+            </CardContent>
+
+            {/* ── Footer: Archive + Delete side by side ── */}
+            {(showArchiveButton || (canDelete && canDeletePermission)) && (
+              <CardFooter className="border-t pt-4 flex justify-end gap-2">
+                {canDelete && canDeletePermission && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm" disabled={isDeleting}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {isDeleting ? 'Deleting...' : 'Delete Series'}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Series</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to permanently delete "{series?.name}"? This cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteSeries} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                          {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Confirm Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                {showArchiveButton && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant={isSeriesArchived ? "outline" : "outline"} size="sm"
+                        className={isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : 'border-amber-500 text-amber-600 hover:bg-amber-50'}
+                        disabled={isPermissionsLoading}>
+                        {isSeriesArchived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />}
+                        {isSeriesArchived ? "Unarchive Series" : "Archive Series"}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure you want to {isSeriesArchived ? "unarchive" : "archive"} this series?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {isSeriesArchived ? "Unarchiving will make this series active again." : "Archiving will also archive all its games and prevent new additions."}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleArchiveToggle} className={cn(isSeriesArchived ? "" : "bg-destructive hover:bg-destructive/90")}>
+                          Confirm {isSeriesArchived ? "Unarchive" : "Archive"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </CardFooter>
             )}
           </Card>
-
-          {/* Scoring Model */}
-          {series && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl font-headline text-primary flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" /> Series Scoring Model
-                </CardTitle>
-                <CardDescription>Performance scoring weights for scorecards and AI selection.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SeriesScoringModel seriesId={series.id} organizationId={series.organizationId} seriesAdminUids={series.seriesAdminUids}
-                  canEdit={!!currentAuthProfile?.roles?.includes('admin') || (isOrgAdmin && series.organizationId === activeOrganizationId) || (isUserASeriesAdminForThisSeries ?? false)} />
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         {/* ══ GAMES TAB ════════════════════════════════════════════════ */}
