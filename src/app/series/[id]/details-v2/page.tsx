@@ -557,11 +557,13 @@ export default function SeriesDetailsPage() {
                       <InfoItem icon={<CalendarFold className="h-4 w-4" />} label="Year" value={series.year.toString()} />
                     </div>
                     {(series.maleCutoffDate || series.femaleCutoffDate) && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {series.maleCutoffDate && <InfoItem icon={<CalendarDays className="h-4 w-4" />} label="Male Cutoff DOB" value={format(parseISO(series.maleCutoffDate), 'PPP')} />}
-                        {series.femaleCutoffDate && <InfoItem icon={<CalendarDays className="h-4 w-4" />} label="Female Cutoff DOB" value={format(parseISO(series.femaleCutoffDate), 'PPP')} />}
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {series.maleCutoffDate && <InfoItem icon={<CalendarDays className="h-4 w-4" />} label="Male Cutoff DOB" value={format(parseISO(series.maleCutoffDate), 'PPP')} />}
+                          {series.femaleCutoffDate && <InfoItem icon={<CalendarDays className="h-4 w-4" />} label="Female Cutoff DOB" value={format(parseISO(series.femaleCutoffDate), 'PPP')} />}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Players must be born on or after the respective cutoff date to be eligible for this series.</p>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">Players must be born on or after the respective cutoff date to be eligible for this series.</p>
                     )}
                   </div>
                 )}
