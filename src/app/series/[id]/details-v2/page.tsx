@@ -153,12 +153,9 @@ export default function SeriesDetailsPage() {
             setSelectedAdminUidsForUpdate([]);
           }
 
-          if (effectivePermissions[PERMISSIONS.SERIES_MANAGE_ADMINS_ANY] ||
-              currentAuthProfile?.roles?.includes('Organization Admin') ||
-              currentAuthProfile?.roles?.includes('admin')) {
-              const potentialAdmins = await getPotentialSeriesAdminsForOrg(currentSeries.organizationId);
-              setPotentialSeriesAdminsToAssign(potentialAdmins);
-          }
+          // Always fetch potential admins — function handles its own org/role filtering
+          const potentialAdmins = await getPotentialSeriesAdminsForOrg(currentSeries.organizationId);
+          setPotentialSeriesAdminsToAssign(potentialAdmins);
         }
       } catch (err: any) {
         toast({ title: "Error", description: err.message, variant: "destructive" });
