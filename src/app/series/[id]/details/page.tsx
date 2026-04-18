@@ -436,33 +436,8 @@ export default function SeriesDetailsPage() {
               </Link>
             </Button>
           )}
-          {showArchiveButton && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant={isSeriesArchived ? "outline" : "destructive"} size="sm"
-                  className={isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : ''}
-                  disabled={isPermissionsLoading}>
-                  {isSeriesArchived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />}
-                  {isSeriesArchived ? "Unarchive Series" : "Archive Series"}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure you want to {isSeriesArchived ? "unarchive" : "archive"} this series?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {isSeriesArchived ? "Unarchiving will make this series active again." : "Archiving will also archive all its games and prevent new additions."}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleArchiveToggle} className={cn(isSeriesArchived ? "" : "bg-destructive hover:bg-destructive/90")}>
-                    Confirm {isSeriesArchived ? "Unarchive" : "Archive"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-          {canDelete && canDeletePermission && (
+          {/* Show Delete when deletable, Archive when not deletable */}
+          {canDeletePermission && canDelete === true ? (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm" disabled={isDeleting}>
@@ -485,7 +460,32 @@ export default function SeriesDetailsPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          )}
+          ) : showArchiveButton ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant={isSeriesArchived ? "outline" : "outline"} size="sm"
+                  className={isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : 'border-destructive text-destructive hover:bg-destructive/10'}
+                  disabled={isPermissionsLoading}>
+                  {isSeriesArchived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />}
+                  {isSeriesArchived ? "Unarchive Series" : "Archive Series"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure you want to {isSeriesArchived ? "unarchive" : "archive"} this series?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {isSeriesArchived ? "Unarchiving will make this series active again." : "Archiving will also archive all its games and prevent new additions."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleArchiveToggle} className={cn(isSeriesArchived ? "" : "bg-destructive hover:bg-destructive/90")}>
+                    Confirm {isSeriesArchived ? "Unarchive" : "Archive"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null}
         </div>
       </div>
       
