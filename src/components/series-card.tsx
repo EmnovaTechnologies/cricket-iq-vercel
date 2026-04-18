@@ -54,7 +54,8 @@ const SeriesCard: React.FC<SeriesCardProps> = ({ series, onArchiveToggle, canArc
   const isOrgAdmin = userProfile?.roles?.includes('Organization Admin') ?? false;
   const isSeriesAdmin = userProfile?.roles?.includes('Series Admin') ?? false;
   const isAssignedToSeries = userProfile?.assignedSeriesIds?.includes(series.id) ?? false;
-  const canDeletePermission = effectivePermissions[PERMISSIONS.SERIES_DELETE_ANY] ||
+  const canDeletePermission = isSuperAdmin ||
+    effectivePermissions[PERMISSIONS.SERIES_DELETE_ANY] ||
     (isOrgAdmin && series.organizationId === activeOrganizationId) ||
     (isSeriesAdmin && isAssignedToSeries);
 
