@@ -129,7 +129,7 @@ export default function SeriesDetailsPage() {
               if (currentSeries.organizationId) {
                 const venuesOfSameOrg = await getAllVenuesFromDB(currentSeries.organizationId);
                 const seriesVenueIds = new Set(currentSeries.venueIds || []);
-                setAllAvailableVenues(venuesOfSameOrg.filter(venue => !seriesVenueIds.has(venue.id)));
+                setAllAvailableVenues(venuesOfSameOrg.filter(venue => !seriesVenueIds.has(venue.id) && venue.status === "active"));
               } else {
                 setAllAvailableVenues([]);
               }
