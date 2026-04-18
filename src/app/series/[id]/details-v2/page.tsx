@@ -32,6 +32,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { getPotentialSeriesAdminsForOrg } from '@/lib/actions/user-actions';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
