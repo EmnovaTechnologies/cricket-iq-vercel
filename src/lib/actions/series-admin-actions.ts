@@ -40,16 +40,19 @@ export async function checkSeriesBulkDeletableAction(
   if (!seriesIds.length) return {};
 
   try {
-    // One query: get all games for this org — find which series have games
-    const gamesSnap = await adminDb.collection('games')
-      .where('organizationId', '==', organizationId)
-      .get();
-
+    // Query games for each series in chunks of 30 (Firestore 'in' limit)
     const seriesWithGames = new Set<string>();
-    gamesSnap.docs.forEach(d => {
-      const sid = d.data().seriesId;
-      if (sid) seriesWithGames.add(sid);
-    });
+    for (let i = 0; i < seriesIds.length; i += 30) {
+      const chunk = seriesIds.slice(i, i + 30);
+      const gamesSnap = await adminDb.collection('games')
+        .where('seriesId', 'in', chunk)
+        .limit(chunk.length)
+        .get();
+      gamesSnap.docs.forEach(d => {
+        const sid = d.data().seriesId;
+        if (sid) seriesWithGames.add(sid);
+      });
+    }
 
     const result: Record<string, boolean> = {};
     seriesIds.forEach(id => { result[id] = !seriesWithGames.has(id); });
