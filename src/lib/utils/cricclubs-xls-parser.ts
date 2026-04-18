@@ -82,9 +82,9 @@ export function parseCricClubsCsv(csvText: string): ParsedCricClubsScorecard {
 
   for (let i = 0; i < lines.length; i++) {
     const cl = cleanLine(lines[i]);
-    const battingMatch = cl.match(/^(.+?)\s+Batting\s*$/i);
-    const bowlingMatch = cl.match(/^(.+?)\s+Bowling\s*$/i);
-    const fowMatch = cl.match(/^(.+?)\s+Fall\s+of\s+[Ww]ickets?\s*$/i);
+    const battingMatch = cl.match(/^(.+?)\s+Batting[\s,]*$/i);
+    const bowlingMatch = cl.match(/^(.+?)\s+Bowling[\s,]*$/i);
+    const fowMatch = cl.match(/^(.+?)\s+Fall\s+of\s+[Ww]ickets?[\s,]*$/i);
     if (battingMatch) sections.push({ type: 'batting', team: battingMatch[1].trim(), lineIdx: i });
     else if (bowlingMatch) sections.push({ type: 'bowling', team: bowlingMatch[1].trim(), lineIdx: i });
     else if (fowMatch) sections.push({ type: 'fow', team: fowMatch[1].trim(), lineIdx: i });
@@ -289,7 +289,7 @@ function parseFow(lines: string[]): string[] {
     const cl = cleanLine(line);
     if (!cl) continue;
     // Format: "PlayerShort, 1-0 ,  Over 0.4"
-    const m = cl.match(/^(.+?),\s*(\d+-\d+)\s*,\s*Over\s*([\d.]+)/i);
+    const m = cl.match(/^(.+?),\s*(\d+-\d+[A-Za-z]*)\s*,\s*Over\s*([\d.]+)/i);
     if (m) fow.push(`${m[2]} (${m[3]} ov) - ${m[1].trim()}`);
   }
   return fow;
@@ -345,8 +345,8 @@ function deriveFielding(batting: ScorecardBatter[]): ScorecardFielder[] {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function cleanLine(line: string): string {
-  // Strip leading tabs, commas, and whitespace
-  return line.replace(/^[\t,\s]+/, '').trim();
+  // Strip leading and trailing tabs, commas, and whitespace
+  return line.replace(/^[\t,\s]+/, '').replace(/[,\s]+$/, '').trim();
 }
 
 function parseCsvRow(line: string): string[] {
