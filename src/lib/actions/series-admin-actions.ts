@@ -22,6 +22,20 @@ export async function checkSeriesDeletableAction(
       };
     }
 
+    // Also check for scorecards linked to this series
+    const scorecardsSnap = await adminDb.collection('matchScorecards')
+      .where('seriesId', '==', seriesId)
+      .limit(1)
+      .get();
+
+    if (!scorecardsSnap.empty) {
+      const sc = scorecardsSnap.docs[0].data();
+      return {
+        canDelete: false,
+        reason: `Series has imported scorecards (e.g. ${sc.team1} vs ${sc.team2}). Remove scorecards first.`,
+      };
+    }
+
     return { canDelete: true };
   } catch (error: any) {
     console.error('[checkSeriesDeletableAction] Error:', error);
@@ -63,6 +77,18 @@ export async function checkSeriesBulkDeletableAction(
       orgGamesSnap.docs.forEach(d => {
         const sid = d.data().seriesId;
         if (sid && seriesIdSet.has(sid)) seriesWithGames.add(sid);
+      });
+    }
+
+    // Approach 3: check scorecards linked to these series
+    for (let i = 0; i < seriesIds.length; i += 30) {
+      const chunk = seriesIds.slice(i, i + 30);
+      const scorecardsSnap = await adminDb.collection('matchScorecards')
+        .where('seriesId', 'in', chunk)
+        .get();
+      scorecardsSnap.docs.forEach(d => {
+        const sid = d.data().seriesId;
+        if (sid) seriesWithGames.add(sid);
       });
     }
 
