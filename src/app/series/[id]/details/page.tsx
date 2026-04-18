@@ -32,6 +32,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { getPotentialSeriesAdminsForOrg } from '@/lib/actions/user-actions';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -128,7 +129,7 @@ export default function SeriesDetailsPage() {
               if (currentSeries.organizationId) {
                 const venuesOfSameOrg = await getAllVenuesFromDB(currentSeries.organizationId);
                 const seriesVenueIds = new Set(currentSeries.venueIds || []);
-                setAllAvailableVenues(venuesOfSameOrg.filter(venue => !seriesVenueIds.has(venue.id)));
+                setAllAvailableVenues(venuesOfSameOrg.filter(venue => !seriesVenueIds.has(venue.id) && venue.status === "active"));
               } else {
                 setAllAvailableVenues([]);
               }
