@@ -337,6 +337,32 @@ interface UpdateSeriesFitnessCriteriaParams {
   fitnessTestType?: FitnessTestType;
   fitnessTestPassingScore?: string;
 }
+export async function updateSeriesBasicInfoAction(
+  seriesId: string,
+  data: {
+    name?: string;
+    ageCategory?: string;
+    year?: number;
+    maleCutoffDate?: string | null;
+    femaleCutoffDate?: string | null;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!seriesId) return { success: false, error: 'Series ID is required.' };
+    const payload: Record<string, any> = {};
+    if (data.name !== undefined) payload.name = data.name.trim();
+    if (data.ageCategory !== undefined) payload.ageCategory = data.ageCategory;
+    if (data.year !== undefined) payload.year = data.year;
+    if (data.maleCutoffDate !== undefined) payload.maleCutoffDate = data.maleCutoffDate;
+    if (data.femaleCutoffDate !== undefined) payload.femaleCutoffDate = data.femaleCutoffDate;
+    await updateSeriesInDB(seriesId, payload);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error in updateSeriesBasicInfoAction:', error);
+    return { success: false, error: error.message || 'Failed to update series.' };
+  }
+}
+
 export async function updateSeriesFitnessCriteriaAction(
   seriesId: string,
   data: UpdateSeriesFitnessCriteriaParams

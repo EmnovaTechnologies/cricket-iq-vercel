@@ -13,7 +13,7 @@ import {
   getUserProfileFromDB, // New import
 } from '@/lib/db';
 
-import { addTeamToSeriesAction, addVenueToSeriesAction, updateSeriesAdminsAction, archiveSeriesAction, unarchiveSeriesAction, updateSeriesFitnessCriteriaAction } from '@/lib/actions/series-actions';
+import { addTeamToSeriesAction, addVenueToSeriesAction, updateSeriesAdminsAction, archiveSeriesAction, unarchiveSeriesAction, updateSeriesFitnessCriteriaAction, updateSeriesBasicInfoAction } from '@/lib/actions/series-actions';
 import { checkSeriesDeletableAction, deleteSeriesAdminAction } from '@/lib/actions/series-admin-actions';
 import type { Series, Team, Venue, Game, UserProfile, FitnessTestType, FitnessTestHeader } from '@/types'; // Added FitnessTestHeader
 import { Layers, Tag, CalendarFold, ArrowLeft, Users, PlusCircle, MapPin, Gamepad2, Map as MapIconLucide, UserCog, Edit3, Save, Archive, ArchiveRestore, Info, Search, CalendarDays, Activity, Dumbbell, ShieldCheck, ListChecks, FileText, Target, Trash2, Loader2, BarChart3 } from 'lucide-react';import Link from 'next/link';
@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { SeriesScoringModel } from '@/components/scorecards/series-scoring-model';
 import { format, parseISO } from 'date-fns';
-import { FITNESS_TEST_TYPES } from '@/lib/constants';
+import { FITNESS_TEST_TYPES, AGE_CATEGORIES } from '@/lib/constants';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'; // Added Table components
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 
@@ -88,7 +88,16 @@ export default function SeriesDetailsPage() {
   const [currentFitnessPassingScoreForEdit, setCurrentFitnessPassingScoreForEdit] = useState<string>('');
   const [isLoadingFitnessUpdate, setIsLoadingFitnessUpdate] = useState(false);
 
-  const [fitnessTests, setFitnessTests] = useState<FitnessTestHeader[]>([]); // New state for fitness tests
+  const [fitnessTests, setFitnessTests] = useState<FitnessTestHeader[]>([]);
+
+  // Basic info editing state
+  const [isEditingBasicInfo, setIsEditingBasicInfo] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editAgeCategory, setEditAgeCategory] = useState('');
+  const [editYear, setEditYear] = useState('');
+  const [editMaleCutoff, setEditMaleCutoff] = useState('');
+  const [editFemaleCutoff, setEditFemaleCutoff] = useState('');
+  const [isSavingBasicInfo, setIsSavingBasicInfo] = useState(false); // New state for fitness tests
 
   const refreshSeriesData = async () => {
     if (seriesId) {
@@ -327,6 +336,31 @@ export default function SeriesDetailsPage() {
       .catch(() => setCanDelete(false));
   }, [series?.id, canDeletePermission]);
 
+  const handleSaveBasicInfo = async () => {
+    if (!series) return;
+    setIsSavingBasicInfo(true);
+    try {
+      const result = await updateSeriesBasicInfoAction(series.id, {
+        name: editName || series.name,
+        ageCategory: editAgeCategory || series.ageCategory,
+        year: parseInt(editYear) || series.year,
+        maleCutoffDate: editMaleCutoff || null,
+        femaleCutoffDate: editFemaleCutoff || null,
+      });
+      if (result.success) {
+        toast({ title: 'Series Updated', description: 'Series information has been saved.' });
+        setIsEditingBasicInfo(false);
+        await refreshSeriesData();
+      } else {
+        toast({ title: 'Update Failed', description: result.error, variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'An unexpected error occurred.', variant: 'destructive' });
+    } finally {
+      setIsSavingBasicInfo(false);
+    }
+  };
+
   const handleDeleteSeries = async () => {
     if (!series || !canDeletePermission) return;
     setIsDeleting(true);
@@ -362,6 +396,11 @@ export default function SeriesDetailsPage() {
 
   const canViewFitnessReport = !!effectivePermissions[PERMISSIONS.SERIES_VIEW_FITNESS_REPORT];
   const canViewSavedTeam = !!effectivePermissions[PERMISSIONS.SERIES_VIEW_SAVED_AI_TEAM];
+
+  const canEditBasicInfo = !isSeriesArchived && (
+    !!effectivePermissions[PERMISSIONS.SERIES_EDIT_ANY] ||
+    (!!effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] && isUserASeriesAdminForThisSeries)
+  );
 
 
   if (isLoadingSeries || isPermissionsLoading) {
@@ -451,48 +490,110 @@ export default function SeriesDetailsPage() {
            )}
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <InfoItem icon={<Tag className="h-5 w-5" />} label="Age Category" value={series.ageCategory} />
-            <InfoItem icon={<CalendarFold className="h-5 w-5" />} label="Year" value={series.year.toString()} />
-            <div className="md:col-span-2 lg:col-span-1">
-                <div className="p-3 bg-background rounded-md border h-full">
-                    <div className="flex items-center justify-between mb-1">
+          {/* ── Basic Info: read mode ─────────────────────────────────────── */}
+          {!isEditingBasicInfo && (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1">
+                  <InfoItem icon={<Tag className="h-5 w-5" />} label="Age Category" value={series.ageCategory} />
+                  <InfoItem icon={<CalendarFold className="h-5 w-5" />} label="Year" value={series.year.toString()} />
+                  <div className="md:col-span-2 lg:col-span-1">
+                    <div className="p-3 bg-background rounded-md border h-full">
+                      <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
-                            <UserCog className="h-5 w-5 text-primary" />
-                            <p className="text-sm text-muted-foreground">Series Administrators</p>
+                          <UserCog className="h-5 w-5 text-primary" />
+                          <p className="text-sm text-muted-foreground">Series Administrators</p>
                         </div>
                         {canManageSeriesAdmins && !isEditingAdmins && !isSeriesArchived && (
-                            <Button variant="outline" size="sm" onClick={() => setIsEditingAdmins(true)} className="h-7 px-2" disabled={isPermissionsLoading}>
-                                <Edit3 className="h-3 w-3 mr-1" /> Edit
-                            </Button>
+                          <Button variant="outline" size="sm" onClick={() => setIsEditingAdmins(true)} className="h-7 px-2" disabled={isPermissionsLoading}>
+                            <Edit3 className="h-3 w-3 mr-1" /> Edit
+                          </Button>
                         )}
-                    </div>
-                    {seriesAdmins.length > 0 ? (
+                      </div>
+                      {seriesAdmins.length > 0 ? (
                         <ul className="space-y-1">
-                        {seriesAdmins.map(admin => (
+                          {seriesAdmins.map(admin => (
                             <li key={admin.uid} className="text-sm font-medium text-foreground">
-                            {admin.displayName || admin.email}
+                              {admin.displayName || admin.email}
                             </li>
-                        ))}
+                          ))}
                         </ul>
-                    ) : (
+                      ) : (
                         <p className="text-sm text-muted-foreground">None Assigned</p>
-                    )}
-                 </div>
-            </div>
-          </div>
-          {(series.maleCutoffDate || series.femaleCutoffDate) && (
-            <div className="pt-4">
-              <h4 className="text-md font-semibold text-foreground mb-2">Age Eligibility Cutoff Dates</h4>
-              <div className="grid md:grid-cols-2 gap-4">
-                {series.maleCutoffDate && (
-                  <InfoItem icon={<CalendarDays className="h-5 w-5" />} label="Male Cutoff DOB" value={format(parseISO(series.maleCutoffDate), 'PPP')} />
-                )}
-                {series.femaleCutoffDate && (
-                  <InfoItem icon={<CalendarDays className="h-5 w-5" />} label="Female Cutoff DOB" value={format(parseISO(series.femaleCutoffDate), 'PPP')} />
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {canEditBasicInfo && (
+                  <Button variant="outline" size="sm" className="ml-4 shrink-0 h-8" onClick={() => {
+                    setEditName(series.name);
+                    setEditAgeCategory(series.ageCategory);
+                    setEditYear(series.year.toString());
+                    setEditMaleCutoff(series.maleCutoffDate || '');
+                    setEditFemaleCutoff(series.femaleCutoffDate || '');
+                    setIsEditingBasicInfo(true);
+                  }}>
+                    <Edit3 className="h-3.5 w-3.5 mr-1.5" /> Edit Info
+                  </Button>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">Players must be born on or after the respective cutoff date to be eligible for this series.</p>
+              {(series.maleCutoffDate || series.femaleCutoffDate) && (
+                <div className="pt-2">
+                  <h4 className="text-md font-semibold text-foreground mb-2">Age Eligibility Cutoff Dates</h4>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {series.maleCutoffDate && (
+                      <InfoItem icon={<CalendarDays className="h-5 w-5" />} label="Male Cutoff DOB" value={format(parseISO(series.maleCutoffDate), 'PPP')} />
+                    )}
+                    {series.femaleCutoffDate && (
+                      <InfoItem icon={<CalendarDays className="h-5 w-5" />} label="Female Cutoff DOB" value={format(parseISO(series.femaleCutoffDate), 'PPP')} />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">Players must be born on or after the respective cutoff date to be eligible for this series.</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── Basic Info: edit mode ─────────────────────────────────────── */}
+          {isEditingBasicInfo && (
+            <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+              <h4 className="text-sm font-semibold text-foreground">Edit Series Information</h4>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Series Name</Label>
+                  <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Series name" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Age Category</Label>
+                  <Select value={editAgeCategory} onValueChange={setEditAgeCategory}>
+                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>
+                      {AGE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Year</Label>
+                  <Input type="number" value={editYear} onChange={e => setEditYear(e.target.value)} placeholder="e.g. 2025" min={2000} max={2100} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Male Cutoff DOB</Label>
+                  <Input type="date" value={editMaleCutoff} onChange={e => setEditMaleCutoff(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Female Cutoff DOB</Label>
+                  <Input type="date" value={editFemaleCutoff} onChange={e => setEditFemaleCutoff(e.target.value)} />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button size="sm" onClick={handleSaveBasicInfo} disabled={isSavingBasicInfo}>
+                  {isSavingBasicInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  {isSavingBasicInfo ? 'Saving...' : 'Save Changes'}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setIsEditingBasicInfo(false)} disabled={isSavingBasicInfo}>
+                  Cancel
+                </Button>
+              </div>
             </div>
           )}
 
