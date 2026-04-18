@@ -2,7 +2,7 @@
 'use client';
 
 import { getGameByIdFromDB, getPlayerByIdFromDB, getPlayersAvailableForGameFromDB, getSeriesByIdFromDB, getTeamByIdFromDB, getTeamsForSeriesFromDB, getPlayersFromIds, isPlayerAgeEligibleForSeriesFromDB, getRatingsForGameFromDB, ratingValueToNumber, getUserProfileFromDB } from '@/lib/db'; // Firestore functions
-import type { Game, Player, PlayerRating, Series, UserProfile, RatingValue, PermissionKey } from '@/types';
+import type { Game, Player, PlayerRating, Series, UserProfile, RatingValue, PermissionKey, MatchScorecard } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -16,9 +16,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { addPlayerToGameRosterAction, updatePlayerGameInclusionAction, updateGameSelectorsAction } from '@/lib/actions/game-actions';
-import { getScorecardForGameAction } from '@/lib/actions/scorecard-actions';
+import { getScorecardForGameAction, getScorecardByIdAction } from '@/lib/actions/scorecard-actions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MatchReportTab } from '@/components/match-report-tab';
+import { ScorecardPerformanceTab } from '@/components/scorecards/scorecard-performance-tab';
+import { PlayerLinkTab } from '@/components/scorecards/player-link-tab';
+import { InningsView, buildPlayersByTeam } from '@/components/scorecards/innings-view';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -55,6 +58,7 @@ export default function GameDetailsPage() {
   const { toast } = useToast();
   // ── activeOrganizationDetails added to read selectionModel ──
   const { userProfile: currentAuthProfile, effectivePermissions, isPermissionsLoading, activeOrganizationId, activeOrganizationDetails } = useAuth();
+  const userProfile = currentAuthProfile; // alias for canEditLinks check
 
   // Check if scorecard already exists for this game
   useEffect(() => {
@@ -63,6 +67,16 @@ export default function GameDetailsPage() {
       if (res.exists && res.scorecardId) setExistingScorecardId(res.scorecardId);
     });
   }, [gameId, activeOrganizationId]);
+
+  // Fetch full scorecard when we know the ID
+  useEffect(() => {
+    if (!existingScorecardId) { setScorecard(null); return; }
+    setIsLoadingScorecard(true);
+    getScorecardByIdAction(existingScorecardId).then(res => {
+      if (res.success && res.scorecard) setScorecard(res.scorecard);
+      setIsLoadingScorecard(false);
+    });
+  }, [existingScorecardId]);
 
   const [game, setGame] = useState<Game | undefined>(undefined);
   const [series, setSeries] = useState<Series | undefined>(undefined);
@@ -90,6 +104,8 @@ export default function GameDetailsPage() {
   const [gameUrl, setGameUrl] = useState('');
   const [isSavingGameUrl, setIsSavingGameUrl] = useState(false);
   const [existingScorecardId, setExistingScorecardId] = useState<string | null>(null);
+  const [scorecard, setScorecard] = useState<MatchScorecard | null>(null);
+  const [isLoadingScorecard, setIsLoadingScorecard] = useState(false);
 
   const handleShareLink = () => {
     const url = `${window.location.origin}/rate/${gameId}`;
@@ -315,6 +331,26 @@ export default function GameDetailsPage() {
   // ── Hide Rate Players entirely for performance-model orgs ──
   const showRatePlayers = activeOrganizationDetails?.selectionModel !== 'performance';
 
+  // ── Selection model flags ──
+  const selectionModel = activeOrganizationDetails?.selectionModel;
+  const isRating = !selectionModel || selectionModel === 'rating';
+  const isPerformance = selectionModel === 'performance';
+  const isHybrid = selectionModel === 'hybrid';
+
+  // Show game-based Match Report for rating + hybrid orgs
+  const showGameMatchReport = isRating || isHybrid;
+  // Show scorecard tabs (innings, performance, player links) when scorecard exists + performance/hybrid
+  const showScorecardTabs = !!scorecard && (isPerformance || isHybrid);
+  // Show scorecard-based Match Report only for hybrid (performance uses scorecard report, rating uses game report)
+  const showScorecardMatchReport = isHybrid && showScorecardTabs;
+  // For performance orgs with a scorecard, the scorecard Match Report IS the only report
+  const showPerformanceMatchReport = isPerformance && showScorecardTabs;
+
+  // ── Player Links tab permission — mirrors scorecard page ──
+  const canEditLinks = !!effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
+                       !!effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
+                       !!userProfile?.roles?.includes('admin');
+
   const getSkillIcon = (skill: Player['primarySkill']) => {
     switch (skill) { case 'Batting': return <CricketBatIcon className="h-4 w-4 text-primary" />; case 'Bowling': return <CricketBallIcon className="h-4 w-4 text-primary" />; case 'Wicket Keeping': return <WicketKeeperGloves className="h-4 w-4 text-primary" />; default: return <UserSquare2 className="h-4 w-4 text-primary" />; }
   };
@@ -323,8 +359,10 @@ export default function GameDetailsPage() {
     <div className="overflow-x-auto">
       <Table><TableHeader><TableRow>
             <TableHead className="w-[70px]">Include</TableHead><TableHead>Name</TableHead><TableHead>Primary Skill</TableHead>
-            <TableHead className="text-center">Batting Score</TableHead><TableHead className="text-center">Bowling Score</TableHead>
-            <TableHead className="text-center">Fielding Score</TableHead><TableHead className="text-center">Wicket keeping Score</TableHead>
+            {showRatePlayers && <>
+              <TableHead className="text-center">Batting Score</TableHead><TableHead className="text-center">Bowling Score</TableHead>
+              <TableHead className="text-center">Fielding Score</TableHead><TableHead className="text-center">Wicket keeping Score</TableHead>
+            </>}
       </TableRow></TableHeader><TableBody>
           {playersToList.map((player) => {
             const isPlayerIncluded = teamIdentifier === 'team1' ? game.team1Players?.includes(player.id) ?? false : game.team2Players?.includes(player.id) ?? false;
@@ -338,8 +376,10 @@ export default function GameDetailsPage() {
                   <Avatar className="h-9 w-9"><AvatarImage src={player.avatarUrl || `https://placehold.co/40x40.png`} alt={player.name} data-ai-hint="player avatar small"/><AvatarFallback>{player.name.substring(0, 2).toUpperCase()}</AvatarFallback></Avatar>
                   {player.name}</div>
               </TableCell><TableCell className="flex items-center gap-1 whitespace-nowrap pt-5">{getSkillIcon(player.primarySkill)}{player.primarySkill}</TableCell>
-              <TableCell className="text-center">{displayRating(player.gameRatings?.batting)}</TableCell><TableCell className="text-center">{displayRating(player.gameRatings?.bowling)}</TableCell>
-              <TableCell className="text-center">{displayRating(player.gameRatings?.fielding)}</TableCell><TableCell className="text-center">{player.primarySkill === 'Wicket Keeping' ? displayRating(player.gameRatings?.wicketKeeping) : '-'}</TableCell>
+              {showRatePlayers && <>
+                <TableCell className="text-center">{displayRating(player.gameRatings?.batting)}</TableCell><TableCell className="text-center">{displayRating(player.gameRatings?.bowling)}</TableCell>
+                <TableCell className="text-center">{displayRating(player.gameRatings?.fielding)}</TableCell><TableCell className="text-center">{player.primarySkill === 'Wicket Keeping' ? displayRating(player.gameRatings?.wicketKeeping) : '-'}</TableCell>
+              </>}
             </TableRow>);
           })}
       </TableBody></Table>
@@ -476,16 +516,56 @@ export default function GameDetailsPage() {
       )}
 
       <Tabs defaultValue="roster">
-        <TabsList className="w-full sm:w-auto">
+        <TabsList className="w-full sm:w-auto flex-wrap h-auto">
+          {/* Roster — always */}
           <TabsTrigger value="roster" className="flex items-center gap-1.5">
             <Users className="h-4 w-4" /> Roster
           </TabsTrigger>
-          <TabsTrigger value="report" className="flex items-center gap-1.5">
-            <FileText className="h-4 w-4" /> Match Report
-          </TabsTrigger>
+
+          {/* Innings tabs — when scorecard exists + performance/hybrid */}
+          {showScorecardTabs && scorecard.innings.map((inn, i) => (
+            <TabsTrigger key={i} value={`innings${i + 1}`} className="flex items-center gap-1.5">
+              {inn.battingTeam} ({inn.totalRuns}/{inn.wickets})
+            </TabsTrigger>
+          ))}
+
+          {/* Performance tab — when scorecard exists + performance/hybrid */}
+          {showScorecardTabs && (
+            <TabsTrigger value="performance" className="flex items-center gap-1.5">
+              Performance
+            </TabsTrigger>
+          )}
+
+          {/* Match Report (game-based) — rating + hybrid */}
+          {showGameMatchReport && (
+            <TabsTrigger value="report" className="flex items-center gap-1.5">
+              <FileText className="h-4 w-4" /> Match Report
+            </TabsTrigger>
+          )}
+
+          {/* Scorecard Report (scorecard-based) — hybrid only, labelled distinctly */}
+          {showScorecardMatchReport && (
+            <TabsTrigger value="scorecard-report" className="flex items-center gap-1.5">
+              <FileText className="h-4 w-4" /> Scorecard Report
+            </TabsTrigger>
+          )}
+
+          {/* Scorecard Report for performance orgs (only report type) */}
+          {showPerformanceMatchReport && (
+            <TabsTrigger value="scorecard-report" className="flex items-center gap-1.5">
+              <FileText className="h-4 w-4" /> Match Report
+            </TabsTrigger>
+          )}
+
+          {/* Player Links — when scorecard exists + performance/hybrid */}
+          {showScorecardTabs && (
+            <TabsTrigger value="player-links" className="flex items-center gap-1.5">
+              Player Links
+            </TabsTrigger>
+          )}
         </TabsList>
 
-        {/* ── Roster Tab ── */}
+        {/* ── Roster Tab ── always shown */}
         <TabsContent value="roster" className="space-y-6 mt-4">
           <Card><CardHeader>
           <div className="flex justify-between items-center">
@@ -564,25 +644,88 @@ export default function GameDetailsPage() {
       </Card>
         </TabsContent>
 
-        {/* ── Match Report Tab ── */}
-        <TabsContent value="report" className="mt-4">
-          <MatchReportTab
-            gameId={gameId}
-            scorecardId={existingScorecardId || undefined}
-            organizationId={game.organizationId || activeOrganizationId || ''}
-            seriesId={game.seriesId}
-            team1={game.team1}
-            team2={game.team2}
-            playersByTeam={{
-              [game.team1]: potentialTeam1Players.map(p => p.name),
-              [game.team2]: potentialTeam2Players.map(p => p.name),
-            }}
-            isAssignedSelector={
-              !!currentAuthProfile?.uid &&
-              !!(game.selectorUserIds?.includes(currentAuthProfile.uid))
-            }
-          />
-        </TabsContent>
+        {/* ── Innings Tabs — performance/hybrid orgs with scorecard ── */}
+        {showScorecardTabs && scorecard.innings.map((inn, i) => (
+          <TabsContent key={i} value={`innings${i + 1}`} className="mt-4">
+            {isLoadingScorecard
+              ? <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+              : <InningsView innings={inn} />}
+          </TabsContent>
+        ))}
+
+        {/* ── Performance Tab — performance/hybrid orgs with scorecard ── */}
+        {showScorecardTabs && (
+          <TabsContent value="performance" className="mt-4">
+            {isLoadingScorecard
+              ? <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+              : <ScorecardPerformanceTab
+                  innings={scorecard.innings}
+                  team1={scorecard.team1}
+                  team2={scorecard.team2}
+                  seriesId={scorecard.seriesId}
+                  gameId={gameId}
+                  scorecardId={scorecard.id}
+                />}
+          </TabsContent>
+        )}
+
+        {/* ── Match Report Tab (game-based) — rating + hybrid ── */}
+        {showGameMatchReport && (
+          <TabsContent value="report" className="mt-4">
+            <MatchReportTab
+              gameId={gameId}
+              scorecardId={existingScorecardId || undefined}
+              organizationId={game.organizationId || activeOrganizationId || ''}
+              seriesId={game.seriesId}
+              team1={game.team1}
+              team2={game.team2}
+              playersByTeam={{
+                [game.team1]: potentialTeam1Players.map(p => p.name),
+                [game.team2]: potentialTeam2Players.map(p => p.name),
+              }}
+              isAssignedSelector={
+                !!currentAuthProfile?.uid &&
+                !!(game.selectorUserIds?.includes(currentAuthProfile.uid))
+              }
+            />
+          </TabsContent>
+        )}
+
+        {/* ── Scorecard Report (scorecard-based) — hybrid + performance ── */}
+        {(showScorecardMatchReport || showPerformanceMatchReport) && scorecard && (
+          <TabsContent value="scorecard-report" className="mt-4">
+            {isLoadingScorecard
+              ? <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+              : <MatchReportTab
+                  gameId={gameId}
+                  scorecardId={scorecard.id}
+                  organizationId={game.organizationId || activeOrganizationId || ''}
+                  seriesId={game.seriesId}
+                  team1={scorecard.team1}
+                  team2={scorecard.team2}
+                  playersByTeam={buildPlayersByTeam(scorecard)}
+                  isAssignedSelector={
+                    !!currentAuthProfile?.uid &&
+                    !!(game.selectorUserIds?.includes(currentAuthProfile.uid))
+                  }
+                  selectorReportScope={activeOrganizationDetails?.selectorReportScope}
+                />}
+          </TabsContent>
+        )}
+
+        {/* ── Player Links Tab — performance/hybrid orgs with scorecard ── */}
+        {showScorecardTabs && (
+          <TabsContent value="player-links" className="mt-4">
+            {isLoadingScorecard
+              ? <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+              : <PlayerLinkTab
+                  scorecardId={scorecard.id}
+                  organizationId={game.organizationId || activeOrganizationId || ''}
+                  canEdit={canEditLinks}
+                />}
+          </TabsContent>
+        )}
+
       </Tabs>
     </div>
   );
