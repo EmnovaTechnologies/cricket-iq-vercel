@@ -979,4 +979,14 @@ export default function SeriesDetailsPage() {
   );
 }
 
-const InfoItem
+const InfoItem: React.FC<{icon: React.ReactNode, label: string, value: string | number | undefined | null}> = ({icon, label, value}) => (
+  <div className="flex items-center gap-3 p-3 bg-background rounded-md border">
+    <div className="p-2 bg-primary/10 rounded-md text-primary">
+      {icon}
+    </div>
+    <div>
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="text-lg font-semibold text-foreground">{value ?? 'N/A'}</p>
+    </div>
+  </div>
+);
