@@ -386,6 +386,36 @@ export async function getPotentialSeriesAdminsForOrg(organizationId: string): Pr
   }
 }
 
+export async function getPotentialSelectorsForOrg(organizationId: string): Promise<UserProfile[]> {
+  try {
+    const allUsers = await getAllUsersFromDB();
+    return allUsers.filter(user =>
+      // Super admins always included
+      user.roles.includes('admin') ||
+      // Selectors and Series Admins scoped to the organization
+      ((user.roles.includes('selector') || user.roles.includes('Series Admin')) &&
+        (user.assignedOrganizationIds || []).includes(organizationId))
+    );
+  } catch (error) {
+    console.error("Error fetching potential selectors for org:", error);
+    return [];
+  }
+}
+
+
+export async function getPotentialTeamManagersForOrg(organizationId: string): Promise<UserProfile[]> {
+  try {
+    const allUsers = await getAllUsersFromDB();
+    return allUsers.filter(user =>
+      user.roles.includes('admin') ||
+      ((user.roles.includes('Team Manager') || user.roles.includes('Series Admin')) &&
+        (user.assignedOrganizationIds || []).includes(organizationId))
+    );
+  } catch (error) {
+    console.error("Error fetching potential team managers for org:", error);
+    return [];
+  }
+}
 export async function getAllPotentialGameSelectors(): Promise<UserProfile[]> {
   try {
     const allUsers = await getAllUsersFromDB();

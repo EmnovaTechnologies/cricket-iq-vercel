@@ -47,7 +47,8 @@ import {
 import { SeriesScoringModel } from '@/components/scorecards/series-scoring-model';
 import { format, parseISO } from 'date-fns';
 import { FITNESS_TEST_TYPES, AGE_CATEGORIES } from '@/lib/constants';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'; // Added Table components
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Added Table components
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 
 const NO_FITNESS_TEST_VALUE = "__NO_FITNESS_TEST__";
@@ -152,10 +153,9 @@ export default function SeriesDetailsPage() {
             setSelectedAdminUidsForUpdate([]);
           }
 
-          if (effectivePermissions[PERMISSIONS.SERIES_MANAGE_ADMINS_ANY]) {
-              const potentialAdmins = await getPotentialSeriesAdminsForOrg(currentSeries.organizationId);
-              setPotentialSeriesAdminsToAssign(potentialAdmins);
-          }
+          // Always fetch potential admins — function handles its own org/role filtering
+          const potentialAdmins = await getPotentialSeriesAdminsForOrg(currentSeries.organizationId);
+          setPotentialSeriesAdminsToAssign(potentialAdmins);
         }
       } catch (err: any) {
         toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -418,7 +418,8 @@ export default function SeriesDetailsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* ── Top bar: back + actions ─────────────────────────────────── */}
       <div className="flex justify-between items-center flex-wrap gap-2">
         <Button asChild variant="outline" size="sm">
           <Link href="/series">
@@ -427,6 +428,40 @@ export default function SeriesDetailsPage() {
           </Link>
         </Button>
         <div className="flex flex-wrap gap-2 justify-end">
+          {canViewSavedTeam && series.savedAiTeam && series.savedAiTeam.length > 0 && !isSeriesArchived && (
+            <Button asChild size="sm" variant="secondary">
+              <Link href={`/series/${seriesId}/saved-team`}>
+                <Target className="mr-2 h-4 w-4" />
+                View Saved AI Team
+              </Link>
+            </Button>
+          )}
+          {showArchiveButton && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant={isSeriesArchived ? "outline" : "destructive"} size="sm"
+                  className={isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : ''}
+                  disabled={isPermissionsLoading}>
+                  {isSeriesArchived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />}
+                  {isSeriesArchived ? "Unarchive Series" : "Archive Series"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure you want to {isSeriesArchived ? "unarchive" : "archive"} this series?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {isSeriesArchived ? "Unarchiving will make this series active again." : "Archiving will also archive all its games and prevent new additions."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleArchiveToggle} className={cn(isSeriesArchived ? "" : "bg-destructive hover:bg-destructive/90")}>
+                    Confirm {isSeriesArchived ? "Unarchive" : "Archive"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
           {canDelete && canDeletePermission && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -440,631 +475,563 @@ export default function SeriesDetailsPage() {
                   <AlertDialogTitle>Delete Series</AlertDialogTitle>
                   <AlertDialogDescription>
                     Are you sure you want to permanently delete "{series?.name}"? This cannot be undone.
-                    The series has no games so it is safe to delete.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={handleDeleteSeries} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Confirm Delete
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Confirm Delete
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          )}
-          {canViewSavedTeam && series.savedAiTeam && series.savedAiTeam.length > 0 && !isSeriesArchived && (
-            <Button asChild size="sm" variant="secondary">
-              <Link href={`/series/${seriesId}/saved-team`}>
-                <Target className="mr-2 h-4 w-4" />
-                View Saved AI Team
-              </Link>
-            </Button>
           )}
         </div>
       </div>
       
-      <Card className="shadow-lg">
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
-              <CardTitle className="text-3xl font-headline text-primary flex items-center gap-2 mb-1">
-                <Layers className="h-7 w-7" />
-                {series.name}
-                <Badge variant={isSeriesArchived ? 'outline' : 'default'} className="capitalize text-base ml-2">
-                  {series.status}
-                </Badge>
-              </CardTitle>
-              <CardDescription className="text-base">
-                Detailed information about the series.
-              </CardDescription>
-            </div>
-          </div>
-           {isSeriesArchived && (
-            <Alert variant="default" className="mt-4 bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300">
-                <Info className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                <AlertTitle className="font-semibold">Series Archived</AlertTitle>
-                <AlertDescription>
-                    This series is archived. Most editing functions are disabled. Games will not be listed, and new teams/venues cannot be added. Associated games are also marked as archived.
-                </AlertDescription>
-            </Alert>
-           )}
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* ── Basic Info: read mode ─────────────────────────────────────── */}
-          {!isEditingBasicInfo && (
-            <>
-              <div className="flex items-center justify-between">
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1">
-                  <InfoItem icon={<Tag className="h-5 w-5" />} label="Age Category" value={series.ageCategory} />
-                  <InfoItem icon={<CalendarFold className="h-5 w-5" />} label="Year" value={series.year.toString()} />
-                  <div className="md:col-span-2 lg:col-span-1">
-                    <div className="p-3 bg-background rounded-md border h-full">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <UserCog className="h-5 w-5 text-primary" />
-                          <p className="text-sm text-muted-foreground">Series Administrators</p>
+      {/* ── Series title ────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2">
+            <Layers className="h-7 w-7" />
+            {series.name}
+            <Badge variant={isSeriesArchived ? 'outline' : 'default'} className="capitalize text-base ml-2">
+              {series.status}
+            </Badge>
+          </h1>
+          <p className="text-muted-foreground text-sm mt-0.5">{series.ageCategory} · {series.year}</p>
+        </div>
+      </div>
+
+      {isSeriesArchived && (
+        <Alert variant="default" className="bg-amber-50 border-amber-200 text-amber-700">
+          <Info className="h-5 w-5 text-amber-600" />
+          <AlertTitle className="font-semibold">Series Archived</AlertTitle>
+          <AlertDescription>
+            This series is archived. Most editing functions are disabled. Games will not be listed, and new teams/venues cannot be added.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* ── Tabs ────────────────────────────────────────────────────── */}
+      <Tabs defaultValue="overview">
+        <TabsList className="w-full grid grid-cols-5">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="venues">Venues</TabsTrigger>
+          <TabsTrigger value="teams">Teams</TabsTrigger>
+          <TabsTrigger value="games">Games</TabsTrigger>
+          <TabsTrigger value="fitness">Fitness Tests</TabsTrigger>
+        </TabsList>
+
+        {/* ══ OVERVIEW TAB ════════════════════════════════════════════ */}
+        <TabsContent value="overview" className="space-y-4 mt-4">
+          <Card className="shadow-lg">
+            <CardContent className="pt-6 space-y-0 divide-y">
+
+              {/* ── Section 1: Series Info ── */}
+              <div className="pb-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Series Information</h3>
+                  {canEditBasicInfo && !isEditingBasicInfo && (
+                    <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => {
+                      setEditName(series.name);
+                      setEditAgeCategory(series.ageCategory);
+                      setEditYear(series.year.toString());
+                      setEditMaleCutoff(series.maleCutoffDate || '');
+                      setEditFemaleCutoff(series.femaleCutoffDate || '');
+                      setIsEditingBasicInfo(true);
+                    }}>
+                      <Edit3 className="h-3 w-3 mr-1" /> Edit
+                    </Button>
+                  )}
+                </div>
+
+                {!isEditingBasicInfo && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <InfoItem icon={<Layers className="h-4 w-4" />} label="Series Name" value={series.name} />
+                      <InfoItem icon={<Tag className="h-4 w-4" />} label="Age Category" value={series.ageCategory} />
+                      <InfoItem icon={<CalendarFold className="h-4 w-4" />} label="Year" value={series.year.toString()} />
+                    </div>
+                    {(series.maleCutoffDate || series.femaleCutoffDate) && (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {series.maleCutoffDate && <InfoItem icon={<CalendarDays className="h-4 w-4" />} label="Male Cutoff DOB" value={format(parseISO(series.maleCutoffDate), 'PPP')} />}
+                          {series.femaleCutoffDate && <InfoItem icon={<CalendarDays className="h-4 w-4" />} label="Female Cutoff DOB" value={format(parseISO(series.femaleCutoffDate), 'PPP')} />}
                         </div>
-                        {canManageSeriesAdmins && !isEditingAdmins && !isSeriesArchived && (
-                          <Button variant="outline" size="sm" onClick={() => setIsEditingAdmins(true)} className="h-7 px-2" disabled={isPermissionsLoading}>
-                            <Edit3 className="h-3 w-3 mr-1" /> Edit
-                          </Button>
-                        )}
+                        <p className="text-xs text-muted-foreground">Players must be born on or after the respective cutoff date to be eligible for this series.</p>
                       </div>
-                      {seriesAdmins.length > 0 ? (
-                        <ul className="space-y-1">
-                          {seriesAdmins.map(admin => (
-                            <li key={admin.uid} className="text-sm font-medium text-foreground">
-                              {admin.displayName || admin.email}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">None Assigned</p>
-                      )}
+                    )}
+                  </div>
+                )}
+
+                {isEditingBasicInfo && (
+                  <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5 md:col-span-2">
+                        <Label className="text-xs text-muted-foreground">Series Name</Label>
+                        <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Series name" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Age Category</Label>
+                        <Select value={editAgeCategory} onValueChange={setEditAgeCategory}>
+                          <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                          <SelectContent>{AGE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Year</Label>
+                        <Input type="number" value={editYear} onChange={e => setEditYear(e.target.value)} placeholder="e.g. 2025" min={2000} max={2100} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Male Cutoff DOB</Label>
+                        <Input type="date" value={editMaleCutoff} onChange={e => setEditMaleCutoff(e.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Female Cutoff DOB</Label>
+                        <Input type="date" value={editFemaleCutoff} onChange={e => setEditFemaleCutoff(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleSaveBasicInfo} disabled={isSavingBasicInfo}>
+                        {isSavingBasicInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        {isSavingBasicInfo ? 'Saving...' : 'Save Changes'}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setIsEditingBasicInfo(false)} disabled={isSavingBasicInfo}>Cancel</Button>
                     </div>
                   </div>
+                )}
+              </div>
+
+              {/* ── Section 2: Administrators ── */}
+              <div className="py-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                    <UserCog className="h-4 w-4" /> Series Administrators
+                  </h3>
+                  {canManageSeriesAdmins && !isEditingAdmins && !isSeriesArchived && (
+                    <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => setIsEditingAdmins(true)} disabled={isPermissionsLoading}>
+                      <Edit3 className="h-3 w-3 mr-1" /> Edit
+                    </Button>
+                  )}
                 </div>
-                {canEditBasicInfo && (
-                  <Button variant="outline" size="sm" className="ml-4 shrink-0 h-8" onClick={() => {
-                    setEditName(series.name);
-                    setEditAgeCategory(series.ageCategory);
-                    setEditYear(series.year.toString());
-                    setEditMaleCutoff(series.maleCutoffDate || '');
-                    setEditFemaleCutoff(series.femaleCutoffDate || '');
-                    setIsEditingBasicInfo(true);
-                  }}>
-                    <Edit3 className="h-3.5 w-3.5 mr-1.5" /> Edit Info
+                {!isEditingAdmins && (
+                  seriesAdmins.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {seriesAdmins.map(admin => (
+                        <Badge key={admin.uid} variant="secondary" className="text-sm py-1 px-3">
+                          {admin.displayName || admin.email}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">None assigned.</p>
+                  )
+                )}
+                {canManageSeriesAdmins && isEditingAdmins && !isSeriesArchived && (
+                  <div className="space-y-3">
+                    {/* Show currently assigned when potential list not yet loaded */}
+                    {seriesAdmins.length > 0 && potentialSeriesAdminsToAssign.length === 0 && (
+                      <div className="rounded-md border bg-muted/30 p-2 space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Currently assigned</p>
+                        {seriesAdmins.map(admin => (
+                          <div key={admin.uid} className="flex items-center gap-2 px-2 py-1">
+                            <span className="text-sm">{admin.displayName || admin.email}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {lockedSuperAdmins.length > 0 && (
+                      <div className="rounded-md border bg-muted/30 p-2 space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned)</p>
+                        {lockedSuperAdmins.map(user => (
+                          <div key={user.uid} className="flex items-center gap-2 px-2 py-1 rounded opacity-70">
+                            <Checkbox checked disabled />
+                            <span className="text-sm flex-grow">{user.displayName || user.email}</span>
+                            <Badge variant="default" className="text-xs">Super Admin</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input type="search" placeholder="Search Series Admins..." value={adminSearchQuery} onChange={e => setAdminSearchQuery(e.target.value)} className="pl-8 h-9" />
+                    </div>
+                    {selectableAdmins.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No users with Series Admin role found.</p>
+                    ) : (
+                      <ScrollArea className="h-48 rounded-md border p-4">
+                        <div className="space-y-2">
+                          {filteredPotentialSeriesAdmins.map(user => (
+                            <div key={user.uid} className="flex items-center space-x-2">
+                              <Checkbox id={`admin-${user.uid}`} checked={selectedAdminUidsForUpdate.includes(user.uid)}
+                                onCheckedChange={checked => setSelectedAdminUidsForUpdate(prev => checked ? [...prev, user.uid] : prev.filter(uid => uid !== user.uid))} />
+                              <label htmlFor={`admin-${user.uid}`} className="text-sm font-normal leading-none">
+                                {user.displayName || user.email}
+                                <span className="text-muted-foreground ml-1 text-xs">(Series Admin)</span>
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => { setIsEditingAdmins(false); setSelectedAdminUidsForUpdate(series.seriesAdminUids || []); setAdminSearchQuery(''); }} disabled={isLoadingSeriesAdmins}>Cancel</Button>
+                      <Button size="sm" onClick={handleSaveSeriesAdmins} disabled={isLoadingSeriesAdmins}>
+                        {isLoadingSeriesAdmins ? <Save className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />} Save Administrators
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Section 3: Fitness Test Criteria ── */}
+              <div className="py-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                    <Dumbbell className="h-4 w-4" /> Fitness Test Criteria
+                  </h3>
+                  {canEditFitnessCriteria && !isEditingFitnessCriteria && !isSeriesArchived && (
+                    <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => setIsEditingFitnessCriteria(true)} disabled={isPermissionsLoading}>
+                      <Edit3 className="h-3 w-3 mr-1" /> Edit
+                    </Button>
+                  )}
+                </div>
+                {!isEditingFitnessCriteria && (
+                  series.fitnessTestType ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <InfoItem icon={<Activity className="h-4 w-4" />} label="Test Type" value={series.fitnessTestType} />
+                      <InfoItem icon={<Tag className="h-4 w-4" />} label="Passing Score" value={series.fitnessTestPassingScore || 'N/A'} />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No fitness test criteria defined for this series.</p>
+                  )
+                )}
+                {isEditingFitnessCriteria && canEditFitnessCriteria && !isSeriesArchived && (
+                  <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+                    <div>
+                      <Label htmlFor="fitnessTestTypeEdit">Fitness Test Type</Label>
+                      <Select value={currentFitnessTestTypeForEdit || NO_FITNESS_TEST_VALUE}
+                        onValueChange={value => { setCurrentFitnessTestTypeForEdit(value as FitnessTestType | typeof NO_FITNESS_TEST_VALUE | undefined); if (value === NO_FITNESS_TEST_VALUE) setCurrentFitnessPassingScoreForEdit(''); }}
+                        disabled={isLoadingFitnessUpdate}>
+                        <SelectTrigger id="fitnessTestTypeEdit"><SelectValue placeholder="Select a test type (optional)" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_FITNESS_TEST_VALUE}>None</SelectItem>
+                          {FITNESS_TEST_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="fitnessPassingScoreEdit">Passing Score</Label>
+                      <Input id="fitnessPassingScoreEdit" type="text" placeholder="e.g. 14.5"
+                        value={currentFitnessPassingScoreForEdit}
+                        onChange={e => setCurrentFitnessPassingScoreForEdit(e.target.value)}
+                        disabled={isLoadingFitnessUpdate || currentFitnessTestTypeForEdit === NO_FITNESS_TEST_VALUE || !currentFitnessTestTypeForEdit} />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => setIsEditingFitnessCriteria(false)} disabled={isLoadingFitnessUpdate}>Cancel</Button>
+                      <Button size="sm" onClick={handleSaveFitnessCriteria} disabled={isLoadingFitnessUpdate}>
+                        {isLoadingFitnessUpdate ? <Save className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />} Save Criteria
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Section 4: Scoring Model ── */}
+              <div className="py-5">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2 mb-4">
+                  <BarChart3 className="h-4 w-4" /> Scoring Model
+                </h3>
+                {series && (
+                  <SeriesScoringModel seriesId={series.id} organizationId={series.organizationId} seriesAdminUids={series.seriesAdminUids}
+                    canEdit={!!currentAuthProfile?.roles?.includes('admin') || (isOrgAdmin && series.organizationId === activeOrganizationId) || (isUserASeriesAdminForThisSeries ?? false)} />
+                )}
+              </div>
+
+            </CardContent>
+
+            {/* ── Footer: Archive + Delete side by side ── */}
+            {(showArchiveButton || (canDelete && canDeletePermission)) && (
+              <CardFooter className="border-t pt-4 flex justify-end gap-2">
+                {canDelete && canDeletePermission && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm" disabled={isDeleting}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {isDeleting ? 'Deleting...' : 'Delete Series'}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Series</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to permanently delete "{series?.name}"? This cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteSeries} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                          {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Confirm Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                {showArchiveButton && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant={isSeriesArchived ? "outline" : "destructive"} size="sm"
+                        className={isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : ''}
+                        disabled={isPermissionsLoading}>
+                        {isSeriesArchived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />}
+                        {isSeriesArchived ? "Unarchive Series" : "Archive Series"}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure you want to {isSeriesArchived ? "unarchive" : "archive"} this series?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {isSeriesArchived ? "Unarchiving will make this series active again." : "Archiving will also archive all its games and prevent new additions."}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleArchiveToggle} className={cn(isSeriesArchived ? "" : "bg-destructive hover:bg-destructive/90")}>
+                          Confirm {isSeriesArchived ? "Unarchive" : "Archive"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </CardFooter>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* ══ GAMES TAB ════════════════════════════════════════════════ */}
+        <TabsContent value="games" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-xl font-headline text-primary flex items-center gap-2">
+                  <Gamepad2 className="h-5 w-5" /> Games in this Series
+                </CardTitle>
+                {canAddGame && !isSeriesArchived && (
+                  <Button asChild size="sm" className="bg-primary hover:bg-primary/90" disabled={isPermissionsLoading}>
+                    <Link href={`/games/add?seriesId=${series.id}`}><PlusCircle className="mr-2 h-4 w-4" />Add Game to Series</Link>
                   </Button>
                 )}
               </div>
-              {(series.maleCutoffDate || series.femaleCutoffDate) && (
-                <div className="pt-2">
-                  <h4 className="text-md font-semibold text-foreground mb-2">Age Eligibility Cutoff Dates</h4>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {series.maleCutoffDate && (
-                      <InfoItem icon={<CalendarDays className="h-5 w-5" />} label="Male Cutoff DOB" value={format(parseISO(series.maleCutoffDate), 'PPP')} />
-                    )}
-                    {series.femaleCutoffDate && (
-                      <InfoItem icon={<CalendarDays className="h-5 w-5" />} label="Female Cutoff DOB" value={format(parseISO(series.femaleCutoffDate), 'PPP')} />
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">Players must be born on or after the respective cutoff date to be eligible for this series.</p>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ── Basic Info: edit mode ─────────────────────────────────────── */}
-          {isEditingBasicInfo && (
-            <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-              <h4 className="text-sm font-semibold text-foreground">Edit Series Information</h4>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-1.5 md:col-span-2">
-                  <Label className="text-xs text-muted-foreground">Series Name</Label>
-                  <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Series name" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Age Category</Label>
-                  <Select value={editAgeCategory} onValueChange={setEditAgeCategory}>
-                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                    <SelectContent>
-                      {AGE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Year</Label>
-                  <Input type="number" value={editYear} onChange={e => setEditYear(e.target.value)} placeholder="e.g. 2025" min={2000} max={2100} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Male Cutoff DOB</Label>
-                  <Input type="date" value={editMaleCutoff} onChange={e => setEditMaleCutoff(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Female Cutoff DOB</Label>
-                  <Input type="date" value={editFemaleCutoff} onChange={e => setEditFemaleCutoff(e.target.value)} />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <Button size="sm" onClick={handleSaveBasicInfo} disabled={isSavingBasicInfo}>
-                  {isSavingBasicInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  {isSavingBasicInfo ? 'Saving...' : 'Save Changes'}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setIsEditingBasicInfo(false)} disabled={isSavingBasicInfo}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-
-            <div className="pt-4">
-                <div className="flex items-center justify-between mb-1">
-                    <h4 className="text-md font-semibold text-foreground flex items-center gap-2">
-                        <Dumbbell className="h-5 w-5 text-primary" /> Fitness Test Criteria
-                    </h4>
-                    {canEditFitnessCriteria && !isEditingFitnessCriteria && !isSeriesArchived && (
-                        <Button variant="outline" size="sm" onClick={() => setIsEditingFitnessCriteria(true)} className="h-7 px-2" disabled={isPermissionsLoading}>
-                            <Edit3 className="h-3 w-3 mr-1" /> Edit
-                        </Button>
-                    )}
-                </div>
-                {series.fitnessTestType ? (
-                    <div className="grid md:grid-cols-2 gap-4">
-                        <InfoItem icon={<Activity className="h-5 w-5" />} label="Test Type" value={series.fitnessTestType} />
-                        <InfoItem icon={<Tag className="h-5 w-5" />} label="Passing Score" value={series.fitnessTestPassingScore || 'N/A'} />
-                    </div>
-                ) : (
-                    <p className="text-sm text-muted-foreground">No specific fitness test criteria defined for this series.</p>
-                )}
-            </div>
-
-        </CardContent>
-         {showArchiveButton && (
-          <CardFooter className="border-t pt-4">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant={isSeriesArchived ? "outline" : "destructive"}
-                  size="sm"
-                  className={`ml-auto ${isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'}`}
-                  disabled={isPermissionsLoading}
-                >
-                  {isSeriesArchived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />}
-                  {isSeriesArchived ? "Unarchive Series" : "Archive Series"}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure you want to {isSeriesArchived ? "unarchive" : "archive"} this series?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {isSeriesArchived
-                      ? "Unarchiving will make this series active again. Associated games will also be reactivated."
-                      : "Archiving this series will also archive all its games. It will hide its games from lists and prevent new games, teams, or venues from being added. Associated games are also marked as archived."}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleArchiveToggle} className={cn(isSeriesArchived ? "" : "bg-destructive hover:bg-destructive/90")}>
-                    Confirm {isSeriesArchived ? "Unarchive" : "Archive"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </CardFooter>
-        )}
-      </Card>
-
-      {isEditingFitnessCriteria && canEditFitnessCriteria && !isSeriesArchived && (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-xl font-headline text-primary">Edit Fitness Test Criteria</CardTitle>
-                <CardDescription>Set or update the fitness test requirements for this series.</CardDescription>
+              <CardDescription>
+                {isSeriesArchived ? 'This series is archived — games are not shown.' : `Active matches scheduled or played as part of ${series.name}. Archived games are not shown here.`}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-                <div>
-                    <Label htmlFor="fitnessTestTypeEdit">Fitness Test Type</Label>
-                    <Select
-                        value={currentFitnessTestTypeForEdit || NO_FITNESS_TEST_VALUE}
-                        onValueChange={(value) => {
-                            setCurrentFitnessTestTypeForEdit(value as FitnessTestType | typeof NO_FITNESS_TEST_VALUE | undefined);
-                            if (value === NO_FITNESS_TEST_VALUE) {
-                                setCurrentFitnessPassingScoreForEdit('');
-                            }
-                        }}
-                        disabled={isLoadingFitnessUpdate}
-                    >
-                        <SelectTrigger id="fitnessTestTypeEdit">
-                            <SelectValue placeholder="Select a test type (optional)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={NO_FITNESS_TEST_VALUE}>None</SelectItem>
-                            {FITNESS_TEST_TYPES.map(type => (
-                                <SelectItem key={type} value={type}>{type}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div>
-                    <Label htmlFor="fitnessPassingScoreEdit">Passing Score</Label>
-                    <Input
-                        id="fitnessPassingScoreEdit"
-                        type="text"
-                        placeholder="e.g. 14.5"
-                        value={currentFitnessPassingScoreForEdit}
-                        onChange={(e) => setCurrentFitnessPassingScoreForEdit(e.target.value)}
-                        disabled={isLoadingFitnessUpdate || currentFitnessTestTypeForEdit === NO_FITNESS_TEST_VALUE || !currentFitnessTestTypeForEdit}
-                    />
-                     {currentFitnessTestTypeForEdit && currentFitnessTestTypeForEdit !== NO_FITNESS_TEST_VALUE && (
-                        <p className="text-xs text-muted-foreground mt-1">Required if a test type is selected. Must be a number.</p>
-                    )}
-                </div>
-            </CardContent>
-            <CardFooter className="flex justify-end gap-2">
-                <Button variant="ghost" onClick={() => setIsEditingFitnessCriteria(false)} disabled={isLoadingFitnessUpdate}>Cancel</Button>
-                <Button onClick={handleSaveFitnessCriteria} disabled={isLoadingFitnessUpdate}>
-                    {isLoadingFitnessUpdate ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Criteria
-                </Button>
-            </CardFooter>
-        </Card>
-      )}
-
-
-      {canManageSeriesAdmins && isEditingAdmins && !isSeriesArchived && (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-xl font-headline text-primary">Manage Series Administrators</CardTitle>
-                <CardDescription>Select users with 'Series Admin' role in this organization. Super admins are always included.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-                {/* Locked super admins */}
-                {lockedSuperAdmins.length > 0 && (
-                  <div className="rounded-md border bg-muted/30 p-2 space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned)</p>
-                    {lockedSuperAdmins.map(user => (
-                      <div key={user.uid} className="flex items-center gap-2 px-2 py-1 rounded opacity-70">
-                        <Checkbox checked disabled />
-                        <span className="text-sm flex-grow">{user.displayName || user.email}</span>
-                        <Badge variant="default" className="text-xs">Super Admin</Badge>
-                      </div>
-                    ))}
+            {!isSeriesArchived && (
+              <CardContent>
+                {seriesGames.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {seriesGames.map(game => <GameCard key={game.id} game={game} />)}
                   </div>
-                )}
-                <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="search"
-                      placeholder="Search Series Admins by name or email..."
-                      value={adminSearchQuery}
-                      onChange={(e) => setAdminSearchQuery(e.target.value)}
-                      className="pl-8 h-9"
-                    />
-                </div>
-                {selectableAdmins.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No users with 'Series Admin' role found for this organization.</p>
-                ) : filteredPotentialSeriesAdmins.length === 0 && adminSearchQuery ? (
-                    <p className="text-sm text-muted-foreground">No Series Admins found matching your search.</p>
                 ) : (
-                    <ScrollArea className="h-60 rounded-md border p-4">
-                        <div className="space-y-2">
-                        {filteredPotentialSeriesAdmins.map(user => (
-                            <div key={user.uid} className="flex items-center space-x-2">
-                                <Checkbox
-                                    id={`admin-${user.uid}`}
-                                    checked={selectedAdminUidsForUpdate.includes(user.uid)}
-                                    onCheckedChange={(checked) => {
-                                        setSelectedAdminUidsForUpdate(prev =>
-                                        checked
-                                            ? [...prev, user.uid]
-                                            : prev.filter(uid => uid !== user.uid)
-                                        );
-                                    }}
-                                />
-                                <label
-                                    htmlFor={`admin-${user.uid}`}
-                                    className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                    {user.displayName || user.email}
-                                    <span className="text-muted-foreground ml-1 text-xs">(Series Admin)</span>
-                                </label>
-                            </div>
-                        ))}
-                        </div>
-                    </ScrollArea>
+                  <p className="text-muted-foreground">No active games have been added to this series yet.</p>
                 )}
-            </CardContent>
-            <CardFooter className="flex justify-end gap-2">
-                <Button variant="ghost" onClick={() => { setIsEditingAdmins(false); setSelectedAdminUidsForUpdate(series.seriesAdminUids || []); setAdminSearchQuery(''); }}>Cancel</Button>
-                <Button onClick={handleSaveSeriesAdmins} disabled={isLoadingSeriesAdmins}>
-                    {isLoadingSeriesAdmins ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Administrators
-                </Button>
-            </CardFooter>
-        </Card>
-      )}
-
-      {/* Fitness Tests Section */}
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-2xl font-headline text-primary flex items-center gap-2">
-              <ListChecks className="h-6 w-6" />
-              Fitness Tests
-            </CardTitle>
-            <div className="flex gap-2">
-                 {canViewFitnessReport && !isSeriesArchived && isFitnessCriteriaDefinedForSeries && (
-                    <Button asChild size="sm" variant="outline" className="border-primary text-primary hover:bg-primary/10">
-                        <Link href={`/series/${seriesId}/fitness-report`}>
-                            <FileText className="mr-2 h-4 w-4" />View Series Fitness Report
-                        </Link>
-                    </Button>
-                 )}
-                {!!effectivePermissions[PERMISSIONS.FITNESS_TESTS_ADD] && !isSeriesArchived && (
-                  isFitnessCriteriaDefinedForSeries ? (
-                    <Button asChild size="sm" className="bg-primary hover:bg-primary/90" disabled={isPermissionsLoading}>
-                      <Link href={`/series/${seriesId}/fitness-tests/add`}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Add New Fitness Test
-                      </Link>
-                    </Button>
-                  ) : (
-                     <Button size="sm" className="bg-primary hover:bg-primary/90" disabled>
-                       <PlusCircle className="mr-2 h-4 w-4" />
-                       Add New Fitness Test
-                     </Button>
-                  )
-                )}
-            </div>
-          </div>
-          <CardDescription>
-            Recorded fitness tests for {series.name}.
-            {!isFitnessCriteriaDefinedForSeries && !!effectivePermissions[PERMISSIONS.FITNESS_TESTS_ADD] && !isSeriesArchived && (
-              <span className="block text-amber-600 text-xs mt-1">
-                Note: To add a new fitness test or view the series fitness report, first define the "Fitness Test Type" and "Passing Score" for this series in the section above.
-              </span>
+              </CardContent>
             )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {fitnessTests.length > 0 ? (
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Administrator</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {fitnessTests.map(test => (
-                    <TableRow key={test.id}>
-                      <TableCell>{format(parseISO(test.testDate), 'PPP')}</TableCell>
-                      <TableCell>{test.testType}</TableCell>
-                      <TableCell>{test.location}</TableCell>
-                      <TableCell>{test.administratorName}</TableCell>
-                      <TableCell>
-                        <Badge variant={test.isCertified ? 'default' : 'secondary'} className={cn(test.isCertified ? 'bg-green-600 hover:bg-green-700' : '')}>
-                          {test.isCertified ? <ShieldCheck className="h-3 w-3 mr-1"/> : <Activity className="h-3 w-3 mr-1"/>}
-                          {test.isCertified ? 'Certified' : 'Pending'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="xs" asChild>
-                           <Link href={`/fitness-tests/${test.id}/details`}>View/Record</Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+          </Card>
+        </TabsContent>
+
+        {/* ══ TEAMS TAB ════════════════════════════════════════════════ */}
+        <TabsContent value="teams" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl font-headline text-primary flex items-center gap-2">
+                <Users className="h-5 w-5" /> Participating Teams
+              </CardTitle>
+              <CardDescription>Teams currently registered for {series.name}.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {participatingTeams.length > 0 ? (
+                <ul className="space-y-3">
+                  {participatingTeams.map(team => (
+                    <li key={team.id} className="p-3 bg-muted/50 rounded-md border flex justify-between items-center">
+                      <span className="font-medium">{team.name} ({team.ageCategory})</span>
+                      <Button variant="outline" size="sm" asChild><Link href={`/teams/${team.id}/details`}>View Roster</Link></Button>
+                    </li>
                   ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <p className="text-muted-foreground">No fitness tests have been recorded for this series yet.</p>
-          )}
-        </CardContent>
-      </Card>
-
-
-    {!isSeriesArchived && (
-      <>
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-2xl font-headline text-primary flex items-center gap-2">
-              <Gamepad2 className="h-6 w-6" />
-              Games in this Series
-            </CardTitle>
-            {canAddGame && (
-              <Button asChild size="sm" className="bg-primary hover:bg-primary/90" disabled={isPermissionsLoading}>
-                <Link href={`/games/add?seriesId=${series.id}`}>
-                  <PlusCircle className="mr-2 h-4 w-4" />Add Game to Series
-                </Link>
-              </Button>
-            )}
-          </div>
-          <CardDescription>Active matches scheduled or played as part of {series.name}. Archived games are not shown here.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {seriesGames.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {seriesGames.map(game => (
-                <GameCard key={game.id} game={game} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground">No active games have been added to this series yet.</p>
-          )}
-        </CardContent>
-      </Card>
-
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl font-headline text-primary flex items-center gap-2">
-            <Users className="h-6 w-6" />
-            Participating Teams
-          </CardTitle>
-          <CardDescription>Teams currently registered for {series.name}.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {participatingTeams.length > 0 ? (
-            <ul className="space-y-3">
-              {participatingTeams.map(team => (
-                <li key={team.id} className="p-3 bg-muted/50 rounded-md border flex justify-between items-center">
-                  <span className="font-medium">{team.name} ({team.ageCategory})</span>
-                   <Button variant="outline" size="sm" asChild><Link href={`/teams/${team.id}/details`}>View Roster</Link></Button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-muted-foreground">No teams have been added to this series yet.</p>
-          )}
-        </CardContent>
-        {canAddTeam && (
-        <CardFooter className="border-t pt-6">
-          <div className="w-full space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Add Team to Series</h3>
-            {availableTeams.length > 0 ? (
-              <div className="flex flex-col sm:flex-row gap-4 items-end">
-                <div className="flex-grow">
-                  <Label htmlFor="team-select" className="mb-1 block text-sm font-medium">Select Team ({series.ageCategory})</Label>
-                  <Select value={selectedTeamToAdd} onValueChange={setSelectedTeamToAdd} disabled={isLoadingTeam || isPermissionsLoading}>
-                    <SelectTrigger id="team-select">
-                      <SelectValue placeholder={`Select a team (${series.ageCategory})`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableTeams.map(team => (
-                        <SelectItem key={team.id} value={team.id}>
-                          {team.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button onClick={handleAddTeamToSeries} disabled={isLoadingTeam || !selectedTeamToAdd || isPermissionsLoading} className="w-full sm:w-auto bg-primary hover:bg-primary/90">
-                  {isLoadingTeam ? <PlusCircle className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-                  Add Selected Team
-                </Button>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No more teams available in the {series.ageCategory} category to add to this series. You can <Link href={`/teams/add?seriesIdToLink=${series.id}&seriesAgeCategoryToEnforce=${encodeURIComponent(series.ageCategory)}`} className="underline text-primary">add a new team</Link>.
-              </p>
-            )}
-          </div>
-        </CardFooter>
-        )}
-      </Card>
-      </>
-    )}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl font-headline text-primary flex items-center gap-2">
-            <MapPin className="h-6 w-6" />
-            Series Venues
-          </CardTitle>
-          <CardDescription>Venues specified for {series.name}. Venues can be viewed even if series is archived.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {seriesVenues.length > 0 ? (
-            <ul className="space-y-3">
-              {seriesVenues.map(venue => {
-                const hasCoordinates = venue.latitude !== undefined && venue.longitude !== undefined;
-                return (
-                  <li key={venue.id} className="p-3 bg-muted/50 rounded-md border flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">{venue.name}</p>
-                      <p className="text-xs text-muted-foreground">{venue.address}</p>
+                </ul>
+              ) : (
+                <p className="text-muted-foreground">No teams have been added to this series yet.</p>
+              )}
+            </CardContent>
+            {canAddTeam && !isSeriesArchived && (
+              <CardFooter className="border-t pt-6">
+                <div className="w-full space-y-4">
+                  <h3 className="text-lg font-semibold text-foreground">Add Team to Series</h3>
+                  {availableTeams.length > 0 ? (
+                    <div className="flex flex-col sm:flex-row gap-4 items-end">
+                      <div className="flex-grow">
+                        <Label htmlFor="team-select" className="mb-1 block text-sm font-medium">Select Team ({series.ageCategory})</Label>
+                        <Select value={selectedTeamToAdd} onValueChange={setSelectedTeamToAdd} disabled={isLoadingTeam || isPermissionsLoading}>
+                          <SelectTrigger id="team-select"><SelectValue placeholder={`Select a team (${series.ageCategory})`} /></SelectTrigger>
+                          <SelectContent>{availableTeams.map(team => <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <Button onClick={handleAddTeamToSeries} disabled={isLoadingTeam || !selectedTeamToAdd || isPermissionsLoading} className="w-full sm:w-auto bg-primary hover:bg-primary/90">
+                        {isLoadingTeam ? <PlusCircle className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />} Add Selected Team
+                      </Button>
                     </div>
-                    {hasCoordinates ? (
-                      <Button asChild variant="outline" size="sm" className="border-primary text-primary hover:bg-primary/10">
-                        <a
-                          href={`https://www.google.com/maps/search/?api=1&query=${venue.latitude},${venue.longitude}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-1"
-                        >
-                          <MapIconLucide className="h-3 w-3" /> Map
-                        </a>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No more teams available in the {series.ageCategory} category to add to this series. You can <Link href={`/teams/add?seriesIdToLink=${series.id}&seriesAgeCategoryToEnforce=${encodeURIComponent(series.ageCategory)}`} className="underline text-primary">add a new team</Link>.</p>
+                  )}
+                </div>
+              </CardFooter>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* ══ VENUES TAB ═══════════════════════════════════════════════ */}
+        <TabsContent value="venues" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl font-headline text-primary flex items-center gap-2">
+                <MapPin className="h-5 w-5" /> Series Venues
+              </CardTitle>
+              <CardDescription>Venues specified for {series.name}. Venues can be viewed even if series is archived.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {seriesVenues.length > 0 ? (
+                <ul className="space-y-3">
+                  {seriesVenues.map(venue => {
+                    const hasCoordinates = venue.latitude !== undefined && venue.longitude !== undefined;
+                    return (
+                      <li key={venue.id} className="p-3 bg-muted/50 rounded-md border flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">{venue.name}</p>
+                          <p className="text-xs text-muted-foreground">{venue.address}</p>
+                        </div>
+                        {hasCoordinates ? (
+                          <Button asChild variant="outline" size="sm" className="border-primary text-primary hover:bg-primary/10">
+                            <a href={`https://www.google.com/maps/search/?api=1&query=${venue.latitude},${venue.longitude}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1">
+                              <MapIconLucide className="h-3 w-3" /> Map
+                            </a>
+                          </Button>
+                        ) : (
+                          <Button variant="outline" size="sm" className="border-primary text-primary hover:bg-primary/10" disabled>
+                            <MapIconLucide className="h-3 w-3" /> Map
+                          </Button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground">No venues have been assigned to this series yet.</p>
+              )}
+            </CardContent>
+            {!isSeriesArchived && canAddVenue && (
+              <CardFooter className="border-t pt-6">
+                <div className="w-full space-y-4">
+                  <h3 className="text-lg font-semibold text-foreground">Add Venue to Series</h3>
+                  {allAvailableVenues.length > 0 ? (
+                    <div className="flex flex-col sm:flex-row gap-4 items-end">
+                      <div className="flex-grow">
+                        <Label htmlFor="venue-select" className="mb-1 block text-sm font-medium">Select Venue</Label>
+                        <Select value={selectedVenueToAdd} onValueChange={setSelectedVenueToAdd} disabled={isLoadingVenue || isPermissionsLoading}>
+                          <SelectTrigger id="venue-select"><SelectValue placeholder="Select a venue to add" /></SelectTrigger>
+                          <SelectContent>{allAvailableVenues.map(venue => <SelectItem key={venue.id} value={venue.id}>{venue.name} ({venue.address})</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <Button onClick={handleAddVenueToSeries} disabled={isLoadingVenue || !selectedVenueToAdd || isPermissionsLoading} className="w-full sm:w-auto bg-primary hover:bg-primary/90">
+                        {isLoadingVenue ? <PlusCircle className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />} Add Selected Venue
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No more venues from this organization are available to add to this series. You can <Link href={`/venues/add?seriesIdToLink=${series.id}`} className="underline text-primary">add a new venue</Link> to the system (it will be associated with the active organization).</p>
+                  )}
+                </div>
+              </CardFooter>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* ══ FITNESS TAB ══════════════════════════════════════════════ */}
+        <TabsContent value="fitness" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-xl font-headline text-primary flex items-center gap-2">
+                  <ListChecks className="h-5 w-5" /> Fitness Tests
+                </CardTitle>
+                <div className="flex gap-2">
+                  {canViewFitnessReport && !isSeriesArchived && isFitnessCriteriaDefinedForSeries && (
+                    <Button asChild size="sm" variant="outline" className="border-primary text-primary hover:bg-primary/10">
+                      <Link href={`/series/${seriesId}/fitness-report`}><FileText className="mr-2 h-4 w-4" />View Series Fitness Report</Link>
+                    </Button>
+                  )}
+                  {!!effectivePermissions[PERMISSIONS.FITNESS_TESTS_ADD] && !isSeriesArchived && (
+                    isFitnessCriteriaDefinedForSeries ? (
+                      <Button asChild size="sm" className="bg-primary hover:bg-primary/90" disabled={isPermissionsLoading}>
+                        <Link href={`/series/${seriesId}/fitness-tests/add`}><PlusCircle className="mr-2 h-4 w-4" />Add New Fitness Test</Link>
                       </Button>
                     ) : (
-                      <Button variant="outline" size="sm" className="border-primary text-primary hover:bg-primary/10" disabled>
-                        <MapIconLucide className="h-3 w-3" /> Map
+                      <Button size="sm" className="bg-primary hover:bg-primary/90" disabled>
+                        <PlusCircle className="mr-2 h-4 w-4" />Add New Fitness Test
                       </Button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="text-muted-foreground">No venues have been assigned to this series yet.</p>
-          )}
-        </CardContent>
-        {!isSeriesArchived && canAddVenue && (
-        <CardFooter className="border-t pt-6">
-          <div className="w-full space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Add Venue to Series</h3>
-            {allAvailableVenues.length > 0 ? (
-              <div className="flex flex-col sm:flex-row gap-4 items-end">
-                <div className="flex-grow">
-                  <Label htmlFor="venue-select" className="mb-1 block text-sm font-medium">Select Venue</Label>
-                  <Select value={selectedVenueToAdd} onValueChange={setSelectedVenueToAdd} disabled={isLoadingVenue || isPermissionsLoading}>
-                    <SelectTrigger id="venue-select">
-                      <SelectValue placeholder="Select a venue to add" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allAvailableVenues.map(venue => (
-                        <SelectItem key={venue.id} value={venue.id}>
-                          {venue.name} ({venue.address})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    )
+                  )}
                 </div>
-                <Button onClick={handleAddVenueToSeries} disabled={isLoadingVenue || !selectedVenueToAdd || isPermissionsLoading} className="w-full sm:w-auto bg-primary hover:bg-primary/90">
-                  {isLoadingVenue ? <PlusCircle className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-                  Add Selected Venue
-                </Button>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No more venues from this organization are available to add to this series. You can <Link href={`/venues/add?seriesIdToLink=${series.id}`} className="underline text-primary">add a new venue</Link> to the system (it will be associated with the active organization).
-              </p>
-            )}
-          </div>
-        </CardFooter>
-        )}
-      </Card>
+              <CardDescription>
+                Recorded fitness tests for {series.name}.
+                {!isFitnessCriteriaDefinedForSeries && !!effectivePermissions[PERMISSIONS.FITNESS_TESTS_ADD] && !isSeriesArchived && (
+                  <span className="block text-amber-600 text-xs mt-1">Define Fitness Test Type in the Overview tab before adding tests.</span>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {fitnessTests.length > 0 ? (
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader className="bg-muted/50">
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Administrator</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {fitnessTests.map(test => (
+                        <TableRow key={test.id}>
+                          <TableCell>{format(parseISO(test.testDate), 'PPP')}</TableCell>
+                          <TableCell>{test.testType}</TableCell>
+                          <TableCell>{test.location}</TableCell>
+                          <TableCell>{test.administratorName}</TableCell>
+                          <TableCell>
+                            <Badge variant={test.isCertified ? 'default' : 'secondary'} className={cn(test.isCertified ? 'bg-green-600 hover:bg-green-700' : '')}>
+                              {test.isCertified ? <ShieldCheck className="h-3 w-3 mr-1"/> : <Activity className="h-3 w-3 mr-1"/>}
+                              {test.isCertified ? 'Certified' : 'Pending'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="outline" size="xs" asChild><Link href={`/fitness-tests/${test.id}/details`}>View/Record</Link></Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No fitness tests have been recorded for this series yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Series Scoring Model */}
-      {series && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl font-headline text-primary flex items-center gap-2">
-              <BarChart3 className="h-6 w-6" /> Series Scoring Model
-            </CardTitle>
-            <CardDescription>
-              Performance scoring weights used for scorecards and AI selection in this series.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SeriesScoringModel
-              seriesId={series.id}
-              organizationId={series.organizationId}
-              seriesAdminUids={series.seriesAdminUids}
-              canEdit={
-                !!currentAuthProfile?.roles?.includes('admin') ||
-                (isOrgAdmin && series.organizationId === activeOrganizationId) ||
-                (isUserASeriesAdminForThisSeries ?? false)
-              }
-            />
-          </CardContent>
-        </Card>
-      )}
-
+      </Tabs>
     </div>
   );
 }
@@ -1080,8 +1047,3 @@ const InfoItem: React.FC<{icon: React.ReactNode, label: string, value: string | 
     </div>
   </div>
 );
-
-    
-
-    
-
