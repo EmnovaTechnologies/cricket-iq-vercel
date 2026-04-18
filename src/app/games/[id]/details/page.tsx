@@ -60,6 +60,11 @@ export default function GameDetailsPage() {
   const { userProfile: currentAuthProfile, effectivePermissions, isPermissionsLoading, activeOrganizationId, activeOrganizationDetails } = useAuth();
   const userProfile = currentAuthProfile; // alias for canEditLinks check
 
+  // ── Scorecard state must be declared before the useEffects that reference them ──
+  const [existingScorecardId, setExistingScorecardId] = useState<string | null>(null);
+  const [scorecard, setScorecard] = useState<MatchScorecard | null>(null);
+  const [isLoadingScorecard, setIsLoadingScorecard] = useState(false);
+
   // Check if scorecard already exists for this game
   useEffect(() => {
     if (!gameId || !activeOrganizationId) return;
@@ -103,9 +108,6 @@ export default function GameDetailsPage() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [gameUrl, setGameUrl] = useState('');
   const [isSavingGameUrl, setIsSavingGameUrl] = useState(false);
-  const [existingScorecardId, setExistingScorecardId] = useState<string | null>(null);
-  const [scorecard, setScorecard] = useState<MatchScorecard | null>(null);
-  const [isLoadingScorecard, setIsLoadingScorecard] = useState(false);
 
   const handleShareLink = () => {
     const url = `${window.location.origin}/rate/${gameId}`;
