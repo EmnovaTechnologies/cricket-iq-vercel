@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
+import { PERMISSIONS } from '@/lib/permissions-master-list';
 
 const ThemePreviewCard: React.FC<{ colors: ThemeColorPalette | null; themeName?: string }> = ({ colors, themeName }) => {
   if (!colors || !themeName) return <p className="text-sm text-muted-foreground">No theme selected or preview unavailable.</p>;
@@ -79,7 +80,7 @@ export default function OrganizationDetailsPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const orgId = params.id;
-  const { userProfile, isAuthLoading, isPermissionsLoading } = useAuth();
+  const { userProfile, isAuthLoading, isPermissionsLoading, effectivePermissions } = useAuth();
 
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [organizationAdmins, setOrganizationAdmins] = useState<UserProfile[]>([]);
@@ -176,11 +177,13 @@ export default function OrganizationDetailsPage() {
                 <CreditCard className="mr-2 h-4 w-4" /> Billing
               </Link>
             </Button>
-            <Button variant="default" size="sm" asChild>
+            {(isSuperAdmin || effectivePermissions[PERMISSIONS.PAGE_VIEW_ADMIN_ORGANIZATION_EDIT]) && (
+              <Button variant="default" size="sm" asChild>
                 <Link href={`/admin/organizations/${orgId}/edit`}>
                   <Edit className="mr-2 h-4 w-4" /> Edit Organization
                 </Link>
-            </Button>
+              </Button>
+            )}
           </div>
           )}
       </div>
