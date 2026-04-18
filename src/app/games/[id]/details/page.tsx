@@ -353,6 +353,17 @@ export default function GameDetailsPage() {
                        !!effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
                        !!userProfile?.roles?.includes('admin');
 
+  // ── Selector assignments for scorecard-based MatchReportTab ──
+  // Prefer explicit scorecard assignments (have team context); fall back to game selectors as neutral
+  const effectiveSelectorAssignments: import('@/types').ScorecardSelectorAssignment[] =
+    scorecard?.selectorAssignments?.length
+      ? scorecard.selectorAssignments
+      : (game.selectorUserIds ?? []).map(uid => ({
+          uid,
+          teamAssociation: 'neutral' as const,
+          name: gameSelectors.find(s => s.uid === uid)?.displayName ?? uid,
+        }));
+
   const getSkillIcon = (skill: Player['primarySkill']) => {
     switch (skill) { case 'Batting': return <CricketBatIcon className="h-4 w-4 text-primary" />; case 'Bowling': return <CricketBallIcon className="h-4 w-4 text-primary" />; case 'Wicket Keeping': return <WicketKeeperGloves className="h-4 w-4 text-primary" />; default: return <UserSquare2 className="h-4 w-4 text-primary" />; }
   };
@@ -708,8 +719,10 @@ export default function GameDetailsPage() {
                   playersByTeam={buildPlayersByTeam(scorecard)}
                   isAssignedSelector={
                     !!currentAuthProfile?.uid &&
-                    !!(game.selectorUserIds?.includes(currentAuthProfile.uid))
+                    !!(game.selectorUserIds?.includes(currentAuthProfile.uid) ||
+                       scorecard.selectorAssignments?.some(a => a.uid === currentAuthProfile.uid))
                   }
+                  selectorAssignments={effectiveSelectorAssignments}
                   selectorReportScope={activeOrganizationDetails?.selectorReportScope}
                 />}
           </TabsContent>
