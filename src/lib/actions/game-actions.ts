@@ -187,7 +187,11 @@ export async function addPlayerToGameRosterAction(gameId: string, playerId: stri
 }
 
 
-export async function updateGameSelectorsAction(gameId: string, newSelectorUserIds: string[]): Promise<{ success: boolean; message: string }> {
+export async function updateGameSelectorsAction(
+  gameId: string,
+  newSelectorUserIds: string[],
+  newSelectorAssignments?: import('../../types').ScorecardSelectorAssignment[]
+): Promise<{ success: boolean; message: string }> {
   try {
     const gameRef = doc(db, 'games', gameId);
     const gameSnap = await getDoc(gameRef);
@@ -212,7 +216,16 @@ export async function updateGameSelectorsAction(gameId: string, newSelectorUserI
     const oldSelectorUserIds = currentGameData.selectorUserIds || [];
 
     const batch = writeBatch(db);
-    batch.update(gameRef, { selectorUserIds: newSelectorUserIds });
+
+    // Always write selectorUserIds (existing field — rating flow depends on this)
+    const gameUpdate: Record<string, any> = { selectorUserIds: newSelectorUserIds };
+    // Write selectorAssignments if provided, otherwise clear it
+    if (newSelectorAssignments && newSelectorAssignments.length > 0) {
+      gameUpdate.selectorAssignments = newSelectorAssignments;
+    } else {
+      gameUpdate.selectorAssignments = deleteField();
+    }
+    batch.update(gameRef, gameUpdate);
 
     // Add to new selectors' assignedGameIds and assignedOrganizationIds
     const selectorsToAdd = newSelectorUserIds.filter(uid => !oldSelectorUserIds.includes(uid));
@@ -220,14 +233,11 @@ export async function updateGameSelectorsAction(gameId: string, newSelectorUserI
       const userRef = doc(db, 'users', uid);
       batch.update(userRef, {
         assignedGameIds: arrayUnion(gameId),
-        assignedOrganizationIds: arrayUnion(currentGameData.organizationId) // Add organization assignment
+        assignedOrganizationIds: arrayUnion(currentGameData.organizationId)
       });
     });
 
     // Remove from old selectors' assignedGameIds
-    // Note: We are not removing them from assignedOrganizationIds here,
-    // as they might have other roles or game assignments in that organization.
-    // A more complex cleanup logic would be needed if full unassignment is desired.
     const selectorsToRemove = oldSelectorUserIds.filter(uid => !newSelectorUserIds.includes(uid));
     selectorsToRemove.forEach(uid => {
       const userRef = doc(db, 'users', uid);

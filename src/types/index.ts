@@ -135,6 +135,8 @@ export interface Game {
   seriesName?: string;
   organizationId: string;
   selectorUserIds?: string[];
+  /** Team-aware selector assignments — parallel to selectorUserIds, written by Manage Selectors panel */
+  selectorAssignments?: ScorecardSelectorAssignment[];
   status?: 'active' | 'archived';
   createdAt?: string | null;
   ratingsLastModifiedAt?: string;

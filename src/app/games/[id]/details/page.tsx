@@ -103,6 +103,8 @@ export default function GameDetailsPage() {
   const [isEditingSelectors, setIsEditingSelectors] = useState(false);
   const [potentialGameSelectorsToAssign, setPotentialGameSelectorsToAssign] = useState<UserProfile[]>([]);
   const [selectedSelectorUidsForUpdate, setSelectedSelectorUidsForUpdate] = useState<string[]>([]);
+  // Team association per selector uid — only used when selectorReportScope requires it
+  const [selectorTeamMap, setSelectorTeamMap] = useState<Record<string, string>>({});
   const [isLoadingGameSelectors, setIsLoadingGameSelectors] = useState(false);
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -233,6 +235,12 @@ export default function GameDetailsPage() {
           }
           setGameSelectors(selectorProfiles);
           setSelectedSelectorUidsForUpdate(fetchedGame.selectorUserIds || []);
+          // Initialise team map from existing selectorAssignments if present
+          const teamMap: Record<string, string> = {};
+          (fetchedGame.selectorAssignments || []).forEach(a => {
+            teamMap[a.uid] = a.teamAssociation;
+          });
+          setSelectorTeamMap(teamMap);
 
           const canManage = !!effectivePermissions[PERMISSIONS.GAMES_MANAGE_SELECTORS_ANY];
           if (canManage && currentSeries?.organizationId) {
@@ -299,12 +307,22 @@ export default function GameDetailsPage() {
   };
 
   const handleSaveGameSelectors = async () => {
-    if (!gameId) return; setIsLoadingGameSelectors(true);
+    if (!gameId || !game) return; setIsLoadingGameSelectors(true);
     const finalUids = [...new Set([
       ...selectedSelectorUidsForUpdate,
       ...lockedSuperAdmins.map(u => u.uid),
     ])];
-    const result = await updateGameSelectorsAction(gameId, finalUids);
+    // Build selectorAssignments with team context
+    const finalAssignments: import('@/types').ScorecardSelectorAssignment[] = finalUids.map(uid => {
+      const profile = [...potentialGameSelectorsToAssign, ...gameSelectors].find(u => u.uid === uid);
+      return {
+        uid,
+        name: profile?.displayName || profile?.email || uid,
+        teamAssociation: (selectorTeamMap[uid] || 'neutral') as string,
+        assignedAt: new Date().toISOString(),
+      };
+    });
+    const result = await updateGameSelectorsAction(gameId, finalUids, finalAssignments);
     if (result.success) { toast({ title: "Game Selectors Updated", description: result.message }); setIsEditingSelectors(false); await refreshGameAndPlayerData(); }
     else { toast({ title: "Error", description: result.message, variant: "destructive" }); }
     setIsLoadingGameSelectors(false);
@@ -354,15 +372,22 @@ export default function GameDetailsPage() {
                        !!userProfile?.roles?.includes('admin');
 
   // ── Selector assignments for scorecard-based MatchReportTab ──
-  // Prefer explicit scorecard assignments (have team context); fall back to game selectors as neutral
+  // Priority: game.selectorAssignments (team-aware, set by Manage Selectors) →
+  //           scorecard.selectorAssignments → fallback: game selectors as neutral
   const effectiveSelectorAssignments: import('@/types').ScorecardSelectorAssignment[] =
-    scorecard?.selectorAssignments?.length
-      ? scorecard.selectorAssignments
-      : (game.selectorUserIds ?? []).map(uid => ({
-          uid,
-          teamAssociation: 'neutral' as const,
-          name: gameSelectors.find(s => s.uid === uid)?.displayName ?? uid,
-        }));
+    game.selectorAssignments?.length
+      ? game.selectorAssignments
+      : scorecard?.selectorAssignments?.length
+        ? scorecard.selectorAssignments
+        : (game.selectorUserIds ?? []).map(uid => ({
+            uid,
+            teamAssociation: 'neutral' as const,
+            name: gameSelectors.find(s => s.uid === uid)?.displayName ?? uid,
+          }));
+
+  // Show team picker in Manage Selectors when scope requires team context
+  const reportScope = activeOrganizationDetails?.selectorReportScope;
+  const showTeamPicker = reportScope === 'opposing_only' || reportScope === 'own_team_only';
 
   const getSkillIcon = (skill: Player['primarySkill']) => {
     switch (skill) { case 'Batting': return <CricketBatIcon className="h-4 w-4 text-primary" />; case 'Bowling': return <CricketBallIcon className="h-4 w-4 text-primary" />; case 'Wicket Keeping': return <WicketKeeperGloves className="h-4 w-4 text-primary" />; default: return <UserSquare2 className="h-4 w-4 text-primary" />; }
@@ -497,7 +522,10 @@ export default function GameDetailsPage() {
 
       {isEditingSelectors && canManageSelectors && (<Card><CardHeader>
             <CardTitle className="text-xl font-headline text-primary">Manage Game Selectors</CardTitle>
-            <CardDescription>Select users with 'selector' or 'Series Admin' role in this organization. Super admins are always included.</CardDescription>
+            <CardDescription>
+              Select users with 'selector' or 'Series Admin' role in this organization. Super admins are always included.
+              {showTeamPicker && <span className="block mt-1 text-xs text-amber-600">Assign each selector a team — required by your org's report scope setting.</span>}
+            </CardDescription>
           </CardHeader><CardContent className="space-y-3">
             {/* Locked super admins */}
             {lockedSuperAdmins.length > 0 && (
@@ -513,17 +541,46 @@ export default function GameDetailsPage() {
               </div>
             )}
             {selectableSelectors.length === 0 ? (<p className="text-muted-foreground text-sm">No users with 'selector' or 'Series Admin' role found for this organization.</p>)
-            : (<ScrollArea className="h-60 rounded-md border p-4"><div className="space-y-2">
-                {selectableSelectors.map(user => (<div key={user.uid} className="flex items-center space-x-2">
-                    <Checkbox id={`selector-${user.uid}`} checked={selectedSelectorUidsForUpdate.includes(user.uid)}
-                      onCheckedChange={(checked) => { setSelectedSelectorUidsForUpdate(prev => checked ? [...prev, user.uid] : prev.filter(uid => uid !== user.uid)); }} />
-                    <label htmlFor={`selector-${user.uid}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      {user.displayName || user.email}
-                      <span className="text-muted-foreground ml-1 text-xs">({user.roles.filter(r => r !== 'admin').join(', ')})</span>
-                    </label>
-                </div>))}</div></ScrollArea>)}
+            : (<ScrollArea className="h-60 rounded-md border p-4"><div className="space-y-3">
+                {selectableSelectors.map(user => {
+                  const isChecked = selectedSelectorUidsForUpdate.includes(user.uid);
+                  return (
+                    <div key={user.uid} className="flex items-center gap-2 flex-wrap">
+                      <Checkbox id={`selector-${user.uid}`} checked={isChecked}
+                        onCheckedChange={(checked) => {
+                          setSelectedSelectorUidsForUpdate(prev => checked ? [...prev, user.uid] : prev.filter(uid => uid !== user.uid));
+                          // Clear team assignment when unchecked
+                          if (!checked) setSelectorTeamMap(prev => { const next = { ...prev }; delete next[user.uid]; return next; });
+                        }} />
+                      <label htmlFor={`selector-${user.uid}`} className="text-sm font-medium leading-none flex-1 peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        {user.displayName || user.email}
+                        <span className="text-muted-foreground ml-1 text-xs">({user.roles.filter(r => r !== 'admin').join(', ')})</span>
+                      </label>
+                      {/* Team picker — only shown when scope requires team context and selector is checked */}
+                      {showTeamPicker && isChecked && (
+                        <select
+                          value={selectorTeamMap[user.uid] || 'neutral'}
+                          onChange={e => setSelectorTeamMap(prev => ({ ...prev, [user.uid]: e.target.value }))}
+                          className="text-xs border rounded px-1.5 py-1 bg-background text-foreground h-7 shrink-0"
+                        >
+                          <option value="neutral">Neutral</option>
+                          <option value={game.team1}>{game.team1}</option>
+                          <option value={game.team2}>{game.team2}</option>
+                        </select>
+                      )}
+                    </div>
+                  );
+                })}
+              </div></ScrollArea>)}
           </CardContent><CardFooter className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => { setIsEditingSelectors(false); setSelectedSelectorUidsForUpdate(game.selectorUserIds || []); }}>Cancel</Button>
+            <Button variant="ghost" onClick={() => {
+              setIsEditingSelectors(false);
+              setSelectedSelectorUidsForUpdate(game.selectorUserIds || []);
+              // Reset team map to what was saved
+              const teamMap: Record<string, string> = {};
+              (game.selectorAssignments || []).forEach(a => { teamMap[a.uid] = a.teamAssociation; });
+              setSelectorTeamMap(teamMap);
+            }}>Cancel</Button>
             <Button onClick={handleSaveGameSelectors} disabled={isLoadingGameSelectors}>{isLoadingGameSelectors ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Selectors</Button>
           </CardFooter></Card>
       )}
@@ -718,9 +775,10 @@ export default function GameDetailsPage() {
                   team2={scorecard.team2}
                   playersByTeam={buildPlayersByTeam(scorecard)}
                   isAssignedSelector={
-                    !!currentAuthProfile?.uid &&
-                    !!(game.selectorUserIds?.includes(currentAuthProfile.uid) ||
-                       scorecard.selectorAssignments?.some(a => a.uid === currentAuthProfile.uid))
+                    !!currentAuthProfile?.uid && !!(
+                      game.selectorUserIds?.includes(currentAuthProfile.uid) ||
+                      scorecard.selectorAssignments?.some(a => a.uid === currentAuthProfile.uid)
+                    )
                   }
                   selectorAssignments={effectiveSelectorAssignments}
                   selectorReportScope={activeOrganizationDetails?.selectorReportScope}
