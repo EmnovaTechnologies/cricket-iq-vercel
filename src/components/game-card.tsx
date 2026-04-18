@@ -62,11 +62,14 @@ function getGameDisplayStatus(game: Game, currentUserId?: string): { text: strin
 
 
 const GameCard: React.FC<GameCardProps> = ({ game }) => {
-  const { userProfile: currentUserProfile, effectivePermissions } = useAuth();
+  const { userProfile: currentUserProfile, effectivePermissions, activeOrganizationDetails } = useAuth();
   const gameDate = game.date ? parseISO(game.date) : null;
   const isFutureGame = gameDate ? startOfDay(gameDate) > startOfDay(new Date()) : false;
 
   const displayStatus = getGameDisplayStatus(game, currentUserProfile?.uid);
+
+  // Hide Rate Players entirely for performance-model orgs; show for rating, hybrid, or unset (safe default)
+  const showRatePlayers = activeOrganizationDetails?.selectionModel !== 'performance';
 
   // Detect mobile for Step 2: redirect selector Rate button to mobile-optimized page
   const [isMobile, setIsMobile] = useState(false);
@@ -115,7 +118,7 @@ const GameCard: React.FC<GameCardProps> = ({ game }) => {
         <div className="min-h-[0.5rem]"></div>
       </CardContent>
       <CardFooter className="grid grid-cols-2 gap-1.5 p-2 pt-1">
-         {canRatePlayers ? (
+         {showRatePlayers && (canRatePlayers ? (
             <Button 
                 asChild 
                 variant="default" 
@@ -154,8 +157,16 @@ const GameCard: React.FC<GameCardProps> = ({ game }) => {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-         )}
-         <Button asChild variant="outline" size="sm" className="w-full border-primary text-primary hover:bg-primary/10 text-sm">
+         ))}
+         <Button
+           asChild
+           variant="outline"
+           size="sm"
+           className={cn(
+             "w-full border-primary text-primary hover:bg-primary/10 text-sm",
+             !showRatePlayers && "col-span-2"
+           )}
+         >
           <Link href={`/games/${game.id}/details`}>
             <span className="flex items-center justify-center gap-1">
               View Details <ArrowRight className="h-3.5 w-3.5" />

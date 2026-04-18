@@ -53,7 +53,8 @@ export default function GameDetailsPage() {
   const gameId = params.id;
   const router = useRouter();
   const { toast } = useToast();
-  const { userProfile: currentAuthProfile, effectivePermissions, isPermissionsLoading, activeOrganizationId } = useAuth();
+  // ── activeOrganizationDetails added to read selectionModel ──
+  const { userProfile: currentAuthProfile, effectivePermissions, isPermissionsLoading, activeOrganizationId, activeOrganizationDetails } = useAuth();
 
   // Check if scorecard already exists for this game
   useEffect(() => {
@@ -311,6 +312,9 @@ export default function GameDetailsPage() {
     (!!effectivePermissions[PERMISSIONS.GAMES_RATE_ASSIGNED] && !!game?.selectorUserIds?.includes(currentAuthProfile?.uid || ''))
   );
 
+  // ── Hide Rate Players entirely for performance-model orgs ──
+  const showRatePlayers = activeOrganizationDetails?.selectionModel !== 'performance';
+
   const getSkillIcon = (skill: Player['primarySkill']) => {
     switch (skill) { case 'Batting': return <CricketBatIcon className="h-4 w-4 text-primary" />; case 'Bowling': return <CricketBallIcon className="h-4 w-4 text-primary" />; case 'Wicket Keeping': return <WicketKeeperGloves className="h-4 w-4 text-primary" />; default: return <UserSquare2 className="h-4 w-4 text-primary" />; }
   };
@@ -486,9 +490,14 @@ export default function GameDetailsPage() {
           <Card><CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle className="text-xl font-headline text-primary flex items-center gap-2"><Users className="h-5 w-5" /> {game.team1} Roster</CardTitle>
-            {isFutureGame ? (<TooltipProvider><Tooltip><TooltipTrigger asChild><span tabIndex={0} className="inline-block cursor-not-allowed"><Button variant="default" size="sm" className="bg-primary hover:bg-primary/90 pointer-events-none" disabled><Edit3 className="h-4 w-4 mr-1" /> Rate Players</Button></span></TooltipTrigger><TooltipContent><p>Cannot rate future games</p></TooltipContent></Tooltip></TooltipProvider>)
-            : canRatePlayers ? (<Button asChild variant="default" size="sm" className="bg-primary hover:bg-primary/90"><Link href={`/games/${gameId}/rate-enhanced`} className="flex items-center gap-1"><Edit3 className="h-4 w-4" /> Rate Players</Link></Button>)
-            : (<Button variant="default" size="sm" className="bg-primary hover:bg-primary/90" disabled title="Rating not available."><Edit3 className="h-4 w-4 mr-1" /> Rate Players</Button>)}
+            {/* ── Rate Players button: hidden entirely for performance orgs ── */}
+            {showRatePlayers && (
+              isFutureGame
+                ? (<TooltipProvider><Tooltip><TooltipTrigger asChild><span tabIndex={0} className="inline-block cursor-not-allowed"><Button variant="default" size="sm" className="bg-primary hover:bg-primary/90 pointer-events-none" disabled><Edit3 className="h-4 w-4 mr-1" /> Rate Players</Button></span></TooltipTrigger><TooltipContent><p>Cannot rate future games</p></TooltipContent></Tooltip></TooltipProvider>)
+                : canRatePlayers
+                  ? (<Button asChild variant="default" size="sm" className="bg-primary hover:bg-primary/90"><Link href={`/games/${gameId}/rate-enhanced`} className="flex items-center gap-1"><Edit3 className="h-4 w-4" /> Rate Players</Link></Button>)
+                  : (<Button variant="default" size="sm" className="bg-primary hover:bg-primary/90" disabled title="Rating not available."><Edit3 className="h-4 w-4 mr-1" /> Rate Players</Button>)
+            )}
           </div>
           <CardDescription>{canManageRoster ? `Select players for ${game.team1}.` : `Players for ${game.team1}.`}</CardDescription>
         </CardHeader><CardContent>
@@ -519,9 +528,14 @@ export default function GameDetailsPage() {
       <Card><CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle className="text-xl font-headline text-primary flex items-center gap-2"><Users className="h-5 w-5" /> {game.team2} Roster</CardTitle>
-            {isFutureGame ? (<TooltipProvider><Tooltip><TooltipTrigger asChild><span tabIndex={0} className="inline-block cursor-not-allowed"><Button variant="default" size="sm" className="bg-primary hover:bg-primary/90 pointer-events-none" disabled><Edit3 className="h-4 w-4 mr-1" /> Rate Players</Button></span></TooltipTrigger><TooltipContent><p>Cannot rate future games</p></TooltipContent></Tooltip></TooltipProvider>)
-            : canRatePlayers ? (<Button asChild variant="default" size="sm" className="bg-primary hover:bg-primary/90"><Link href={`/games/${gameId}/rate-enhanced`} className="flex items-center gap-1"><Edit3 className="h-4 w-4" /> Rate Players</Link></Button>)
-            : (<Button variant="default" size="sm" className="bg-primary hover:bg-primary/90" disabled title="Rating not available."><Edit3 className="h-4 w-4 mr-1" /> Rate Players</Button>)}
+            {/* ── Rate Players button: hidden entirely for performance orgs ── */}
+            {showRatePlayers && (
+              isFutureGame
+                ? (<TooltipProvider><Tooltip><TooltipTrigger asChild><span tabIndex={0} className="inline-block cursor-not-allowed"><Button variant="default" size="sm" className="bg-primary hover:bg-primary/90 pointer-events-none" disabled><Edit3 className="h-4 w-4 mr-1" /> Rate Players</Button></span></TooltipTrigger><TooltipContent><p>Cannot rate future games</p></TooltipContent></Tooltip></TooltipProvider>)
+                : canRatePlayers
+                  ? (<Button asChild variant="default" size="sm" className="bg-primary hover:bg-primary/90"><Link href={`/games/${gameId}/rate-enhanced`} className="flex items-center gap-1"><Edit3 className="h-4 w-4" /> Rate Players</Link></Button>)
+                  : (<Button variant="default" size="sm" className="bg-primary hover:bg-primary/90" disabled title="Rating not available."><Edit3 className="h-4 w-4 mr-1" /> Rate Players</Button>)
+            )}
           </div>
           <CardDescription>{canManageRoster ? `Select players for ${game.team2}.` : `Players for ${game.team2}.`}</CardDescription>
         </CardHeader><CardContent>
