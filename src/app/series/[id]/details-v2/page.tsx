@@ -152,7 +152,9 @@ export default function SeriesDetailsPage() {
             setSelectedAdminUidsForUpdate([]);
           }
 
-          if (effectivePermissions[PERMISSIONS.SERIES_MANAGE_ADMINS_ANY]) {
+          if (effectivePermissions[PERMISSIONS.SERIES_MANAGE_ADMINS_ANY] ||
+              currentAuthProfile?.roles?.includes('Organization Admin') ||
+              currentAuthProfile?.roles?.includes('admin')) {
               const potentialAdmins = await getPotentialSeriesAdminsForOrg(currentSeries.organizationId);
               setPotentialSeriesAdminsToAssign(potentialAdmins);
           }
