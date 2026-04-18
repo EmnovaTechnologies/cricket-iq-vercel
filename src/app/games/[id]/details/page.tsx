@@ -385,9 +385,8 @@ export default function GameDetailsPage() {
             name: gameSelectors.find(s => s.uid === uid)?.displayName ?? uid,
           }));
 
-  // Show team picker in Manage Selectors when scope requires team context
+  // reportScope used for effectiveSelectorAssignments context
   const reportScope = activeOrganizationDetails?.selectorReportScope;
-  const showTeamPicker = reportScope === 'opposing_only' || reportScope === 'own_team_only';
 
   const getSkillIcon = (skill: Player['primarySkill']) => {
     switch (skill) { case 'Batting': return <CricketBatIcon className="h-4 w-4 text-primary" />; case 'Bowling': return <CricketBallIcon className="h-4 w-4 text-primary" />; case 'Wicket Keeping': return <WicketKeeperGloves className="h-4 w-4 text-primary" />; default: return <UserSquare2 className="h-4 w-4 text-primary" />; }
@@ -524,7 +523,7 @@ export default function GameDetailsPage() {
             <CardTitle className="text-xl font-headline text-primary">Manage Game Selectors</CardTitle>
             <CardDescription>
               Select users with 'selector' or 'Series Admin' role in this organization. Super admins are always included.
-              {showTeamPicker && <span className="block mt-1 text-xs text-amber-600">Assign each selector a team — required by your org's report scope setting.</span>}
+              <span className="block mt-1 text-xs text-muted-foreground">Optionally assign each selector a team to enable scope-based match reporting.</span>
             </CardDescription>
           </CardHeader><CardContent className="space-y-3">
             {/* Locked super admins */}
@@ -556,8 +555,8 @@ export default function GameDetailsPage() {
                         {user.displayName || user.email}
                         <span className="text-muted-foreground ml-1 text-xs">({user.roles.filter(r => r !== 'admin').join(', ')})</span>
                       </label>
-                      {/* Team picker — only shown when scope requires team context and selector is checked */}
-                      {showTeamPicker && isChecked && (
+                      {/* Team picker — always shown when selector is checked */}
+                      {isChecked && (
                         <select
                           value={selectorTeamMap[user.uid] || 'neutral'}
                           onChange={e => setSelectorTeamMap(prev => ({ ...prev, [user.uid]: e.target.value }))}
