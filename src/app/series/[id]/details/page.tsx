@@ -751,10 +751,10 @@ export default function SeriesDetailsPage() {
 
             </CardContent>
 
-            {/* ── Footer: Archive + Delete side by side ── */}
-            {(showArchiveButton || (canDelete && canDeletePermission)) && (
+            {/* ── Footer: Delete OR Archive (dynamic) ── */}
+            {(canDeletePermission && canDelete === true) || showArchiveButton ? (
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                {canDelete && canDeletePermission && (
+                {canDeletePermission && canDelete === true ? (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive" size="sm" disabled={isDeleting}>
@@ -777,12 +777,11 @@ export default function SeriesDetailsPage() {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-                )}
-                {showArchiveButton && (
+                ) : showArchiveButton ? (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant={isSeriesArchived ? "outline" : "destructive"} size="sm"
-                        className={isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : ''}
+                      <Button variant="outline" size="sm"
+                        className={isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : 'border-destructive text-destructive hover:bg-destructive/10'}
                         disabled={isPermissionsLoading}>
                         {isSeriesArchived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />}
                         {isSeriesArchived ? "Unarchive Series" : "Archive Series"}
@@ -803,9 +802,9 @@ export default function SeriesDetailsPage() {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-                )}
+                ) : null}
               </CardFooter>
-            )}
+            ) : null}
           </Card>
         </TabsContent>
 
