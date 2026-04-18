@@ -441,8 +441,8 @@ export default function SeriesDetailsPage() {
           {showArchiveButton && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant={isSeriesArchived ? "outline" : "outline"} size="sm"
-                  className={isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : 'border-amber-500 text-amber-600 hover:bg-amber-50'}
+                <Button variant={isSeriesArchived ? "outline" : "destructive"} size="sm"
+                  className={isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : ''}
                   disabled={isPermissionsLoading}>
                   {isSeriesArchived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />}
                   {isSeriesArchived ? "Unarchive Series" : "Archive Series"}
@@ -770,8 +770,8 @@ export default function SeriesDetailsPage() {
                 {showArchiveButton && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant={isSeriesArchived ? "outline" : "outline"} size="sm"
-                        className={isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : 'border-amber-500 text-amber-600 hover:bg-amber-50'}
+                      <Button variant={isSeriesArchived ? "outline" : "destructive"} size="sm"
+                        className={isSeriesArchived ? 'border-primary text-primary hover:bg-primary/10' : ''}
                         disabled={isPermissionsLoading}>
                         {isSeriesArchived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />}
                         {isSeriesArchived ? "Unarchive Series" : "Archive Series"}
