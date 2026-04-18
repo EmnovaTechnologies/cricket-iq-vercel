@@ -40,17 +40,29 @@ export async function checkSeriesBulkDeletableAction(
   if (!seriesIds.length) return {};
 
   try {
-    // Query games for each series in chunks of 30 (Firestore 'in' limit)
     const seriesWithGames = new Set<string>();
+    const seriesIdSet = new Set(seriesIds);
+
+    // Approach 1: query by seriesId in chunks
     for (let i = 0; i < seriesIds.length; i += 30) {
       const chunk = seriesIds.slice(i, i + 30);
       const gamesSnap = await adminDb.collection('games')
         .where('seriesId', 'in', chunk)
-        .limit(chunk.length)
         .get();
       gamesSnap.docs.forEach(d => {
         const sid = d.data().seriesId;
         if (sid) seriesWithGames.add(sid);
+      });
+    }
+
+    // Approach 2: also check by organizationId in case seriesId indexing differs
+    if (organizationId) {
+      const orgGamesSnap = await adminDb.collection('games')
+        .where('organizationId', '==', organizationId)
+        .get();
+      orgGamesSnap.docs.forEach(d => {
+        const sid = d.data().seriesId;
+        if (sid && seriesIdSet.has(sid)) seriesWithGames.add(sid);
       });
     }
 
