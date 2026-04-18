@@ -633,7 +633,17 @@ export default function SeriesDetailsPage() {
                 )}
                 {canManageSeriesAdmins && isEditingAdmins && !isSeriesArchived && (
                   <div className="space-y-3">
-
+                    {/* Show currently assigned when potential list not yet loaded */}
+                    {seriesAdmins.length > 0 && potentialSeriesAdminsToAssign.length === 0 && (
+                      <div className="rounded-md border bg-muted/30 p-2 space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Currently assigned</p>
+                        {seriesAdmins.map(admin => (
+                          <div key={admin.uid} className="flex items-center gap-2 px-2 py-1">
+                            <span className="text-sm">{admin.displayName || admin.email}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {lockedSuperAdmins.length > 0 && (
                       <div className="rounded-md border bg-muted/30 p-2 space-y-1">
                         <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned)</p>
