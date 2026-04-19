@@ -408,6 +408,8 @@ export async function importPlayersAction(playersData: CsvPlayerImportRow[], org
         const RawBowlingStyle = row.BowlingStyle?.trim();
         const PrimaryClubName = row.PrimaryClubName?.trim();
         const PrimaryTeamName = row.PrimaryTeamName?.trim();
+        const RawIsAllrounder = row.IsAllrounder?.trim().toLowerCase();
+        const isAllrounder = RawIsAllrounder === 'true' || RawIsAllrounder === 'yes' || RawIsAllrounder === '1';
 
 
         if (!CricClubsID || CricClubsID === "") { errors.push({ rowNumber, csvRow: row, error: "CricClubsID is missing." }); continue; }
@@ -465,6 +467,11 @@ export async function importPlayersAction(playersData: CsvPlayerImportRow[], org
         const nameTokens = Name.toLowerCase().split(' ').filter(Boolean);
         const searchableNameTokens = [...nameTokens, Name.toLowerCase()];
 
+        // Derive effectiveSkill
+        let effectiveSkill: string = primarySkill;
+        if (isAllrounder && primarySkill === 'Batting') effectiveSkill = 'Batting Allrounder';
+        if (isAllrounder && primarySkill === 'Bowling') effectiveSkill = 'Bowling Allrounder';
+
         playersToProcess.push({
           name: Name,
           firstName: RawFirstName,
@@ -473,14 +480,16 @@ export async function importPlayersAction(playersData: CsvPlayerImportRow[], org
           dateOfBirth,
           gender,
           primarySkill,
+          isAllrounder,
+          effectiveSkill,
           dominantHandBatting,
           battingOrder,
           dominantHandBowling,
           bowlingStyle,
           searchableNameTokens: searchableNameTokens,
           clubName: PrimaryClubName && PrimaryClubName !== "" ? PrimaryClubName : undefined,
-          primaryTeamId: primaryTeamIdToLink, 
-          organizationId: organizationIdForImport, 
+          primaryTeamId: primaryTeamIdToLink,
+          organizationId: organizationIdForImport,
         });
       } catch (rowError: any) {
         console.error(`Error processing player import row ${rowNumber}:`, rowError);
@@ -496,17 +505,19 @@ export async function importPlayersAction(playersData: CsvPlayerImportRow[], org
         const { primaryTeamId: teamIdToLinkTo, organizationId, ...playerCoreData } = playerData;
         
         const firestoreReadyPlayerData: Omit<Player, 'id' | 'gamesPlayed'> & { gamesPlayed?: number, organizationId: string, primaryTeamId?: string, clubName?: string } = {
-          name: playerCoreData.name, // Name is already trimmed
+          name: playerCoreData.name,
           firstName: playerCoreData.firstName,
           lastName: playerCoreData.lastName,
           searchableNameTokens: playerCoreData.searchableNameTokens,
-          cricClubsId: playerCoreData.cricClubsId, // ID is already trimmed
+          cricClubsId: playerCoreData.cricClubsId,
           dateOfBirth: playerCoreData.dateOfBirth,
           gender: playerCoreData.gender,
           primarySkill: playerCoreData.primarySkill,
+          isAllrounder: (playerCoreData as any).isAllrounder ?? false,
+          effectiveSkill: (playerCoreData as any).effectiveSkill ?? playerCoreData.primarySkill,
           battingOrder: playerCoreData.battingOrder,
           dominantHandBatting: playerCoreData.dominantHandBatting,
-          organizationId: organizationId, 
+          organizationId: organizationId,
           gamesPlayed: 0,
         };
 

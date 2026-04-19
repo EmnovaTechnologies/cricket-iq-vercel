@@ -43,8 +43,13 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player }) => {
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 {getSkillIcon()}
-                {player.primarySkill}
+                {player.effectiveSkill || player.primarySkill}
               </div>
+              {player.effectiveSkill && player.effectiveSkill !== player.primarySkill && (
+                <div className="text-xs text-muted-foreground/70">
+                  ({player.primarySkill})
+                </div>
+              )}
               {player.age !== undefined && (
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <Cake className="h-4 w-4" />

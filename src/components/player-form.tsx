@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DatePickerField } from '@/components/date-picker-field';
 import { AlertTriangle, Loader2, UploadCloud, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 import { format, differenceInYears, parseISO, isValid } from 'date-fns';
-import type { Player, Gender, BowlingStyle as BowlingStyleType, Team, AgeCategory, UserProfile } from '../../types';
+import type { Player, Gender, BowlingStyle as BowlingStyleType, Team, AgeCategory, UserProfile, EffectiveSkill } from '../../types';
 import { PRIMARY_SKILLS, BATTING_ORDERS, BOWLING_STYLES, DOMINANT_HANDS, GENDERS } from '@/lib/constants';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -47,6 +48,7 @@ const playerFormSchema = z.object({
   avatarUrl: z.string().url({ message: "Please enter a valid URL for the avatar." }).optional().or(z.literal('')),
   primaryTeamId: z.string().optional(),
   clubName: z.string().optional(),
+  isAllrounder: z.boolean().optional().default(false),
 }).superRefine((data, ctx) => {
   if (data.primarySkill === 'Bowling') {
     if (!data.dominantHandBowling) {
@@ -114,6 +116,7 @@ export function PlayerForm({
       avatarUrl: initialData.avatarUrl || '',
       primaryTeamId: initialData.primaryTeamId || NO_TEAM_VALUE,
       clubName: initialData.clubName || undefined,
+      isAllrounder: initialData.isAllrounder ?? false,
     } : {
       firstName: '',
       lastName: '',
@@ -128,6 +131,7 @@ export function PlayerForm({
       primaryTeamId: preselectedPrimaryTeamId || NO_TEAM_VALUE,
       gender: undefined,
       clubName: preselectedClubName || undefined,
+      isAllrounder: false,
     },
   });
 
@@ -135,6 +139,15 @@ export function PlayerForm({
   const dominantHandBowlingValue = form.watch('dominantHandBowling');
   const primarySkillValue = form.watch('primarySkill');
   const watchedClubName = form.watch('clubName');
+  const isAllrounderValue = form.watch('isAllrounder');
+
+  // Derive effectiveSkill in real time
+  const effectiveSkill = useMemo((): EffectiveSkill | undefined => {
+    if (!primarySkillValue) return undefined;
+    if (isAllrounderValue && primarySkillValue === 'Batting') return 'Batting Allrounder';
+    if (isAllrounderValue && primarySkillValue === 'Bowling') return 'Bowling Allrounder';
+    return primarySkillValue;
+  }, [primarySkillValue, isAllrounderValue]);
 
   const filteredTeamsForDropdown = useMemo(() => {
     if (!watchedClubName || watchedClubName === '') {
@@ -186,6 +199,10 @@ export function PlayerForm({
         form.setValue('dominantHandBowling', undefined, { shouldValidate: false });
         form.setValue('bowlingStyle', undefined, { shouldValidate: true });
       }
+    }
+    // Reset allrounder when Wicket Keeping selected
+    if (primarySkillValue === 'Wicket Keeping') {
+      form.setValue('isAllrounder', false, { shouldValidate: false });
     }
   }, [primarySkillValue, form]);
 
@@ -304,6 +321,8 @@ export function PlayerForm({
         dateOfBirth: format(data.dateOfBirth, 'yyyy-MM-dd'),
         gender: data.gender,
         primarySkill: data.primarySkill,
+        isAllrounder: data.isAllrounder ?? false,
+        effectiveSkill: effectiveSkill ?? data.primarySkill,
         battingOrder: data.battingOrder,
         dominantHandBatting: data.dominantHandBatting,
         dominantHandBowling: data.dominantHandBowling,
@@ -502,6 +521,42 @@ export function PlayerForm({
                 <SelectContent>{PRIMARY_SKILLS.map((skill) => (<SelectItem key={skill} value={skill}>{skill}</SelectItem>))}</SelectContent>
               </Select><FormMessage /></FormItem>
           )}/>
+
+        {/* Allrounder checkbox — only for Batting or Bowling */}
+        {(primarySkillValue === 'Batting' || primarySkillValue === 'Bowling') && (
+          <FormField control={form.control} name="isAllrounder"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center gap-3 space-y-0 rounded-md border p-4">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value ?? false}
+                    onCheckedChange={field.onChange}
+                    disabled={disableSubmitButton}
+                    id="isAllrounder"
+                  />
+                </FormControl>
+                <div className="space-y-0.5">
+                  <FormLabel htmlFor="isAllrounder" className="cursor-pointer">Allrounder?</FormLabel>
+                  <FormDescription>
+                    Check if this player can contribute with both bat and ball.
+                  </FormDescription>
+                </div>
+              </FormItem>
+            )}/>
+        )}
+
+        {/* Effective Skill — always derived, read-only */}
+        {primarySkillValue && (
+          <FormItem>
+            <FormLabel>Effective Skill</FormLabel>
+            <Input
+              readOnly
+              value={effectiveSkill ?? ''}
+              className="bg-muted cursor-default"
+            />
+            <FormDescription>Automatically derived from Primary Skill and Allrounder status.</FormDescription>
+          </FormItem>
+        )}
         <fieldset className="border p-4 rounded-md space-y-4"><legend className="text-sm font-medium px-1">Batting Details</legend>
            <FormField control={form.control} name="dominantHandBatting"
             render={({ field }) => (

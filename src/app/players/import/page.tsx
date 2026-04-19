@@ -75,7 +75,7 @@ export default function ImportPlayersPage() {
                 <AlertTitle>CSV Format Requirements</AlertTitle>
                 <AlertDescription>
                   <ul className="list-disc pl-5 space-y-1 text-sm mt-2">
-                    <li>Must contain these headers: <strong>FirstName, LastName, CricClubsID, DateOfBirth, Gender, PrimarySkill, DominantHandBatting, BattingOrder, DominantHandBowling, BowlingStyle, PrimaryClubName, PrimaryTeamName</strong>.</li>
+                    <li>Must contain these headers: <strong>FirstName, LastName, CricClubsID, DateOfBirth, Gender, PrimarySkill, DominantHandBatting, BattingOrder, DominantHandBowling, BowlingStyle, PrimaryClubName, PrimaryTeamName, IsAllrounder</strong>.</li>
                     <li><strong>FirstName</strong> and <strong>LastName</strong> are required and will be combined for the full name.</li>
                     <li><strong>CricClubsID</strong> must be unique across all players.</li>
                     <li><strong>DateOfBirth</strong> must be in <strong>MM/DD/YYYY</strong> format.</li>
@@ -87,6 +87,7 @@ export default function ImportPlayersPage() {
                     <li><strong>BowlingStyle</strong> is required if PrimarySkill is 'Bowling'. Must be one of: {bowlingStylesString}.</li>
                     <li><strong>PrimaryClubName</strong> (optional) must match a club defined for the active organization.</li>
                     <li><strong>PrimaryTeamName</strong> (optional) must match an existing team name. Player will be added if age-eligible.</li>
+                    <li><strong>IsAllrounder</strong> (optional) — <strong>true/yes/1</strong> or <strong>false/no/0</strong>. Only applies when PrimarySkill is Batting or Bowling. Effective Skill is always derived automatically.</li>
                   </ul>
                 </AlertDescription>
               </Alert>

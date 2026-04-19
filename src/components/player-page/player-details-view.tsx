@@ -99,6 +99,12 @@ export function PlayerDetailsView({ player, effectivePermissions, userProfile }:
           {player.age !== undefined && <InfoItem icon={<Cake />} label="Age" value={`${player.age} years`} />}
           {player.dateOfBirth && <InfoItem icon={<CalendarDays />} label="Born" value={format(parseISO(player.dateOfBirth), 'PPP')} />}
           <InfoItem icon={getSkillIcon(player.primarySkill)} label="Primary Skill" value={player.primarySkill} />
+          {(player.primarySkill === 'Batting' || player.primarySkill === 'Bowling') && (
+            <InfoItem icon={<UserCheck />} label="Allrounder" value={player.isAllrounder ? 'Yes' : 'No'} />
+          )}
+          {player.effectiveSkill && player.effectiveSkill !== player.primarySkill && (
+            <InfoItem icon={getSkillIcon(player.primarySkill)} label="Effective Skill" value={player.effectiveSkill} />
+          )}
           <InfoItem icon={<CricketBatIcon />} label="Batting Hand" value={player.dominantHandBatting} />
           {player.battingOrder && <InfoItem icon={<ListOrdered />} label="Batting Order" value={player.battingOrder} />}
           {player.dominantHandBowling && <InfoItem icon={<CricketBallIcon />} label="Bowling Hand" value={player.dominantHandBowling} />}

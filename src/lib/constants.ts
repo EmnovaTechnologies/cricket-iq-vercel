@@ -4,6 +4,8 @@ export const RATING_VALUES = ['Not Rated', 'Not Applicable', '0.5', '1.0', '1.5'
 
 export const PRIMARY_SKILLS = ['Batting', 'Bowling', 'Wicket Keeping'] as const;
 
+export const EFFECTIVE_SKILLS = ['Batting', 'Bowling', 'Wicket Keeping', 'Batting Allrounder', 'Bowling Allrounder'] as const;
+
 export const BATTING_ORDERS = ['Top Order', 'Middle Order', 'Low Order'] as const;
 
 export const BOWLING_STYLES = [
