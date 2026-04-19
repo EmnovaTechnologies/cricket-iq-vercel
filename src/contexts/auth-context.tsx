@@ -279,6 +279,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (displayName && userCredential.user) {
         await updateFirebaseProfile(userCredential.user, { displayName });
       }
+
+      // ── Create user profile immediately while we have the token ──
+      // We cannot rely on onAuthStateChanged to do this later because:
+      // 1. The email verification gate blocks loadUserProfileAndData for unverified users
+      // 2. pendingRegistrationToken state is lost when the user navigates away to verify email
+      // Calling createUserProfile now ensures the player role + userId link are written
+      // before we sign out.
+      await createUserProfile(
+        userCredential.user.uid,
+        userCredential.user.email,
+        displayName,
+        userCredential.user.phoneNumber,
+        null, // targetOrgId — derived from player doc via token
+        registrationToken
+      );
+      setPendingRegistrationToken(null);
+
       // Send verification email then sign out — user must verify before accessing app
       await sendEmailVerification(userCredential.user);
       await signOut(auth);
