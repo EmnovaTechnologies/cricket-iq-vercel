@@ -20,11 +20,15 @@ import { useAuth } from '@/contexts/auth-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 
-const EXPECTED_HEADERS = [
+// Headers required for validation — IsAllrounder is optional so not included here
+const REQUIRED_HEADERS = [
   'FirstName', 'LastName', 'CricClubsID', 'DateOfBirth', 'Gender', 'PrimarySkill',
   'DominantHandBatting', 'BattingOrder', 'DominantHandBowling',
   'BowlingStyle', 'PrimaryClubName', 'PrimaryTeamName'
 ];
+
+// All expected headers including optional ones
+const EXPECTED_HEADERS = [...REQUIRED_HEADERS, 'IsAllrounder'];
 
 interface PlayerImportFormProps {
   mode?: 'csv' | 'xlsx';
@@ -74,10 +78,10 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
         skipEmptyLines: true,
         complete: (results) => {
           const headers = results.meta.fields;
-          if (!headers || !EXPECTED_HEADERS.every(h => headers.includes(h))) {
+          if (!headers || !REQUIRED_HEADERS.every(h => headers.includes(h))) {
             toast({
               title: 'Invalid CSV Headers',
-              description: `CSV must contain headers: ${EXPECTED_HEADERS.join(', ')}. Found: ${headers?.join(', ') || 'None'}`,
+              description: `CSV must contain headers: ${REQUIRED_HEADERS.join(', ')}. Found: ${headers?.join(', ') || 'None'}`,
               variant: 'destructive',
             });
             setFile(null);
@@ -198,10 +202,10 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
           const cell = worksheet[XLSX.utils.encode_cell({ r: 0, c })];
           headers.push(cell ? String(cell.v).trim() : '');
         }
-        if (!EXPECTED_HEADERS.every(h => headers.includes(h))) {
+        if (!REQUIRED_HEADERS.every(h => headers.includes(h))) {
           toast({
             title: 'Invalid Excel Headers',
-            description: `Excel must contain: ${EXPECTED_HEADERS.join(', ')}. Found: ${headers.filter(Boolean).join(', ')}`,
+            description: `Excel must contain: ${REQUIRED_HEADERS.join(', ')}. Found: ${headers.filter(Boolean).join(', ')}`,
             variant: 'destructive',
           });
           setXlsxFile(null); setXlsxFileName(null); event.target.value = '';
@@ -242,21 +246,23 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
         BowlingStyle:       ['Fast', 'Medium', 'Off Spin', 'Leg Spin', 'Left Hand - Orthodox', 'Left Hand - Unorthodox'],
         PrimaryClubName:    data.clubs,
         PrimaryTeamName:    data.teams,
+        IsAllrounder:       ['true', 'false'],
       };
 
       const HEADERS = [
-        { key: 'FirstName',          label: 'FirstName',          width: 16, color: '2E75B6' }, // required
-        { key: 'LastName',           label: 'LastName',           width: 16, color: '2E75B6' }, // required
+        { key: 'FirstName',          label: 'FirstName',          width: 16, color: '2E75B6' },
+        { key: 'LastName',           label: 'LastName',           width: 16, color: '2E75B6' },
         { key: 'CricClubsID',        label: 'CricClubsID',        width: 18, color: '1F4E79' },
         { key: 'DateOfBirth',        label: 'DateOfBirth',        width: 16, color: '1F4E79' },
         { key: 'Gender',             label: 'Gender',             width: 12, color: '1F4E79' },
         { key: 'PrimarySkill',       label: 'PrimarySkill',       width: 20, color: '1F4E79' },
         { key: 'DominantHandBatting',label: 'DominantHandBatting',width: 22, color: '1F4E79' },
         { key: 'BattingOrder',       label: 'BattingOrder',       width: 18, color: '1F4E79' },
-        { key: 'DominantHandBowling',label: 'DominantHandBowling',width: 22, color: 'F4B942' }, // conditional
-        { key: 'BowlingStyle',       label: 'BowlingStyle',       width: 32, color: 'F4B942' }, // conditional
+        { key: 'DominantHandBowling',label: 'DominantHandBowling',width: 22, color: 'F4B942' },
+        { key: 'BowlingStyle',       label: 'BowlingStyle',       width: 32, color: 'F4B942' },
         { key: 'PrimaryClubName',    label: 'PrimaryClubName',    width: 22, color: '1F4E79' },
         { key: 'PrimaryTeamName',    label: 'PrimaryTeamName',    width: 26, color: '1F4E79' },
+        { key: 'IsAllrounder',       label: 'IsAllrounder',       width: 16, color: '1F4E79' },
       ];
 
       const ExcelJS = (await import('exceljs')).default;
@@ -362,6 +368,7 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
       addVVSection('BATTING ORDER',         LISTS.BattingOrder);
       addVVSection('DOMINANT HAND BOWLING (required if Bowling)', LISTS.DominantHandBowling);
       addVVSection('BOWLING STYLE (required if Bowling)',          LISTS.BowlingStyle);
+      addVVSection('IS ALLROUNDER (optional — Batting/Bowling only)', LISTS.IsAllrounder);
       if (data.clubs.length > 0) addVVSection('PRIMARY CLUB NAME (your organization)', data.clubs);
       if (data.teams.length > 0) addVVSection('PRIMARY TEAM NAME (your organization)', data.teams);
 
@@ -402,6 +409,7 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
       instrWs.addRow(['BowlingStyle',        'CONDITIONAL', 'Required if PrimarySkill = Bowling. Select from dropdown.']);
       instrWs.addRow(['PrimaryClubName',     'Optional',    'Must match a club in your organization. Select from dropdown.']);
       instrWs.addRow(['PrimaryTeamName',     'Optional',    'Must match a team in your organization. Select from dropdown.']);
+      instrWs.addRow(['IsAllrounder',        'Optional',    'true or false. Only applies when PrimarySkill is Batting or Bowling. Effective Skill is derived automatically.']);
       instrWs.addRow(['']);
       addI(['TIPS', '', ''], true);
       ['Do NOT change the column headers in row 1.',
