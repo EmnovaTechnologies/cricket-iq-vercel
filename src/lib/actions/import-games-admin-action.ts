@@ -7,6 +7,7 @@ import { isPlayerAgeEligibleForSeriesFromDB } from '../db';
 
 interface CsvGameRow {
   GameDate: string;
+  Time?: string;
   SeriesName: string;
   VenueName: string;
   Team1Name: string;
@@ -29,17 +30,41 @@ interface GameImportResult {
   errors: GameImportError[];
 }
 
-export async function importGamesAdminAction(gamesData: CsvGameRow[]): Promise<GameImportResult> {
+export async function importGamesAdminAction(gamesData: CsvGameRow[], organizationId?: string): Promise<GameImportResult> {
   const errors: GameImportError[] = [];
   let successfulImports = 0;
   const gamesToAdd: any[] = [];
 
+  if (!organizationId) {
+    return {
+      success: false,
+      message: 'Cannot import games: Organization context is missing. Please ensure an organization is active.',
+      successfulImports: 0,
+      failedImports: gamesData.length,
+      errors: [{ rowNumber: 0, csvRow: {}, error: 'Critical: Organization ID missing for import.' }],
+    };
+  }
+
+  // Normalize helper — trim, collapse spaces, lowercase
+  const normalize = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+
   try {
-    // Fetch all active series once
-    const seriesSnap = await adminDb.collection('series').where('status', '==', 'active').get();
+    // Fetch active series scoped to this organization only
+    const seriesSnap = await adminDb.collection('series')
+      .where('status', '==', 'active')
+      .where('organizationId', '==', organizationId)
+      .get();
     const seriesMapByName = new Map(
-      seriesSnap.docs.map(d => [d.data().name.trim().toLowerCase(), { id: d.id, ...d.data() }])
+      seriesSnap.docs.map(d => [normalize(d.data().name), { id: d.id, ...d.data() }])
     );
+
+    // Pre-fetch all teams for this org for case-insensitive matching
+    const teamsSnap = await adminDb.collection('teams')
+      .where('organizationId', '==', organizationId)
+      .get();
+    const allOrgTeams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    const findTeam = (name: string) =>
+      allOrgTeams.find(t => typeof t.name === 'string' && normalize(t.name) === normalize(name));
 
     for (let i = 0; i < gamesData.length; i++) {
       const row = gamesData[i];
@@ -47,6 +72,7 @@ export async function importGamesAdminAction(gamesData: CsvGameRow[]): Promise<G
 
       try {
         const GameDate        = row.GameDate?.trim();
+        const GameTime        = row.Time?.trim();
         const RawSeriesName   = row.SeriesName?.trim();
         const rawVenueName    = row.VenueName?.trim();
         const RawTeam1Name    = row.Team1Name?.trim();
@@ -55,30 +81,22 @@ export async function importGamesAdminAction(gamesData: CsvGameRow[]): Promise<G
 
         // Validate Series
         if (!RawSeriesName) { errors.push({ rowNumber, csvRow: row, error: 'SeriesName is missing.' }); continue; }
-        const series = seriesMapByName.get(RawSeriesName.toLowerCase()) as any;
-        if (!series?.organizationId) { errors.push({ rowNumber, csvRow: row, error: `Series "${RawSeriesName}" not found or not active.` }); continue; }
+        const series = seriesMapByName.get(normalize(RawSeriesName)) as any;
+        if (!series?.organizationId) { errors.push({ rowNumber, csvRow: row, error: `Series "${RawSeriesName}" not found or not active in your organization.` }); continue; }
 
         const participatingTeams: string[] = series.participatingTeams || [];
         const venueIds: string[] = series.venueIds || [];
 
-        // Validate Team1
+        // Validate Team1 — case-insensitive match against pre-fetched org teams
         if (!RawTeam1Name) { errors.push({ rowNumber, csvRow: row, error: 'Team1Name is missing.' }); continue; }
-        const team1Snap = await adminDb.collection('teams')
-          .where('name', '==', RawTeam1Name)
-          .where('organizationId', '==', series.organizationId)
-          .limit(1).get();
-        if (team1Snap.empty) { errors.push({ rowNumber, csvRow: row, error: `Team1 "${RawTeam1Name}" not found.` }); continue; }
-        const team1 = { id: team1Snap.docs[0].id, ...team1Snap.docs[0].data() } as any;
+        const team1 = findTeam(RawTeam1Name);
+        if (!team1) { errors.push({ rowNumber, csvRow: row, error: `Team1 "${RawTeam1Name}" not found.` }); continue; }
         if (!participatingTeams.includes(team1.id)) { errors.push({ rowNumber, csvRow: row, error: `Team1 "${RawTeam1Name}" is not in series "${series.name}".` }); continue; }
 
-        // Validate Team2
+        // Validate Team2 — case-insensitive match against pre-fetched org teams
         if (!RawTeam2Name) { errors.push({ rowNumber, csvRow: row, error: 'Team2Name is missing.' }); continue; }
-        const team2Snap = await adminDb.collection('teams')
-          .where('name', '==', RawTeam2Name)
-          .where('organizationId', '==', series.organizationId)
-          .limit(1).get();
-        if (team2Snap.empty) { errors.push({ rowNumber, csvRow: row, error: `Team2 "${RawTeam2Name}" not found.` }); continue; }
-        const team2 = { id: team2Snap.docs[0].id, ...team2Snap.docs[0].data() } as any;
+        const team2 = findTeam(RawTeam2Name);
+        if (!team2) { errors.push({ rowNumber, csvRow: row, error: `Team2 "${RawTeam2Name}" not found.` }); continue; }
         if (!participatingTeams.includes(team2.id)) { errors.push({ rowNumber, csvRow: row, error: `Team2 "${RawTeam2Name}" is not in series "${series.name}".` }); continue; }
         if (team1.id === team2.id) { errors.push({ rowNumber, csvRow: row, error: 'Team1Name and Team2Name cannot be the same.' }); continue; }
 
@@ -93,11 +111,27 @@ export async function importGamesAdminAction(gamesData: CsvGameRow[]): Promise<G
         if (venue.status !== 'active') { errors.push({ rowNumber, csvRow: row, error: `Venue "${rawVenueName}" is not active.` }); continue; }
         if (!venueIds.includes(venue.id)) { errors.push({ rowNumber, csvRow: row, error: `Venue "${rawVenueName}" is not associated with series "${series.name}".` }); continue; }
 
-        // Validate Date
+        // Validate Date and merge optional Time
         if (!GameDate) { errors.push({ rowNumber, csvRow: row, error: 'GameDate is missing.' }); continue; }
         const parsedDate = parse(GameDate, 'MM/dd/yyyy', new Date());
         if (!isValid(parsedDate)) { errors.push({ rowNumber, csvRow: row, error: `Invalid GameDate "${GameDate}". Use MM/DD/YYYY.` }); continue; }
-        const normalizedDate = parsedDate.toISOString();
+        let normalizedDate = parsedDate.toISOString();
+        if (GameTime && GameTime !== '') {
+          const timeMatch = GameTime.match(/^(\d+):(\d{2})\s*(AM|PM)$/i);
+          if (timeMatch) {
+            let hours = parseInt(timeMatch[1], 10);
+            const minutes = parseInt(timeMatch[2], 10);
+            const period = timeMatch[3].toUpperCase();
+            if (period === 'PM' && hours !== 12) hours += 12;
+            if (period === 'AM' && hours === 12) hours = 0;
+            const d = new Date(parsedDate);
+            d.setHours(hours, minutes, 0, 0);
+            normalizedDate = d.toISOString();
+          } else {
+            errors.push({ rowNumber, csvRow: row, error: `Invalid Time format: "${GameTime}". Use H:MM AM/PM e.g. 8:00 AM.` });
+            continue;
+          }
+        }
 
         // Check duplicate
         const existingSnap = await adminDb.collection('games')

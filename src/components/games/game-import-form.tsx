@@ -84,7 +84,7 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
     setIsLoading(true); setImportResult(null); setCurrentProgress(0);
     try {
       const interval = setInterval(() => setCurrentProgress(p => p < 90 ? p + 10 : p), 200);
-      const result = await importGamesAction(parsedData);
+      const result = await importGamesAction(parsedData, activeOrganizationId || undefined);
       clearInterval(interval); setCurrentProgress(100); setImportResult(result);
       toast({ title: result.success ? 'Import Completed' : 'Import Failed', description: `${result.successfulImports} imported, ${result.failedImports} failed.`, variant: result.success ? 'default' : 'destructive' });
     } catch {
@@ -144,7 +144,7 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
     setXlsxIsLoading(true); setXlsxImportResult(null); setXlsxProgress(0);
     try {
       const interval = setInterval(() => setXlsxProgress(p => p < 90 ? p + 10 : p), 200);
-      const result = await importGamesAdminAction(xlsxParsedData);
+      const result = await importGamesAdminAction(xlsxParsedData, activeOrganizationId || undefined);
       clearInterval(interval); setXlsxProgress(100); setXlsxImportResult(result);
       toast({ title: result.success ? 'Import Completed' : 'Import Failed', description: `${result.successfulImports} imported, ${result.failedImports} failed.`, variant: result.success ? 'default' : 'destructive' });
     } catch {

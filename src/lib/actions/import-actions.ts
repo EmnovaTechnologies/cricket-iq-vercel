@@ -63,14 +63,24 @@ import { isValid, parse, format } from 'date-fns';
 import { AGE_CATEGORIES, PRIMARY_SKILLS, BATTING_ORDERS, BOWLING_STYLES, DOMINANT_HANDS, GENDERS } from '../constants';
 
 
-export async function importGamesAction(gamesData: CsvGameImportRow[]): Promise<GameImportResult> {
+export async function importGamesAction(gamesData: CsvGameImportRow[], organizationIdForImport?: string): Promise<GameImportResult> {
   const errors: GameImportError[] = [];
   let successfulImports = 0;
   const gamesToBatchAdd: Omit<Game, 'id' | 'seriesName' | 'status' | 'selectorCertifications' | 'ratingsFinalized' | 'createdAt'>[] = [];
 
+  if (!organizationIdForImport) {
+    return {
+      success: false,
+      message: 'Cannot import games: Organization context is missing. Please ensure an organization is active.',
+      successfulImports: 0,
+      failedImports: gamesData.length,
+      errors: [{ rowNumber: 0, csvRow: {}, error: 'Critical: Organization ID missing for import.' }],
+    };
+  }
+
   try {
-    // Fetch all active series once, as series names need to be looked up
-    const allActiveSeries = await getAllSeriesFromDB('active');
+    // Fetch active series scoped to this organization only
+    const allActiveSeries = await getAllSeriesFromDB('active', organizationIdForImport);
     const seriesMapByName = new Map(allActiveSeries.map(s => [s.name.trim().toLowerCase(), s]));
 
     for (let i = 0; i < gamesData.length; i++) {
