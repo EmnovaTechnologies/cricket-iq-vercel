@@ -371,25 +371,34 @@ export async function getTeamByIdFromDB(id: string): Promise<Team | undefined> {
 
 export async function getTeamByNameFromDB(name: string, organizationId?: string): Promise<Team | undefined> {
   if (!name || name.trim() === "") return undefined;
-  const trimmedName = name.trim();
-  const queryConstraints: QueryConstraint[] = [where('name', '==', trimmedName), limit(1)];
+  // Normalize: trim, collapse multiple spaces, lowercase for comparison
+  const normalize = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+  const normalizedInput = normalize(name);
+
+  // Fetch all teams for the org and do case-insensitive comparison in JS
+  // (Firestore does not support case-insensitive queries natively)
+  const queryConstraints: QueryConstraint[] = [];
   if (organizationId) {
     queryConstraints.push(where('organizationId', '==', organizationId));
   }
   const teamsQuery = query(collection(db, 'teams'), ...queryConstraints);
   const teamSnapshot = await getDocs(teamsQuery);
-  if (!teamSnapshot.empty) {
-    const docSnapshot = teamSnapshot.docs[0];
-    const data = docSnapshot.data();
-    return {
-      id: docSnapshot.id,
-      ...data,
-      name: data.name.trim(),
-      clubName: data.clubName || 'N/A', // Add default
-      teamManagerUids: data.teamManagerUids || [],
-    } as Team;
-  }
-  return undefined;
+  if (teamSnapshot.empty) return undefined;
+
+  const match = teamSnapshot.docs.find(doc => {
+    const dbName = doc.data().name;
+    return typeof dbName === 'string' && normalize(dbName) === normalizedInput;
+  });
+
+  if (!match) return undefined;
+  const data = match.data();
+  return {
+    id: match.id,
+    ...data,
+    name: data.name.trim(),
+    clubName: data.clubName || 'N/A',
+    teamManagerUids: data.teamManagerUids || [],
+  } as Team;
 }
 
 export async function addTeamToDB(teamData: Omit<Team, 'id' | 'playerIds'> & { organizationId: string }): Promise<Team> {
