@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
-import { getScorecardByIdAction, deleteScorecardAction } from '@/lib/actions/scorecard-actions';
+import { getScorecardByIdAction, deleteScorecardAction, linkScorecardToGameAction, unlinkScorecardFromGameAction, getUnlinkedGamesForSeriesAction } from '@/lib/actions/scorecard-actions';
 import { getMatchReportsForScorecardAction } from '@/lib/actions/match-report-actions';
 import { ScorecardSelectorAssignmentPanel } from '@/components/scorecards/scorecard-selector-assignment';
 import type { MatchScorecard, ScorecardSelectorAssignment, UserProfile } from '@/types';
@@ -21,7 +21,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import { ArrowLeft, Loader2, ShieldAlert, Table, CalendarFold, MapPin, ExternalLink, Trash2, FileText, QrCode, Link2 } from 'lucide-react';
+import { ArrowLeft, Loader2, ShieldAlert, Table, CalendarFold, MapPin, ExternalLink, Trash2, FileText, QrCode, Link2, Link2Off, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
@@ -45,6 +45,15 @@ export default function ScorecardDetailsPage() {
   const [selectorAssignments, setSelectorAssignments] = useState<ScorecardSelectorAssignment[]>([]);
   const [availableSelectors, setAvailableSelectors] = useState<UserProfile[]>([]);
 
+  // Link to game state
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [unlinkedGames, setUnlinkedGames] = useState<{ id: string; team1: string; team2: string; date: string }[]>([]);
+  const [isLoadingGames, setIsLoadingGames] = useState(false);
+  const [isLinking, setIsLinking] = useState(false);
+  const [isUnlinking, setIsUnlinking] = useState(false);
+  const [linkedGameName, setLinkedGameName] = useState<string | null>(null);
+  const [gameSearchQuery, setGameSearchQuery] = useState('');
+
   // Derived permissions — defined before useEffects so they can be used as dependencies
   const canEditLinks = effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
@@ -65,6 +74,48 @@ export default function ScorecardDetailsPage() {
       setIsDeleting(false);
       setShowDeleteDialog(false);
     }
+  };
+
+  const openLinkDialog = async () => {
+    if (!scorecard?.seriesId || !activeOrganizationId) {
+      toast({ title: 'Cannot link', description: 'This scorecard must be associated with a series before linking to a game.', variant: 'destructive' });
+      return;
+    }
+    setIsLoadingGames(true);
+    setGameSearchQuery('');
+    setShowLinkDialog(true);
+    const res = await getUnlinkedGamesForSeriesAction(activeOrganizationId, scorecard.seriesId);
+    setUnlinkedGames(res.games);
+    setIsLoadingGames(false);
+  };
+
+  const handleLinkToGame = async (gameId: string, gameName: string) => {
+    if (!scorecard) return;
+    setIsLinking(true);
+    const res = await linkScorecardToGameAction(scorecard.id, gameId);
+    if (res.success) {
+      setScorecard(prev => prev ? { ...prev, linkedGameId: gameId } : prev);
+      setLinkedGameName(gameName);
+      setShowLinkDialog(false);
+      toast({ title: 'Linked', description: `Scorecard linked to ${gameName}.` });
+    } else {
+      toast({ title: 'Link failed', description: res.error, variant: 'destructive' });
+    }
+    setIsLinking(false);
+  };
+
+  const handleUnlinkFromGame = async () => {
+    if (!scorecard?.linkedGameId) return;
+    setIsUnlinking(true);
+    const res = await unlinkScorecardFromGameAction(scorecard.id, scorecard.linkedGameId);
+    if (res.success) {
+      setScorecard(prev => prev ? { ...prev, linkedGameId: undefined } : prev);
+      setLinkedGameName(null);
+      toast({ title: 'Unlinked', description: 'Scorecard unlinked from game.' });
+    } else {
+      toast({ title: 'Unlink failed', description: res.error, variant: 'destructive' });
+    }
+    setIsUnlinking(false);
   };
 
   useEffect(() => {
@@ -153,6 +204,84 @@ export default function ScorecardDetailsPage() {
               </a>
             </Button>
           )}
+
+          {/* ── Link / Unlink Game ── */}
+          {canEditLinks && (
+            scorecard.linkedGameId ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleUnlinkFromGame}
+                disabled={isUnlinking}
+                className="border-amber-400 text-amber-700 hover:bg-amber-50"
+              >
+                {isUnlinking
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <Link2Off className="mr-2 h-4 w-4" />}
+                Unlink Game
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={openLinkDialog}>
+                <Link2 className="mr-2 h-4 w-4" /> Link to Game
+              </Button>
+            )
+          )}
+
+          {/* Link to Game Dialog */}
+          <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Link2 className="h-5 w-5 text-primary" /> Link to Game
+                </DialogTitle>
+                <DialogDescription>
+                  Select a game from the same series to link this scorecard to. Only unlinked games are shown.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    className="w-full pl-9 pr-3 py-2 text-sm border rounded-md bg-background"
+                    placeholder="Search teams or date..."
+                    value={gameSearchQuery}
+                    onChange={e => setGameSearchQuery(e.target.value)}
+                  />
+                </div>
+                {isLoadingGames ? (
+                  <div className="flex justify-center py-6">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : unlinkedGames.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    No unlinked games found in this series.
+                  </p>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
+                    {unlinkedGames
+                      .filter(g => {
+                        const q = gameSearchQuery.toLowerCase();
+                        return !q || g.team1.toLowerCase().includes(q) || g.team2.toLowerCase().includes(q) || g.date.includes(q);
+                      })
+                      .map(g => (
+                        <button
+                          key={g.id}
+                          onClick={() => handleLinkToGame(g.id, `${g.team1} vs ${g.team2}`)}
+                          disabled={isLinking}
+                          className="w-full text-left px-3 py-2.5 rounded-lg border hover:bg-primary/5 hover:border-primary transition-colors text-sm"
+                        >
+                          <span className="font-medium">{g.team1} vs {g.team2}</span>
+                          <span className="text-muted-foreground ml-2 text-xs">{g.date}</span>
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowLinkDialog(false)}>Cancel</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           {/* ── Mobile QR for Match Report ── */}
           <Button variant="outline" size="sm" onClick={() => setShowQrDialog(true)}>
             <QrCode className="mr-2 h-4 w-4" /> Match Report QR
@@ -291,6 +420,28 @@ export default function ScorecardDetailsPage() {
               </div>
             ))}
           </div>
+
+          {/* Linked game indicator */}
+          {scorecard.linkedGameId ? (
+            <div className="flex items-center gap-2 mt-3 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              <Link2 className="h-3.5 w-3.5 shrink-0" />
+              <span>Linked to game</span>
+              {linkedGameName && <span className="font-medium">{linkedGameName}</span>}
+              <Link href={`/games/${scorecard.linkedGameId}/details`} className="ml-auto underline hover:text-green-900 shrink-0">
+                View Game
+              </Link>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <Link2Off className="h-3.5 w-3.5 shrink-0" />
+              <span>Not linked to a game.</span>
+              {canEditLinks && (
+                <button onClick={openLinkDialog} className="ml-auto underline hover:text-amber-900 shrink-0">
+                  Link now
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Selector assignment — admin/series admin only */}
           {canEditLinks && (

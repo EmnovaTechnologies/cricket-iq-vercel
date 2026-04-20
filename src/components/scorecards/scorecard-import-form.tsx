@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { parseAllScorecardImagesAction, type ImageInput } from '@/lib/actions/parse-scorecard-action';
-import { saveScorecardAction, checkDuplicateScorecardAction } from '@/lib/actions/scorecard-actions';
+import { saveScorecardAction, checkDuplicateScorecardAction, autoMatchGameAction, linkScorecardToGameAction } from '@/lib/actions/scorecard-actions';
 import { parseCricClubsUrl } from '@/lib/utils/cricclubs-utils';
 import { parseCricClubsCsv, xlsxToCsv, type ParsedCricClubsScorecard } from '@/lib/utils/cricclubs-xls-parser';
 import { getAllSeriesFromDB, getAllTeamsFromDB } from '@/lib/db';
@@ -355,7 +355,24 @@ export function ScorecardImportForm() {
       }, currentUser.uid);
 
       if (res.success) {
-        toast({ title: 'Scorecard Saved', description: 'Scorecard imported successfully.' });
+        // Auto-match to existing game if not already linked via URL param
+        if (!linkedGameId && res.scorecardId && finalSeriesId) {
+          const match = await autoMatchGameAction({
+            organizationId: activeOrganizationId,
+            seriesId: finalSeriesId,
+            team1: team1.trim(),
+            team2: team2.trim(),
+            date,
+          });
+          if (match.gameId) {
+            await linkScorecardToGameAction(res.scorecardId, match.gameId);
+            toast({ title: 'Scorecard Saved', description: `Scorecard imported and automatically linked to game ${match.gameName}.` });
+          } else {
+            toast({ title: 'Scorecard Saved', description: 'Scorecard imported. No matching game found — you can link it manually from the scorecard details page.' });
+          }
+        } else {
+          toast({ title: 'Scorecard Saved', description: 'Scorecard imported successfully.' });
+        }
         router.push('/scorecards');
       } else {
         toast({ title: 'Save Failed', description: res.error, variant: 'destructive' });

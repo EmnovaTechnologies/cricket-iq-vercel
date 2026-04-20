@@ -564,6 +564,129 @@ export async function getScorecardsForSelectorAction(
   }
 }
 
+// ─── Auto-match Scorecard to Game ────────────────────────────────────────────
+
+/**
+ * Attempt to find a game matching the scorecard's org, series, teams and date.
+ * Teams are matched order-insensitively. Date is matched on the date portion only
+ * (ignoring time) since the scorecard date is YYYY-MM-DD and game dates include time.
+ */
+export async function autoMatchGameAction(params: {
+  organizationId: string;
+  seriesId?: string;
+  team1: string;
+  team2: string;
+  date: string; // YYYY-MM-DD
+}): Promise<{ gameId?: string; gameName?: string; error?: string }> {
+  try {
+    const { organizationId, seriesId, team1, team2, date } = params;
+    const normalize = (s: string) => s.trim().toLowerCase();
+
+    let q = adminDb.collection('games')
+      .where('organizationId', '==', organizationId);
+    if (seriesId) q = q.where('seriesId', '==', seriesId) as any;
+
+    const snap = await (q as any).get();
+    if (snap.empty) return {};
+
+    for (const doc of snap.docs) {
+      const g = doc.data();
+      // Match date on date portion only (game.date is ISO string)
+      const gameDate = (g.date || '').slice(0, 10);
+      if (gameDate !== date) continue;
+      // Teams match order-insensitively
+      const t1 = normalize(g.team1 || '');
+      const t2 = normalize(g.team2 || '');
+      const sc1 = normalize(team1);
+      const sc2 = normalize(team2);
+      if ((t1 === sc1 && t2 === sc2) || (t1 === sc2 && t2 === sc1)) {
+        return { gameId: doc.id, gameName: `${g.team1} vs ${g.team2}` };
+      }
+    }
+    return {};
+  } catch (error: any) {
+    console.error('[autoMatchGameAction] Error:', error);
+    return { error: error.message };
+  }
+}
+
+// ─── Link Scorecard to Game ───────────────────────────────────────────────────
+
+/**
+ * Bidirectionally links a scorecard to a game:
+ * - Sets linkedGameId on the scorecard document
+ * - Sets existingScorecardId on the game document
+ */
+export async function linkScorecardToGameAction(
+  scorecardId: string,
+  gameId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const batch = adminDb.batch();
+    batch.update(adminDb.collection('matchScorecards').doc(scorecardId), { linkedGameId: gameId });
+    batch.update(adminDb.collection('games').doc(gameId), { existingScorecardId: scorecardId });
+    await batch.commit();
+    return { success: true };
+  } catch (error: any) {
+    console.error('[linkScorecardToGameAction] Error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── Unlink Scorecard from Game ───────────────────────────────────────────────
+
+export async function unlinkScorecardFromGameAction(
+  scorecardId: string,
+  gameId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const batch = adminDb.batch();
+    batch.update(adminDb.collection('matchScorecards').doc(scorecardId), {
+      linkedGameId: admin.firestore.FieldValue.delete(),
+    });
+    batch.update(adminDb.collection('games').doc(gameId), {
+      existingScorecardId: admin.firestore.FieldValue.delete(),
+    });
+    await batch.commit();
+    return { success: true };
+  } catch (error: any) {
+    console.error('[unlinkScorecardFromGameAction] Error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── Get Unlinked Games for Series ───────────────────────────────────────────
+
+/**
+ * Returns games in a series that don't have a scorecard linked yet.
+ * Used for the manual "Link to Game" picker on the scorecard details page.
+ */
+export async function getUnlinkedGamesForSeriesAction(
+  organizationId: string,
+  seriesId: string,
+): Promise<{ games: { id: string; team1: string; team2: string; date: string }[]; error?: string }> {
+  try {
+    const gamesSnap = await adminDb.collection('games')
+      .where('organizationId', '==', organizationId)
+      .where('seriesId', '==', seriesId)
+      .get();
+
+    const games = gamesSnap.docs
+      .filter(d => !d.data().existingScorecardId)
+      .map(d => ({
+        id: d.id,
+        team1: d.data().team1,
+        team2: d.data().team2,
+        date: (d.data().date || '').slice(0, 10),
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    return { games };
+  } catch (error: any) {
+    return { games: [], error: error.message };
+  }
+}
+
 // ─── Get Scorecard for Game ───────────────────────────────────────────────────
 
 export async function getScorecardForGameAction(
