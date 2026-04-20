@@ -66,6 +66,12 @@ export async function importGamesAdminAction(gamesData: CsvGameRow[], organizati
     const findTeam = (name: string) =>
       allOrgTeams.find(t => typeof t.name === 'string' && normalize(t.name) === normalize(name));
 
+    // ── DEBUG LOGGING ────────────────────────────────────────────────────────
+    console.log(`[importGamesAdminAction] orgId received: ${organizationId}`);
+    console.log(`[importGamesAdminAction] series found (${seriesSnap.size}):`, [...seriesMapByName.keys()]);
+    console.log(`[importGamesAdminAction] teams found (${allOrgTeams.length}):`, allOrgTeams.map(t => `${t.name} [${t.id}]`));
+    // ────────────────────────────────────────────────────────────────────────
+
     for (let i = 0; i < gamesData.length; i++) {
       const row = gamesData[i];
       const rowNumber = i + 2;
@@ -91,13 +97,19 @@ export async function importGamesAdminAction(gamesData: CsvGameRow[], organizati
         if (!RawTeam1Name) { errors.push({ rowNumber, csvRow: row, error: 'Team1Name is missing.' }); continue; }
         const team1 = findTeam(RawTeam1Name);
         if (!team1) { errors.push({ rowNumber, csvRow: row, error: `Team1 "${RawTeam1Name}" not found.` }); continue; }
-        if (!participatingTeams.includes(team1.id)) { errors.push({ rowNumber, csvRow: row, error: `Team1 "${RawTeam1Name}" is not in series "${series.name}".` }); continue; }
+        if (!participatingTeams.includes(team1.id)) {
+          console.log(`[Row ${rowNumber}] Team1 "${RawTeam1Name}" found as id=${team1.id} but participatingTeams=${JSON.stringify(participatingTeams)}`);
+          errors.push({ rowNumber, csvRow: row, error: `Team1 "${RawTeam1Name}" is not in series "${series.name}".` }); continue;
+        }
 
         // Validate Team2 — case-insensitive match against pre-fetched org teams
         if (!RawTeam2Name) { errors.push({ rowNumber, csvRow: row, error: 'Team2Name is missing.' }); continue; }
         const team2 = findTeam(RawTeam2Name);
         if (!team2) { errors.push({ rowNumber, csvRow: row, error: `Team2 "${RawTeam2Name}" not found.` }); continue; }
-        if (!participatingTeams.includes(team2.id)) { errors.push({ rowNumber, csvRow: row, error: `Team2 "${RawTeam2Name}" is not in series "${series.name}".` }); continue; }
+        if (!participatingTeams.includes(team2.id)) {
+          console.log(`[Row ${rowNumber}] Team2 "${RawTeam2Name}" found as id=${team2.id} but participatingTeams=${JSON.stringify(participatingTeams)}`);
+          errors.push({ rowNumber, csvRow: row, error: `Team2 "${RawTeam2Name}" is not in series "${series.name}".` }); continue;
+        }
         if (team1.id === team2.id) { errors.push({ rowNumber, csvRow: row, error: 'Team1Name and Team2Name cannot be the same.' }); continue; }
 
         // Validate Venue
