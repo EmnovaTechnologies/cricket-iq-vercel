@@ -63,14 +63,16 @@ export async function importGamesAdminAction(gamesData: CsvGameRow[], organizati
       .where('organizationId', '==', organizationId)
       .get();
     const allOrgTeams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
-    const findTeam = (name: string) =>
-      allOrgTeams.find(t => typeof t.name === 'string' && normalize(t.name) === normalize(name));
 
-    // ── DEBUG LOGGING ────────────────────────────────────────────────────────
-    console.log(`[importGamesAdminAction] orgId received: ${organizationId}`);
-    console.log(`[importGamesAdminAction] series found (${seriesSnap.size}):`, [...seriesMapByName.keys()]);
-    console.log(`[importGamesAdminAction] teams found (${allOrgTeams.length}):`, allOrgTeams.map(t => `${t.name} [${t.id}]`));
-    // ────────────────────────────────────────────────────────────────────────
+    // Find team by name — when multiple teams normalize to the same name,
+    // prefer the one that is in the series' participatingTeams array
+    const findTeam = (name: string, participatingTeams: string[]) => {
+      const matches = allOrgTeams.filter(t => typeof t.name === 'string' && normalize(t.name) === normalize(name));
+      if (matches.length === 0) return undefined;
+      // Prefer the one that's actually in this series
+      const inSeries = matches.find(t => participatingTeams.includes(t.id));
+      return inSeries || matches[0];
+    };
 
     for (let i = 0; i < gamesData.length; i++) {
       const row = gamesData[i];
@@ -93,23 +95,18 @@ export async function importGamesAdminAction(gamesData: CsvGameRow[], organizati
         const participatingTeams: string[] = series.participatingTeams || [];
         const venueIds: string[] = series.venueIds || [];
 
-        // Validate Team1 — case-insensitive match against pre-fetched org teams
+        // Validate Team1 — case-insensitive match, prefer team in this series
         if (!RawTeam1Name) { errors.push({ rowNumber, csvRow: row, error: 'Team1Name is missing.' }); continue; }
-        const team1 = findTeam(RawTeam1Name);
+        const team1 = findTeam(RawTeam1Name, participatingTeams);
         if (!team1) { errors.push({ rowNumber, csvRow: row, error: `Team1 "${RawTeam1Name}" not found.` }); continue; }
-        if (!participatingTeams.includes(team1.id)) {
-          console.log(`[Row ${rowNumber}] Team1 "${RawTeam1Name}" found as id=${team1.id} but participatingTeams=${JSON.stringify(participatingTeams)}`);
-          errors.push({ rowNumber, csvRow: row, error: `Team1 "${RawTeam1Name}" is not in series "${series.name}".` }); continue;
-        }
+        if (!participatingTeams.includes(team1.id)) { errors.push({ rowNumber, csvRow: row, error: `Team1 "${RawTeam1Name}" is not in series "${series.name}".` }); continue; }
 
-        // Validate Team2 — case-insensitive match against pre-fetched org teams
+        // Validate Team2 — case-insensitive match, prefer team in this series
         if (!RawTeam2Name) { errors.push({ rowNumber, csvRow: row, error: 'Team2Name is missing.' }); continue; }
-        const team2 = findTeam(RawTeam2Name);
+        const team2 = findTeam(RawTeam2Name, participatingTeams);
         if (!team2) { errors.push({ rowNumber, csvRow: row, error: `Team2 "${RawTeam2Name}" not found.` }); continue; }
-        if (!participatingTeams.includes(team2.id)) {
-          console.log(`[Row ${rowNumber}] Team2 "${RawTeam2Name}" found as id=${team2.id} but participatingTeams=${JSON.stringify(participatingTeams)}`);
-          errors.push({ rowNumber, csvRow: row, error: `Team2 "${RawTeam2Name}" is not in series "${series.name}".` }); continue;
-        }
+        if (!participatingTeams.includes(team2.id)) { errors.push({ rowNumber, csvRow: row, error: `Team2 "${RawTeam2Name}" is not in series "${series.name}".` }); continue; }
+        if (team1.id === team2.id) { errors.push({ rowNumber, csvRow: row, error: 'Team1Name and Team2Name cannot be the same.' }); continue; }
         if (team1.id === team2.id) { errors.push({ rowNumber, csvRow: row, error: 'Team1Name and Team2Name cannot be the same.' }); continue; }
 
         // Validate Venue
