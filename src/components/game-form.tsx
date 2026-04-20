@@ -25,12 +25,56 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 
+// Generate 30-min time slots from 6:00 AM to 10:00 PM
+const TIME_SLOTS: string[] = (() => {
+  const slots: string[] = [];
+  for (let h = 6; h <= 22; h++) {
+    for (const m of [0, 30]) {
+      if (h === 22 && m === 30) break;
+      const period = h < 12 ? 'AM' : 'PM';
+      const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      slots.push(`${hour12}:${m === 0 ? '00' : '30'} ${period}`);
+    }
+  }
+  return slots;
+})();
+
+/** Merge a Date and optional time string (e.g. '8:00 AM') into an ISO string */
+function mergeDateAndTime(date: Date, timeStr?: string): string {
+  if (!timeStr) return date.toISOString();
+  const match = timeStr.match(/^(\d+):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return date.toISOString();
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3].toUpperCase();
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  const d = new Date(date);
+  d.setHours(hours, minutes, 0, 0);
+  return d.toISOString();
+}
+
+/** Extract a time string like '8:00 AM' from an ISO date string, or undefined if midnight */
+function extractTimeFromISO(isoString?: string): string | undefined {
+  if (!isoString) return undefined;
+  try {
+    const d = new Date(isoString);
+    const h = d.getHours();
+    const m = d.getMinutes();
+    if (h === 0 && m === 0) return undefined;
+    const period = h < 12 ? 'AM' : 'PM';
+    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${hour12}:${m === 0 ? '00' : '30'} ${period}`;
+  } catch { return undefined; }
+}
+
 const gameFormSchema = z.object({
   seriesId: z.string({ required_error: 'Please select a series.' }).min(1, "Series selection is required."),
   date: z.date({
     required_error: 'A game date is required.',
     invalid_type_error: "Invalid date. Please use YYYY-MM-DD, MM/DD/YYYY, or select from calendar.",
   }),
+  gameTime: z.string().optional(),
   venue: z.string().min(1, { message: 'Venue selection is required.' }),
   team1: z.string().min(1, { message: 'Team 1 selection is required.' }),
   team2: z.string().min(1, { message: 'Team 2 selection is required.' }),
@@ -69,11 +113,13 @@ export function GameForm({ initialData, onSubmitSuccess, allSeriesForForm, prese
     defaultValues: initialData ? {
       ...initialData,
       date: initialData.date ? (isValid(new Date(initialData.date)) ? new Date(initialData.date) : undefined) : undefined,
+      gameTime: extractTimeFromISO(initialData.date),
       seriesId: defaultSeriesIdToUse,
       selectorUserIds: initialData.selectorUserIds || [],
     } : {
       seriesId: defaultSeriesIdToUse,
       date: new Date(),
+      gameTime: undefined,
       venue: '',
       team1: '',
       team2: '',
@@ -142,7 +188,7 @@ export function GameForm({ initialData, onSubmitSuccess, allSeriesForForm, prese
     try {
       const gamePayload = {
         ...data,
-        date: data.date.toISOString(),
+        date: mergeDateAndTime(data.date, data.gameTime),
         selectorUserIds: [
           ...new Set([
             ...(data.selectorUserIds || []),
@@ -245,20 +291,49 @@ export function GameForm({ initialData, onSubmitSuccess, allSeriesForForm, prese
             </Alert>
         )}
 
-        <FormField
-          control={form.control}
-          name="date"
-          render={({ field }) => (
-            <DatePickerField
-                field={field}
-                label="Game Date"
-                required
-                disabled={isCurrentSeriesArchived}
-                fromYear={new Date().getFullYear() - 2}
-                toYear={new Date().getFullYear() + 3}
-            />
-          )}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="date"
+            render={({ field }) => (
+              <DatePickerField
+                  field={field}
+                  label="Game Date"
+                  required
+                  disabled={isCurrentSeriesArchived}
+                  fromYear={new Date().getFullYear() - 2}
+                  toYear={new Date().getFullYear() + 3}
+              />
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="gameTime"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Time (Optional)</FormLabel>
+                <Select
+                  onValueChange={val => field.onChange(val === '__none__' ? undefined : val)}
+                  value={field.value || '__none__'}
+                  disabled={isCurrentSeriesArchived}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="No time set" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="__none__">No time set</SelectItem>
+                    {TIME_SLOTS.map(slot => (
+                      <SelectItem key={slot} value={slot}>{slot}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <FormField
           control={form.control}

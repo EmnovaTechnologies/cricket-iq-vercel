@@ -80,6 +80,7 @@ export async function importGamesAction(gamesData: CsvGameImportRow[]): Promise<
       try {
         // Trim all string inputs from CSV
         const GameDate = row.GameDate?.trim();
+        const GameTime = row.Time?.trim();
         const rawVenueName = row.VenueName?.trim();
         const RawSeriesName = row.SeriesName?.trim();
         const RawTeam1Name = row.Team1Name?.trim();
@@ -137,7 +138,25 @@ export async function importGamesAction(gamesData: CsvGameImportRow[]): Promise<
         if (!GameDate || GameDate === "") { errors.push({ rowNumber, csvRow: row, error: "GameDate is missing." }); continue; }
         const parsedDate = parse(GameDate, 'MM/dd/yyyy', new Date());
         if (!isValid(parsedDate)) { errors.push({ rowNumber, csvRow: row, error: `Invalid GameDate format: "${GameDate}". Use MM/DD/YYYY.` }); continue; }
-        const normalizedDateString = parsedDate.toISOString();
+
+        // Merge optional Time column (e.g. '8:00 AM', '2:00 PM')
+        let normalizedDateString = parsedDate.toISOString();
+        if (GameTime && GameTime !== '') {
+          const timeMatch = GameTime.match(/^(\d+):(\d{2})\s*(AM|PM)$/i);
+          if (timeMatch) {
+            let hours = parseInt(timeMatch[1], 10);
+            const minutes = parseInt(timeMatch[2], 10);
+            const period = timeMatch[3].toUpperCase();
+            if (period === 'PM' && hours !== 12) hours += 12;
+            if (period === 'AM' && hours === 12) hours = 0;
+            const d = new Date(parsedDate);
+            d.setHours(hours, minutes, 0, 0);
+            normalizedDateString = d.toISOString();
+          } else {
+            errors.push({ rowNumber, csvRow: row, error: `Invalid Time format: "${GameTime}". Use H:MM AM/PM e.g. 8:00 AM or 2:00 PM.` });
+            continue;
+          }
+        }
 
         // Check for existing game
         const existingGameQuery = query(
@@ -408,8 +427,6 @@ export async function importPlayersAction(playersData: CsvPlayerImportRow[], org
         const RawBowlingStyle = row.BowlingStyle?.trim();
         const PrimaryClubName = row.PrimaryClubName?.trim();
         const PrimaryTeamName = row.PrimaryTeamName?.trim();
-        const RawIsAllrounder = row.IsAllrounder?.trim().toLowerCase();
-        const isAllrounder = RawIsAllrounder === 'true' || RawIsAllrounder === 'yes' || RawIsAllrounder === '1';
 
 
         if (!CricClubsID || CricClubsID === "") { errors.push({ rowNumber, csvRow: row, error: "CricClubsID is missing." }); continue; }
@@ -467,11 +484,6 @@ export async function importPlayersAction(playersData: CsvPlayerImportRow[], org
         const nameTokens = Name.toLowerCase().split(' ').filter(Boolean);
         const searchableNameTokens = [...nameTokens, Name.toLowerCase()];
 
-        // Derive effectiveSkill
-        let effectiveSkill: string = primarySkill;
-        if (isAllrounder && primarySkill === 'Batting') effectiveSkill = 'Batting Allrounder';
-        if (isAllrounder && primarySkill === 'Bowling') effectiveSkill = 'Bowling Allrounder';
-
         playersToProcess.push({
           name: Name,
           firstName: RawFirstName,
@@ -480,16 +492,14 @@ export async function importPlayersAction(playersData: CsvPlayerImportRow[], org
           dateOfBirth,
           gender,
           primarySkill,
-          isAllrounder,
-          effectiveSkill,
           dominantHandBatting,
           battingOrder,
           dominantHandBowling,
           bowlingStyle,
           searchableNameTokens: searchableNameTokens,
           clubName: PrimaryClubName && PrimaryClubName !== "" ? PrimaryClubName : undefined,
-          primaryTeamId: primaryTeamIdToLink,
-          organizationId: organizationIdForImport,
+          primaryTeamId: primaryTeamIdToLink, 
+          organizationId: organizationIdForImport, 
         });
       } catch (rowError: any) {
         console.error(`Error processing player import row ${rowNumber}:`, rowError);
@@ -505,19 +515,17 @@ export async function importPlayersAction(playersData: CsvPlayerImportRow[], org
         const { primaryTeamId: teamIdToLinkTo, organizationId, ...playerCoreData } = playerData;
         
         const firestoreReadyPlayerData: Omit<Player, 'id' | 'gamesPlayed'> & { gamesPlayed?: number, organizationId: string, primaryTeamId?: string, clubName?: string } = {
-          name: playerCoreData.name,
+          name: playerCoreData.name, // Name is already trimmed
           firstName: playerCoreData.firstName,
           lastName: playerCoreData.lastName,
           searchableNameTokens: playerCoreData.searchableNameTokens,
-          cricClubsId: playerCoreData.cricClubsId,
+          cricClubsId: playerCoreData.cricClubsId, // ID is already trimmed
           dateOfBirth: playerCoreData.dateOfBirth,
           gender: playerCoreData.gender,
           primarySkill: playerCoreData.primarySkill,
-          isAllrounder: (playerCoreData as any).isAllrounder ?? false,
-          effectiveSkill: (playerCoreData as any).effectiveSkill ?? playerCoreData.primarySkill,
           battingOrder: playerCoreData.battingOrder,
           dominantHandBatting: playerCoreData.dominantHandBatting,
-          organizationId: organizationId,
+          organizationId: organizationId, 
           gamesPlayed: 0,
         };
 

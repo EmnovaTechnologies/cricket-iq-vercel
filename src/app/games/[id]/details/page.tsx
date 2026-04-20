@@ -432,7 +432,12 @@ export default function GameDetailsPage() {
           </div>
           <CardDescription>Details for the game played on {formattedGameDate || "loading date..."}.</CardDescription>
         </CardHeader><CardContent className="space-y-3">
-          <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-muted-foreground" /><span>{formattedGameDate ? format(parseISO(game.date), 'EEEE, MMMM do, yyyy') : "N/A"}</span></div>
+          <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-muted-foreground" /><span>{formattedGameDate ? (
+            <>
+              {format(parseISO(game.date), 'EEEE, MMMM do, yyyy')}
+              {(() => { const d = parseISO(game.date); return (d.getHours() !== 0 || d.getMinutes() !== 0) ? <span className="ml-2 text-muted-foreground">@ {format(d, 'h:mm a')}</span> : null; })()}
+            </>
+          ) : "N/A"}</span></div>
           <div className="flex items-center gap-2"><MapPin className="h-5 w-5 text-muted-foreground" /><span>Venue: {game.venue}</span></div>
           {game.seriesId && series && (<div className="flex items-center gap-2"><LayersIcon className="h-5 w-5 text-muted-foreground" /><span>Series: <Link href={`/series/${game.seriesId}/details`} className="underline text-primary hover:text-primary/80">{series.name}</Link></span></div>)}
 

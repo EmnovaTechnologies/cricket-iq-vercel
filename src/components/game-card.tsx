@@ -107,6 +107,11 @@ const GameCard: React.FC<GameCardProps> = ({ game }) => {
           <span className="flex items-center gap-1">
             <CalendarDays className="h-4 w-4" />
             {gameDate ? format(gameDate, 'PP') : 'Date N/A'}
+            {gameDate && (gameDate.getHours() !== 0 || gameDate.getMinutes() !== 0) && (
+              <span className="text-muted-foreground">
+                {format(gameDate, 'h:mm a')}
+              </span>
+            )}
           </span>
           <span className="flex items-center gap-1 truncate">
             <MapPin className="h-4 w-4" />

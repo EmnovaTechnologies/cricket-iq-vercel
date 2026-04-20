@@ -7,7 +7,6 @@ import type { SuggestedTeam as AISuggestedTeam } from '@/ai/flows/suggest-team-c
 
 export type RatingValue = typeof RATING_VALUES[number];
 export type PrimarySkill = typeof PRIMARY_SKILLS[number];
-export type EffectiveSkill = PrimarySkill | 'Batting Allrounder' | 'Bowling Allrounder';
 export type BattingOrder = typeof BATTING_ORDERS[number];
 export type BowlingStyle = typeof BOWLING_STYLES[number];
 export type DominantHand = typeof DOMINANT_HANDS[number];
@@ -82,8 +81,6 @@ export interface Player {
   clubName?: string;
   searchableNameTokens?: string[];
   primarySkill?: PrimarySkill;
-  isAllrounder?: boolean;
-  effectiveSkill?: EffectiveSkill;
   battingOrder?: BattingOrder;
   bowlingStyle?: BowlingStyle;
   dominantHandBatting?: DominantHand;
@@ -280,6 +277,7 @@ export interface RankedAllRounder {
 
 export interface CsvGameImportRow {
   GameDate: string;
+  Time?: string; // Optional — H:MM AM/PM format e.g. '8:00 AM', '2:00 PM'
   VenueName: string;
   SeriesName: string;
   Team1Name: string;
@@ -336,7 +334,6 @@ export interface CsvPlayerImportRow {
   BowlingStyle?: BowlingStyle | string;
   PrimaryClubName?: string;
   PrimaryTeamName?: string;
-  IsAllrounder?: string; // 'true'/'yes'/'1' or 'false'/'no'/'0' — EffectiveSkill is always derived
 }
 
 export interface PlayerImportError {
