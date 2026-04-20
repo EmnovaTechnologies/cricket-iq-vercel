@@ -18,7 +18,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/auth-context';
 
-const EXPECTED_HEADERS = ['GameDate', 'VenueName', 'SeriesName', 'Team1Name', 'Team2Name'];
+// Required headers for validation — Time is optional so not included
+const REQUIRED_HEADERS = ['GameDate', 'VenueName', 'SeriesName', 'Team1Name', 'Team2Name'];
+// All expected headers including optional ones
+const EXPECTED_HEADERS = [...REQUIRED_HEADERS, 'Time'];
 
 interface GameImportFormProps {
   mode?: 'csv' | 'xlsx';
@@ -60,8 +63,8 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
       header: true, skipEmptyLines: true,
       complete: (results) => {
         const headers = results.meta.fields;
-        if (!headers || !EXPECTED_HEADERS.every(h => headers.includes(h))) {
-          toast({ title: 'Invalid CSV Headers', description: `CSV must contain: ${EXPECTED_HEADERS.join(', ')}`, variant: 'destructive' });
+        if (!headers || !REQUIRED_HEADERS.every(h => headers.includes(h))) {
+          toast({ title: 'Invalid CSV Headers', description: `CSV must contain: ${REQUIRED_HEADERS.join(', ')}`, variant: 'destructive' });
           setFile(null); setFileName(null); event.target.value = ''; return;
         }
         const validRows = results.data.filter(row => EXPECTED_HEADERS.some(h => row[h] && row[h].trim() !== ''));
@@ -116,8 +119,8 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
           const cell = worksheet[XLSX.utils.encode_cell({ r: 0, c })];
           headers.push(cell ? String(cell.v).trim() : '');
         }
-        if (!EXPECTED_HEADERS.every(h => headers.includes(h))) {
-          toast({ title: 'Invalid Headers', description: `Excel must contain: ${EXPECTED_HEADERS.join(', ')}. Found: ${headers.filter(Boolean).join(', ')}`, variant: 'destructive' });
+        if (!REQUIRED_HEADERS.every(h => headers.includes(h))) {
+          toast({ title: 'Invalid Headers', description: `Excel must contain: ${REQUIRED_HEADERS.join(', ')}. Found: ${headers.filter(Boolean).join(', ')}`, variant: 'destructive' });
           setXlsxFile(null); setXlsxFileName(null); event.target.value = ''; return;
         }
         const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false, header: headers });
@@ -178,13 +181,25 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
       const teamNames   = data.teams.map(t => t.name);
       const selectorEmails = data.selectorEmails;
 
-      // Column A = series, B = venues, C = teams, D = selector emails
-      const maxRows = Math.max(seriesNames.length, venueNames.length, teamNames.length, selectorEmails.length, 1);
+      // Generate 30-min time slots 6:00 AM – 10:00 PM
+      const timeSlots: string[] = [];
+      for (let h = 6; h <= 22; h++) {
+        for (const m of [0, 30]) {
+          if (h === 22 && m === 30) break;
+          const period = h < 12 ? 'AM' : 'PM';
+          const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+          timeSlots.push(`${hour12}:${m === 0 ? '00' : '30'} ${period}`);
+        }
+      }
+
+      // Column A = series, B = venues, C = teams, D = selector emails, E = time slots
+      const maxRows = Math.max(seriesNames.length, venueNames.length, teamNames.length, selectorEmails.length, timeSlots.length, 1);
       for (let i = 0; i < maxRows; i++) {
         listsSheet.getCell(i + 1, 1).value = seriesNames[i]    || null;
         listsSheet.getCell(i + 1, 2).value = venueNames[i]     || null;
         listsSheet.getCell(i + 1, 3).value = teamNames[i]      || null;
         listsSheet.getCell(i + 1, 4).value = selectorEmails[i] || null;
+        listsSheet.getCell(i + 1, 5).value = timeSlots[i]      || null;
       }
 
       // Define named ranges for each list
@@ -192,12 +207,14 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
       const vLen = venueNames.length    || 1;
       const tLen = teamNames.length     || 1;
       const eLen = selectorEmails.length || 1;
+      const tmLen = timeSlots.length    || 1;
       wb.definedNames.add(`_Lists!$A$1:$A$${sLen}`, 'SeriesList');
       wb.definedNames.add(`_Lists!$B$1:$B$${vLen}`, 'VenueList');
       wb.definedNames.add(`_Lists!$C$1:$C$${tLen}`, 'TeamList');
       if (selectorEmails.length > 0) {
         wb.definedNames.add(`_Lists!$D$1:$D$${eLen}`, 'SelectorList');
       }
+      wb.definedNames.add(`_Lists!$E$1:$E$${tmLen}`, 'TimeList');
 
       // ── Sheet 2: Games Import ─────────────────────────────────────────────
       const ws = wb.addWorksheet('Games Import');
@@ -205,6 +222,7 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
 
       const headers = [
         { key: 'GameDate',          label: 'GameDate',          width: 16, required: true,  color: '2E75B6' },
+        { key: 'Time',              label: 'Time',              width: 14, required: false, color: navy   },
         { key: 'SeriesName',        label: 'SeriesName',        width: 36, required: true,  color: '2E75B6' },
         { key: 'VenueName',         label: 'VenueName',         width: 28, required: true,  color: '2E75B6' },
         { key: 'Team1Name',         label: 'Team1Name',         width: 28, required: true,  color: '2E75B6' },
@@ -248,24 +266,23 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
         });
 
         // Dropdowns using named ranges
+        // Col 1 = GameDate, Col 2 = Time, Col 3 = SeriesName, Col 4 = VenueName, Col 5 = Team1Name, Col 6 = Team2Name, Col 7 = GameSelectorEmails
         ws.getCell(r, 2).dataValidation = {
+          type: 'list', allowBlank: true, showErrorMessage: false,
+          formulae: ['TimeList'],
+          showDropDown: false,
+        };
+        ws.getCell(r, 3).dataValidation = {
           type: 'list', allowBlank: true, showErrorMessage: true,
           formulae: ['SeriesList'],
           errorStyle: 'warning', errorTitle: 'Invalid Series',
           error: 'Please select from the dropdown list.',
           showDropDown: false,
         };
-        ws.getCell(r, 3).dataValidation = {
+        ws.getCell(r, 4).dataValidation = {
           type: 'list', allowBlank: true, showErrorMessage: true,
           formulae: ['VenueList'],
           errorStyle: 'warning', errorTitle: 'Invalid Venue',
-          error: 'Please select from the dropdown list.',
-          showDropDown: false,
-        };
-        ws.getCell(r, 4).dataValidation = {
-          type: 'list', allowBlank: true, showErrorMessage: true,
-          formulae: ['TeamList'],
-          errorStyle: 'warning', errorTitle: 'Invalid Team',
           error: 'Please select from the dropdown list.',
           showDropDown: false,
         };
@@ -276,9 +293,16 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
           error: 'Please select from the dropdown list.',
           showDropDown: false,
         };
-        // GameSelectorEmails dropdown (col 6) — optional, allow free text too
+        ws.getCell(r, 6).dataValidation = {
+          type: 'list', allowBlank: true, showErrorMessage: true,
+          formulae: ['TeamList'],
+          errorStyle: 'warning', errorTitle: 'Invalid Team',
+          error: 'Please select from the dropdown list.',
+          showDropDown: false,
+        };
+        // GameSelectorEmails dropdown (col 7) — optional, allow free text too
         if (selectorEmails.length > 0) {
-          ws.getCell(r, 6).dataValidation = {
+          ws.getCell(r, 7).dataValidation = {
             type: 'list', allowBlank: true, showErrorMessage: false,
             formulae: ['SelectorList'],
             showDropDown: false,
@@ -370,6 +394,7 @@ export function GameImportForm({ mode = 'csv' }: GameImportFormProps) {
 
       const rules = [
         ['GameDate',          'YES',      'Date of the game. Format: MM/DD/YYYY  e.g. 04/15/2026. Type as text — do not use Excel date format.'],
+        ['Time',              'Optional', 'Game start time. Select from dropdown (6:00 AM – 10:00 PM, 30-min increments). e.g. 8:00 AM, 2:00 PM. Leave blank if unknown.'],
         ['SeriesName',        'YES',      'Must match an active series in your organization. Select from the dropdown or refer to the Valid Values sheet.'],
         ['VenueName',         'YES',      'Must match a venue already associated with the selected series. Select from dropdown or see Valid Values sheet.'],
         ['Team1Name',         'YES',      'Must match a team already in the selected series. Select from dropdown or see Valid Values sheet.'],
