@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { parseAllScorecardImagesAction, type ImageInput } from '@/lib/actions/parse-scorecard-action';
-import { saveScorecardAction, checkDuplicateScorecardAction, autoMatchGameAction, linkScorecardToGameAction } from '@/lib/actions/scorecard-actions';
+import { saveScorecardAction, checkDuplicateScorecardAction, autoMatchGameAction, linkScorecardToGameAction, getUnlinkedGamesForSeriesAction } from '@/lib/actions/scorecard-actions';
 import { parseCricClubsUrl } from '@/lib/utils/cricclubs-utils';
 import { parseCricClubsCsv, xlsxToCsv, type ParsedCricClubsScorecard } from '@/lib/utils/cricclubs-xls-parser';
 import { getAllSeriesFromDB, getAllTeamsFromDB } from '@/lib/db';
@@ -110,6 +110,12 @@ export function ScorecardImportForm() {
   const [createNewTeam1, setCreateNewTeam1] = useState(false);
   const [createNewTeam2, setCreateNewTeam2] = useState(false);
 
+  // Game auto-match state
+  const [matchedGameId, setMatchedGameId] = useState<string>(linkedGameId || '');
+  const [matchedGameName, setMatchedGameName] = useState<string>('');
+  const [availableGamesForSeries, setAvailableGamesForSeries] = useState<{ id: string; team1: string; team2: string; date: string }[]>([]);
+  const [isAutoMatchingGame, setIsAutoMatchingGame] = useState(false);
+
   const [parsedInnings, setParsedInnings] = useState<ScorecardInnings[]>([]);
   const xlsFileRef = useRef<HTMLInputElement | null>(null);
 
@@ -167,7 +173,29 @@ export function ScorecardImportForm() {
     reader.readAsDataURL(file);
   };
 
-  // ── XLS file handler ──────────────────────────────────────────────────────
+  // ── Auto-match game when series/teams/date are known ────────────────────
+  const tryAutoMatchGame = useCallback(async (
+    orgId: string, sid: string, t1: string, t2: string, d: string
+  ) => {
+    if (!sid || !t1 || !t2 || !d) return;
+    setIsAutoMatchingGame(true);
+    try {
+      // Fetch unlinked games for the series for the picker
+      const gamesRes = await getUnlinkedGamesForSeriesAction(orgId, sid);
+      setAvailableGamesForSeries(gamesRes.games);
+      // Try auto-match
+      const match = await autoMatchGameAction({ organizationId: orgId, seriesId: sid, team1: t1, team2: t2, date: d });
+      if (match.gameId) {
+        setMatchedGameId(match.gameId);
+        setMatchedGameName(match.gameName || '');
+      } else {
+        setMatchedGameId('');
+        setMatchedGameName('');
+      }
+    } finally {
+      setIsAutoMatchingGame(false);
+    }
+  }, []);
   const handleXlsUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -230,6 +258,14 @@ export function ScorecardImportForm() {
         toast({ title: 'Parsed with warnings', description: parsed.parseWarnings.slice(0, 3).join('; '), variant: 'default' });
       } else {
         toast({ title: 'File parsed', description: `${parsed.innings.length} innings found for ${parsed.team1} vs ${parsed.team2}` });
+      }
+
+      // Auto-match game if series was matched
+      if (activeOrganizationId && parsed.seriesNameRaw) {
+        const matchedS = bestMatch(parsed.seriesNameRaw, availableSeries);
+        if (matchedS && parsed.team1 && parsed.team2 && parsed.date) {
+          tryAutoMatchGame(activeOrganizationId, matchedS.id, parsed.team1, parsed.team2, parsed.date);
+        }
       }
     } catch (err: any) {
       toast({ title: 'Parse failed', description: err.message || 'Could not read the file.', variant: 'destructive' });
@@ -355,8 +391,16 @@ export function ScorecardImportForm() {
       }, currentUser.uid);
 
       if (res.success) {
-        // Auto-match to existing game if not already linked via URL param
-        if (!linkedGameId && res.scorecardId && finalSeriesId) {
+        // Link to game — prefer explicit linkedGameId (from URL), then matched game
+        const gameIdToLink = linkedGameId || matchedGameId;
+        const gameNameToLink = linkedGameId ? '' : matchedGameName;
+        if (gameIdToLink && res.scorecardId) {
+          await linkScorecardToGameAction(res.scorecardId, gameIdToLink);
+          toast({ title: 'Scorecard Saved', description: gameNameToLink
+            ? `Scorecard imported and linked to ${gameNameToLink}.`
+            : 'Scorecard imported and linked to game.' });
+        } else if (!linkedGameId && res.scorecardId && finalSeriesId) {
+          // Fallback: try server-side auto-match if client-side didn't find one
           const match = await autoMatchGameAction({
             organizationId: activeOrganizationId,
             seriesId: finalSeriesId,
@@ -366,7 +410,7 @@ export function ScorecardImportForm() {
           });
           if (match.gameId) {
             await linkScorecardToGameAction(res.scorecardId, match.gameId);
-            toast({ title: 'Scorecard Saved', description: `Scorecard imported and automatically linked to game ${match.gameName}.` });
+            toast({ title: 'Scorecard Saved', description: `Scorecard imported and linked to ${match.gameName}.` });
           } else {
             toast({ title: 'Scorecard Saved', description: 'Scorecard imported. No matching game found — you can link it manually from the scorecard details page.' });
           }
@@ -544,7 +588,7 @@ export function ScorecardImportForm() {
               {availableSeries.length > 0 && (
                 <div className="space-y-3 border rounded-lg p-3 bg-muted/20">
                   <p className="text-sm font-medium">
-                    Link to Series
+                    Link to Series & Game
                     {!linkedGameId && <span className="text-destructive text-xs ml-1">*</span>}
                   </p>
                   {linkedGameId ? (
@@ -570,7 +614,16 @@ export function ScorecardImportForm() {
                         <Select value={seriesId || 'none'} onValueChange={v => {
                           const val = v === 'none' ? '' : v;
                           setSeriesId(val);
-                          setSeriesName(availableSeries.find(s => s.id === val)?.name || '');
+                          const sName = availableSeries.find(s => s.id === val)?.name || '';
+                          setSeriesName(sName);
+                          // Trigger auto-match when series changes
+                          if (val && team1 && team2 && date && activeOrganizationId) {
+                            tryAutoMatchGame(activeOrganizationId, val, team1, team2, date);
+                          } else {
+                            setMatchedGameId('');
+                            setMatchedGameName('');
+                            setAvailableGamesForSeries([]);
+                          }
                         }}>
                           <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select series" /></SelectTrigger>
                           <SelectContent>
@@ -583,7 +636,55 @@ export function ScorecardImportForm() {
                       </div>
                     </div>
                   )}
-                  {!linkedGameId && seriesName && <p className="text-xs text-green-600">✓ Will be linked to: {seriesName}</p>}
+                  {!linkedGameId && seriesName && <p className="text-xs text-green-600">✓ Will be linked to series: {seriesName}</p>}
+
+                  {/* Game picker — shown when series is selected and not coming from a game page */}
+                  {!linkedGameId && seriesId && (
+                    <div className="pt-2 border-t space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Game <span className="text-muted-foreground font-normal">(optional)</span></p>
+                      {isAutoMatchingGame ? (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Looking for matching game...
+                        </div>
+                      ) : matchedGameId && matchedGameName ? (
+                        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-md px-2.5 py-1.5">
+                          <CheckCircle className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                          <span className="text-xs text-green-800 flex-1 truncate">✓ {matchedGameName}</span>
+                          <button
+                            onClick={() => { setMatchedGameId(''); setMatchedGameName(''); }}
+                            className="text-xs text-muted-foreground hover:text-foreground shrink-0"
+                          >
+                            Change
+                          </button>
+                        </div>
+                      ) : (
+                        <Select
+                          value={matchedGameId || 'none'}
+                          onValueChange={v => {
+                            const val = v === 'none' ? '' : v;
+                            setMatchedGameId(val);
+                            const g = availableGamesForSeries.find(g => g.id === val);
+                            setMatchedGameName(g ? `${g.team1} vs ${g.team2} (${g.date})` : '');
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue placeholder={availableGamesForSeries.length === 0 ? 'No unlinked games in series' : 'Select game (optional)'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {availableGamesForSeries.map(g => (
+                              <SelectItem key={g.id} value={g.id}>
+                                {g.team1} vs {g.team2} — {g.date}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {matchedGameId && <p className="text-xs text-green-600">✓ Will be linked to game</p>}
+                    </div>
+                  )}
+
+                  {linkedGameId && seriesName && <p className="text-xs text-green-600">✓ Linked to series: <span className="font-medium">{seriesName}</span></p>}
                 </div>
               )}
 
