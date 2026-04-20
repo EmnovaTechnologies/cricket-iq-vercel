@@ -77,8 +77,9 @@ export default function ImportGamesPage() {
               <AlertTitle>CSV Format Requirements</AlertTitle>
               <AlertDescription>
                 <ul className="list-disc pl-5 space-y-1 text-sm mt-2">
-                  <li>Must contain headers: <strong>GameDate, VenueName, SeriesName, Team1Name, Team2Name</strong>.</li>
+                  <li>Must contain headers: <strong>GameDate, VenueName, SeriesName, Team1Name, Team2Name</strong>. The <strong>Time</strong> column is optional.</li>
                   <li><strong>GameDate</strong> must be in <strong>MM/DD/YYYY</strong> format.</li>
+                  <li><strong>Time</strong> (optional) must be in <strong>H:MM AM/PM</strong> format on 30-minute increments e.g. <strong>8:00 AM</strong>, <strong>2:30 PM</strong>. Leave blank if unknown.</li>
                   <li><strong>SeriesName</strong> must match an existing active series in the system.</li>
                   <li><strong>VenueName</strong> must match a venue already associated with the specified series.</li>
                   <li><strong>Team1Name</strong> and <strong>Team2Name</strong> must match teams already associated with the specified series.</li>
@@ -116,7 +117,8 @@ export default function ImportGamesPage() {
               <AlertDescription className="text-green-700">
                 <ul className="list-disc pl-5 space-y-1 text-sm mt-2">
                   <li>Click <strong>Download Excel Template</strong> — it is generated live with your organization's current data.</li>
-                  <li>Dropdowns for Series, Venue, Team1, and Team2 are pre-populated with valid values.</li>
+                  <li>Dropdowns for Series, Venue, Team1, Team2, and Time are pre-populated with valid values.</li>
+                  <li>The <strong>Time</strong> column is optional — select a 30-minute slot (6:00 AM–10:00 PM) or leave blank.</li>
                   <li>Use the <strong>Valid Values</strong> sheet to see which venues and teams belong to each series.</li>
                   <li>Use the <strong>Instructions</strong> sheet for full field rules.</li>
                   <li>Dates must be entered as <strong>MM/DD/YYYY</strong> text — not Excel date format.</li>
