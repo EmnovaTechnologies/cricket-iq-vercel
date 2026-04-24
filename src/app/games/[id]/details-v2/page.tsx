@@ -562,7 +562,8 @@ export default function GameDetailsPage() {
           </div>
 
           <div className="pt-2">
-            <h4 className="text-sm font-semibold text-muted-foreground mb-2">Selectors</h4>
+            <h4 className="text-sm font-semibold text-muted-foreground mb-1">Selectors</h4>
+            <p className="text-xs text-muted-foreground mb-2">Assigned selectors and the team they are scoped to rate for this game.</p>
             {gameSelectors.filter(s => !s.roles?.includes('admin')).length > 0 ? (
               <div className="space-y-1.5">
                 {gameSelectors.filter(s => !s.roles?.includes('admin')).map(s => {
