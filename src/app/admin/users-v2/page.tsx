@@ -17,7 +17,10 @@ import { Input } from '@/components/ui/input';
 import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import { getAllUsersFromDB, getUsersForOrgAdminViewFromDB, getAllOrganizationsFromDB } from '@/lib/db';
 import { updateUserClubAction } from '@/lib/actions/user-actions';
-import { Loader2, AlertCircle, ShieldAlert, Info, Filter, Search, Building, X, User, Phone, Calendar, Clock, Shield } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { Loader2, AlertCircle, ShieldAlert, Info, Filter, Search, Building, X, User, Phone, Calendar, Clock } from 'lucide-react';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -80,7 +83,6 @@ function UserDrawer({ user, allOrgs, orgClubs, isSuperAdmin, onUpdated, onClose 
   };
 
   const clubChanged = clubValue !== (user.clubName || NO_CLUB);
-  const isUserSuperAdmin = user.roles.includes('admin');
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
@@ -136,9 +138,7 @@ function UserDrawer({ user, allOrgs, orgClubs, isSuperAdmin, onUpdated, onClose 
         {/* Club */}
         <div className="p-4">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Club</p>
-          {isUserSuperAdmin ? (
-            <p className="text-sm text-muted-foreground">Not applicable for super admins.</p>
-          ) : orgClubs.length === 0 ? (
+          {orgClubs.length === 0 ? (
             <p className="text-sm text-muted-foreground">No clubs configured for this organization.</p>
           ) : (
             <div className="space-y-2">
@@ -172,31 +172,23 @@ function UserDrawer({ user, allOrgs, orgClubs, isSuperAdmin, onUpdated, onClose 
         {isSuperAdmin && (
           <div className="p-4">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Organization</p>
-            {isUserSuperAdmin ? (
-              <p className="text-sm text-muted-foreground">Super admins are not assigned to organizations.</p>
-            ) : (
-              <UserOrgCell
-                userId={user.uid}
-                assignedOrgIds={user.assignedOrganizationIds || []}
-                allOrgs={allOrgs}
-                onUpdated={onUpdated}
-              />
-            )}
+            <UserOrgCell
+              userId={user.uid}
+              assignedOrgIds={user.assignedOrganizationIds || []}
+              allOrgs={allOrgs}
+              onUpdated={onUpdated}
+            />
           </div>
         )}
 
         {/* Roles */}
         <div className="p-4">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Roles</p>
-          {isUserSuperAdmin && !isSuperAdmin ? (
-            <p className="text-sm text-muted-foreground">Super admin role cannot be modified.</p>
-          ) : (
-            <UserRoleCell
-              user={user}
-              isCallingUserSuperAdmin={isSuperAdmin}
-              onRolesUpdated={onUpdated}
-            />
-          )}
+          <UserRoleCell
+            user={user}
+            isCallingUserSuperAdmin={isSuperAdmin}
+            onRolesUpdated={onUpdated}
+          />
         </div>
 
       </div>
@@ -225,6 +217,7 @@ export default function AdminUsersV2Page() {
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [orgFilter, setOrgFilter] = useState<string>('all');
   const [clubFilter, setClubFilter] = useState<string>('all');
+  const [clubFilterOpen, setClubFilterOpen] = useState(false);
 
   const isSuperAdmin = userProfile?.roles.includes('admin') ?? false;
 
@@ -367,6 +360,8 @@ export default function AdminUsersV2Page() {
             </CardHeader>
             <CardContent>
               <div className={cn('grid gap-4', isSuperAdmin ? 'grid-cols-1 md:grid-cols-5' : 'grid-cols-1 md:grid-cols-4')}>
+
+                {/* 1. Organization — super admin only */}
                 {isSuperAdmin && (
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
@@ -383,6 +378,48 @@ export default function AdminUsersV2Page() {
                     </Select>
                   </div>
                 )}
+
+                {/* 2. Club — searchable combobox */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5">Club</Label>
+                  <Popover open={clubFilterOpen} onOpenChange={setClubFilterOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={clubFilterOpen}
+                        className="w-full justify-between h-10 font-normal"
+                      >
+                        <span className="truncate">
+                          {clubFilter === 'all' ? 'All clubs' : clubFilter}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search clubs..." />
+                        <CommandList>
+                          <CommandEmpty>No club found.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem value="all" onSelect={() => { setClubFilter('all'); setClubFilterOpen(false); }}>
+                              <Check className={cn('mr-2 h-4 w-4', clubFilter === 'all' ? 'opacity-100' : 'opacity-0')} />
+                              All clubs
+                            </CommandItem>
+                            {clubsForFilter.map((club: string) => (
+                              <CommandItem key={club} value={club} onSelect={() => { setClubFilter(club); setClubFilterOpen(false); }}>
+                                <Check className={cn('mr-2 h-4 w-4', clubFilter === club ? 'opacity-100' : 'opacity-0')} />
+                                {club}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* 3. Name / email */}
                 <div>
                   <Label className="text-xs text-muted-foreground mb-1.5">Name / email</Label>
                   <div className="relative">
@@ -395,6 +432,8 @@ export default function AdminUsersV2Page() {
                     />
                   </div>
                 </div>
+
+                {/* 4. Phone */}
                 <div>
                   <Label className="text-xs text-muted-foreground mb-1.5">Phone</Label>
                   <div className="relative">
@@ -407,30 +446,21 @@ export default function AdminUsersV2Page() {
                     />
                   </div>
                 </div>
+
+                {/* 5. Role — excludes admin */}
                 <div>
                   <Label className="text-xs text-muted-foreground mb-1.5">Role</Label>
                   <Select value={roleFilter} onValueChange={v => setRoleFilter(v as UserRole | 'all')}>
                     <SelectTrigger><SelectValue placeholder="All roles" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All roles</SelectItem>
-                      {USER_ROLES.map(role => (
+                      {USER_ROLES.filter(r => r !== 'admin').map(role => (
                         <SelectItem key={role} value={role} className="capitalize">{role}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1.5">Club</Label>
-                  <Select value={clubFilter} onValueChange={setClubFilter}>
-                    <SelectTrigger><SelectValue placeholder="All clubs" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All clubs</SelectItem>
-                      {clubsForFilter.map((club: string) => (
-                        <SelectItem key={club} value={club}>{club}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+
               </div>
             </CardContent>
           </Card>
@@ -495,8 +525,8 @@ export default function AdminUsersV2Page() {
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-wrap gap-1">
-                                {(user.roles || ['unassigned']).map(role => (
-                                  <Badge key={role} variant={role === 'admin' ? 'default' : 'secondary'} className="capitalize text-xs">
+                                {(user.roles || ['unassigned']).filter(r => r !== 'admin').map(role => (
+                                  <Badge key={role} variant="secondary" className="capitalize text-xs">
                                     {role}
                                   </Badge>
                                 ))}
@@ -514,7 +544,7 @@ export default function AdminUsersV2Page() {
                                 className="h-7 text-xs px-2.5"
                                 onClick={() => setSelectedUserUid(isSelected ? null : user.uid)}
                               >
-                                {isSelected ? 'Close' : 'Edit →'}
+                                {isSelected ? '← Close' : 'Edit →'}
                               </Button>
                             </TableCell>
                           </TableRow>
