@@ -8,10 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { UserPlus, Loader2, Mail, Key, Building, User as UserIcon, CheckCircle, Send, Users, ChevronRight } from 'lucide-react';
+import { UserPlus, Loader2, Mail, Key, Building, User as UserIcon, CheckCircle, Send, Users, ChevronRight, Shield } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getPublicOrganizationDetails } from '@/lib/actions/public-org-action';
-import { getAllPublicActiveOrganizations } from '@/lib/actions/public-org-action';
+import { getPublicOrganizationDetails, getAllPublicActiveOrganizations } from '@/lib/actions/public-org-action';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -23,11 +23,14 @@ import { GoogleIcon } from '@/components/custom-icons';
 
 const SESSION_STORAGE_ORG_ID_KEY = 'pendingSignupOrgId';
 const SESSION_STORAGE_DISPLAY_NAME_KEY = 'pendingSignupDisplayName';
+const SESSION_STORAGE_CLUB_NAME_KEY = 'pendingSignupClubName';
 
 function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [clubName, setClubName] = useState('');
+  const [orgClubs, setOrgClubs] = useState<string[]>([]);
   const [verificationSent, setVerificationSent] = useState(false);
   const [resending, setResending] = useState(false);
 
@@ -80,6 +83,8 @@ function SignupForm() {
           if (org && org.status === 'active') {
             setTargetOrgDetails(org);
             if (typeof window !== 'undefined') sessionStorage.setItem(SESSION_STORAGE_ORG_ID_KEY, orgIdFromQuery);
+            // Fetch clubs for this org
+            setOrgClubs((org as any).clubs || []);
           } else {
             toast({ title: 'Invalid Organization Link', description: 'The organization specified is not valid or inactive.', variant: 'destructive' });
             setTargetOrgId(null);
@@ -113,6 +118,8 @@ function SignupForm() {
     if (typeof window !== 'undefined') {
       if (name) sessionStorage.setItem(SESSION_STORAGE_DISPLAY_NAME_KEY, name);
       else sessionStorage.removeItem(SESSION_STORAGE_DISPLAY_NAME_KEY);
+      if (clubName.trim()) sessionStorage.setItem(SESSION_STORAGE_CLUB_NAME_KEY, clubName.trim());
+      else sessionStorage.removeItem(SESSION_STORAGE_CLUB_NAME_KEY);
     }
   };
 
@@ -343,6 +350,32 @@ function SignupForm() {
               </div>
               <p className="text-xs text-muted-foreground">Password should be at least 6 characters.</p>
             </div>
+
+            {/* Club association — only shown when org is known and has clubs */}
+            {targetOrgDetails && orgClubs.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="club-signup" className="flex items-center gap-1.5">
+                  <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                  Club <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+                </Label>
+                <Select
+                  value={clubName || '__none__'}
+                  onValueChange={v => setClubName(v === '__none__' ? '' : v)}
+                  disabled={isAnyAuthActionLoading}
+                >
+                  <SelectTrigger id="club-signup">
+                    <SelectValue placeholder="Select your club (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No club / Not sure</SelectItem>
+                    {orgClubs.map(club => (
+                      <SelectItem key={club} value={club}>{club}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Your club association within {targetOrgDetails.name}.</p>
+              </div>
+            )}
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isAnyAuthActionLoading}>
               {emailFormSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating Account...</> : <><UserPlus className="mr-2 h-4 w-4" /> Create Account with Email</>}

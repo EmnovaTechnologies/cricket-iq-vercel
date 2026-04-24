@@ -241,7 +241,8 @@ export async function createUserProfile(
   displayName?: string | null,
   phoneNumber?: string | null,
   targetOrgId?: string | null,
-  registrationToken?: string | null
+  registrationToken?: string | null,
+  clubName?: string | null
 ): Promise<UserProfile> {
   console.log('[createUserProfile] Starting profile creation for UID:', uid);
   const userDocRef = doc(db, 'users', uid);
@@ -309,7 +310,7 @@ export async function createUserProfile(
   
   console.log('[createUserProfile] Final roles for new user:', userRoles);
 
-  const userProfileDataForFirestore = {
+  const userProfileDataForFirestore: Record<string, any> = {
     uid,
     email,
     displayName: displayName || null,
@@ -323,6 +324,10 @@ export async function createUserProfile(
     lastLogin: serverTimestamp(),
     phoneNumber: phoneNumber || null,
   };
+
+  if (clubName && clubName.trim() !== '') {
+    userProfileDataForFirestore.clubName = clubName.trim();
+  }
 
   batch.set(userDocRef, userProfileDataForFirestore);
   console.log('[createUserProfile] Committing user profile to Firestore...');
@@ -343,6 +348,7 @@ export async function createUserProfile(
     lastLogin: new Date().toISOString(),
     phoneNumber: phoneNumber || null,
     playerId: playerId,
+    clubName: clubName?.trim() || null,
   };
   return result;
 }

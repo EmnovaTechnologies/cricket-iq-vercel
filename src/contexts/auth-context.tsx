@@ -53,6 +53,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const ACTIVE_ORG_ID_LS_KEY = 'cricket-iq-activeOrgId';
 const SESSION_STORAGE_ORG_ID_KEY = 'pendingSignupOrgId';
 const SESSION_STORAGE_DISPLAY_NAME_KEY = 'pendingSignupDisplayName';
+const SESSION_STORAGE_CLUB_NAME_KEY = 'pendingSignupClubName';
 
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -119,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
             const targetOrgIdFromStorage = typeof window !== 'undefined' ? sessionStorage.getItem(SESSION_STORAGE_ORG_ID_KEY) : null;
             const targetDisplayNameFromStorage = typeof window !== 'undefined' ? sessionStorage.getItem(SESSION_STORAGE_DISPLAY_NAME_KEY) : null;
+            const targetClubNameFromStorage = typeof window !== 'undefined' ? sessionStorage.getItem(SESSION_STORAGE_CLUB_NAME_KEY) : null;
             
             profile = await createUserProfile(
               user.uid,
@@ -126,12 +128,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               targetDisplayNameFromStorage || user.displayName,
               user.phoneNumber,
               targetOrgIdFromStorage,
-              pendingRegistrationToken
+              pendingRegistrationToken,
+              targetClubNameFromStorage,
             );
 
             if (typeof window !== 'undefined') {
                 sessionStorage.removeItem(SESSION_STORAGE_ORG_ID_KEY);
                 sessionStorage.removeItem(SESSION_STORAGE_DISPLAY_NAME_KEY);
+                sessionStorage.removeItem(SESSION_STORAGE_CLUB_NAME_KEY);
             }
             setPendingRegistrationToken(null);
         }

@@ -363,6 +363,15 @@ export default function ProfilePage() {
               </div>
             </div>
           )}
+          {userProfile.clubName && (
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Club</p>
+                <p className="font-medium">{userProfile.clubName}</p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -66,7 +66,8 @@ export interface UserProfile {
   createdAt?: string | null;
   lastLogin?: string | null;
   phoneNumber?: string | null;
-  playerId?: string | null; // Added to link user account to a player profile
+  playerId?: string | null;
+  clubName?: string | null;
 }
 
 export interface AdminUserView extends UserProfile {
