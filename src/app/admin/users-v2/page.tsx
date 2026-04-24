@@ -251,8 +251,12 @@ export default function AdminUsersV2Page() {
           setOrganizations(fetchedOrgs);
         } else if (effectivePermissions[PERMISSIONS.USERS_VIEW_LIST_ASSIGNED_ORG]) {
           if (activeOrganizationId) {
-            const fetchedUsers = await getUsersForOrgAdminViewFromDB(activeOrganizationId);
+            const [fetchedUsers, fetchedOrgs] = await Promise.all([
+              getUsersForOrgAdminViewFromDB(activeOrganizationId),
+              getAllOrganizationsFromDB(), // fetch all so we get clubs array for active org
+            ]);
             setUsers(fetchedUsers);
+            setOrganizations(fetchedOrgs);
           }
         } else {
           setFetchError('You do not have permission to view any user list.');
@@ -275,20 +279,32 @@ export default function AdminUsersV2Page() {
     }
   }, [users]);
 
-  // Clubs for active org (for filter dropdown and drawer)
-  const activeOrgClubs = useMemo(() => {
-    const orgId = isSuperAdmin ? orgFilter : activeOrganizationId;
-    if (!orgId || orgId === 'all') return [];
-    const org = organizations.find(o => o.id === orgId);
-    return (org as any)?.clubs || [];
-  }, [organizations, orgFilter, activeOrganizationId, isSuperAdmin]);
-
-  // All unique clubs across all orgs for filter when orgFilter = 'all'
-  const allClubs = useMemo(() => {
+  // All clubs from org documents (not from user data) — used for filter dropdown
+  const allOrgClubs = useMemo(() => {
     const clubs = new Set<string>();
-    users.forEach(u => { if (u.clubName) clubs.add(u.clubName); });
+    organizations.forEach(org => {
+      ((org as any).clubs || []).forEach((c: string) => clubs.add(c));
+    });
     return [...clubs].sort();
-  }, [users]);
+  }, [organizations]);
+
+  // Clubs available for the filter dropdown — scoped to orgFilter if set
+  const clubsForFilter = useMemo(() => {
+    if (isSuperAdmin && orgFilter !== 'all') {
+      const org = organizations.find(o => o.id === orgFilter);
+      return ((org as any)?.clubs || []).sort();
+    }
+    return allOrgClubs;
+  }, [organizations, orgFilter, isSuperAdmin, allOrgClubs]);
+
+  // Clubs for the drawer — based on the selected user's assigned org
+  const drawerClubs = useMemo(() => {
+    if (!selectedUser) return [];
+    const userOrgId = (selectedUser.assignedOrganizationIds || [])[0] || activeOrganizationId;
+    if (!userOrgId) return allOrgClubs;
+    const org = organizations.find(o => o.id === userOrgId);
+    return ((org as any)?.clubs || []).sort();
+  }, [selectedUser, organizations, activeOrganizationId, allOrgClubs]);
 
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
@@ -304,7 +320,6 @@ export default function AdminUsersV2Page() {
     });
   }, [users, nameFilter, roleFilter, orgFilter, clubFilter, isSuperAdmin]);
 
-  const clubsForFilter = clubFilter === 'all' || !isSuperAdmin ? allClubs : activeOrgClubs;
 
   const renderContent = () => {
     if (isAuthLoading || loadingUsers) {
@@ -396,7 +411,7 @@ export default function AdminUsersV2Page() {
                     <SelectTrigger><SelectValue placeholder="All clubs" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All clubs</SelectItem>
-                      {allClubs.map(club => (
+                      {clubsForFilter.map((club: string) => (
                         <SelectItem key={club} value={club}>{club}</SelectItem>
                       ))}
                     </SelectContent>
@@ -503,7 +518,7 @@ export default function AdminUsersV2Page() {
               <UserDrawer
                 user={selectedUser}
                 allOrgs={organizations}
-                orgClubs={activeOrgClubs.length > 0 ? activeOrgClubs : allClubs}
+                orgClubs={drawerClubs}
                 isSuperAdmin={isSuperAdmin}
                 onUpdated={handleUpdated}
                 onClose={() => setSelectedUser(null)}
