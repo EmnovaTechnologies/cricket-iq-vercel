@@ -280,23 +280,33 @@ export default function AdminUsersV2Page() {
     return [...clubs].sort();
   }, [organizations]);
 
-  // Clubs available for the filter dropdown — scoped to orgFilter if set
+  // Clubs available for the filter dropdown — scoped to orgFilter if set (super admin) or activeOrg (org admin)
   const clubsForFilter = useMemo(() => {
-    if (isSuperAdmin && orgFilter !== 'all') {
-      const org = organizations.find(o => o.id === orgFilter);
-      return ((org as any)?.clubs || []).sort();
+    if (isSuperAdmin) {
+      if (orgFilter !== 'all') {
+        const org = organizations.find(o => o.id === orgFilter);
+        return ((org as any)?.clubs || []).sort();
+      }
+      return allOrgClubs;
     }
-    return allOrgClubs;
-  }, [organizations, orgFilter, isSuperAdmin, allOrgClubs]);
+    // Org admin — scope to their active org only
+    const org = organizations.find(o => o.id === activeOrganizationId);
+    return ((org as any)?.clubs || []).sort();
+  }, [organizations, orgFilter, isSuperAdmin, allOrgClubs, activeOrganizationId]);
 
-  // Clubs for the drawer — based on the selected user's assigned org
+  // Clubs for the drawer — based on the selected user's assigned org, scoped to active org for org admins
   const drawerClubs = useMemo(() => {
     if (!selectedUser) return [];
-    const userOrgId = (selectedUser.assignedOrganizationIds || [])[0] || activeOrganizationId;
+    if (!isSuperAdmin) {
+      // Org admin — only show clubs from their active org
+      const org = organizations.find(o => o.id === activeOrganizationId);
+      return ((org as any)?.clubs || []).sort();
+    }
+    const userOrgId = (selectedUser.assignedOrganizationIds || [])[0];
     if (!userOrgId) return allOrgClubs;
     const org = organizations.find(o => o.id === userOrgId);
     return ((org as any)?.clubs || []).sort();
-  }, [selectedUser, organizations, activeOrganizationId, allOrgClubs]);
+  }, [selectedUser, organizations, activeOrganizationId, isSuperAdmin, allOrgClubs]);
 
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
