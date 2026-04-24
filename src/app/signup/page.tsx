@@ -69,7 +69,7 @@ function SignupForm() {
   const searchParams = useSearchParams();
 
   const [targetOrgId, setTargetOrgId] = useState<string | null>(null);
-  const [targetOrgDetails, setTargetOrgDetails] = useState<{ id: string; name: string; status: string } | null>(null);
+  const [targetOrgDetails, setTargetOrgDetails] = useState<{ id: string; name: string; status: string; clubs?: string[] } | null>(null);
   const [isLoadingOrgDetails, setIsLoadingOrgDetails] = useState(false);
 
   useEffect(() => {
@@ -84,7 +84,7 @@ function SignupForm() {
             setTargetOrgDetails(org);
             if (typeof window !== 'undefined') sessionStorage.setItem(SESSION_STORAGE_ORG_ID_KEY, orgIdFromQuery);
             // Fetch clubs for this org
-            setOrgClubs((org as any).clubs || []);
+            setOrgClubs(org.clubs || []);
           } else {
             toast({ title: 'Invalid Organization Link', description: 'The organization specified is not valid or inactive.', variant: 'destructive' });
             setTargetOrgId(null);
@@ -198,7 +198,9 @@ function SignupForm() {
                   key={org.id}
                   onClick={() => {
                     setTargetOrgId(org.id);
-                    setTargetOrgDetails({ id: org.id, name: org.name, status: 'active' });
+                    setTargetOrgDetails({ id: org.id, name: org.name, status: 'active', clubs: org.clubs || [] });
+                    setOrgClubs(org.clubs || []);
+                    setClubName('');
                     if (typeof window !== 'undefined') sessionStorage.setItem(SESSION_STORAGE_ORG_ID_KEY, org.id);
                     setOrgPickerStep(false);
                   }}
