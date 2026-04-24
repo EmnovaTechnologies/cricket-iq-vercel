@@ -183,6 +183,7 @@ export async function getAllUsersFromDB(): Promise<UserProfile[]> {
       createdAt: createdAtTimestamp?.toDate?.().toISOString() || null,
       lastLogin: lastLoginTimestamp?.toDate?.().toISOString() || null,
       phoneNumber: data.phoneNumber || null,
+      clubName: data.clubName || null,
     });
   });
   // Perform sorting in the code instead of the database query
@@ -213,6 +214,7 @@ export async function getUsersForOrgAdminViewFromDB(organizationId: string): Pro
       createdAt: createdAtTimestamp?.toDate?.().toISOString() || null,
       lastLogin: lastLoginTimestamp?.toDate?.().toISOString() || null,
       phoneNumber: data.phoneNumber || null,
+      clubName: data.clubName || null,
     });
   });
 

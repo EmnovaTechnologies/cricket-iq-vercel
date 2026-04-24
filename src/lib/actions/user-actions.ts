@@ -354,6 +354,25 @@ export async function createUserProfile(
 }
 
 
+export async function updateUserClubAction(
+  uid: string,
+  clubName: string | null
+): Promise<{ success: boolean; error?: string }> {
+  if (!uid) return { success: false, error: 'Missing user ID.' };
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    if (clubName && clubName.trim() !== '') {
+      await updateDoc(userDocRef, { clubName: clubName.trim() });
+    } else {
+      await updateDoc(userDocRef, { clubName: deleteField() });
+    }
+    return { success: true };
+  } catch (error: any) {
+    console.error('[updateUserClubAction] Error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function updateUserLastLogin(uid: string): Promise<void> {
   if (!uid) return;
   try {
