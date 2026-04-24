@@ -174,7 +174,29 @@ export async function updatePlayerGameInclusionAction(
 }
 
 
-export async function addPlayerToGameRosterAction(gameId: string, playerId: string, teamIdentifier: 'team1' | 'team2'): Promise<{ success: boolean; message: string; playerName?: string; teamName?: string }> {
+export async function bulkSetGameRosterAction(
+  gameId: string,
+  team1PlayerIds: string[],
+  team2PlayerIds: string[]
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const gameRef = doc(db, 'games', gameId);
+    const gameSnap = await getDoc(gameRef);
+    if (!gameSnap.exists()) return { success: false, message: 'Game not found.' };
+    const gameData = gameSnap.data() as Game;
+    if (gameData.seriesId) {
+      const series = await getSeriesByIdFromDB(gameData.seriesId);
+      if (series?.status === 'archived') {
+        return { success: false, message: `Cannot update roster for a game in an archived series (${series.name}).` };
+      }
+    }
+    await updateDoc(gameRef, { team1Players: team1PlayerIds, team2Players: team2PlayerIds });
+    return { success: true, message: `Roster updated — ${team1PlayerIds.length} + ${team2PlayerIds.length} players set.` };
+  } catch (error) {
+    console.error('Error in bulkSetGameRosterAction:', error);
+    return { success: false, message: error instanceof Error ? error.message : 'Unexpected error.' };
+  }
+}(gameId: string, playerId: string, teamIdentifier: 'team1' | 'team2'): Promise<{ success: boolean; message: string; playerName?: string; teamName?: string }> {
   const result = await updatePlayerGameInclusionAction(gameId, playerId, teamIdentifier, true);
   if (result.success) {
     const player = await getPlayerByIdFromDB(playerId);
