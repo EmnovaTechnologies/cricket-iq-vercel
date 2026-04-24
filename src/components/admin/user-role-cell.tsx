@@ -135,7 +135,8 @@ export function UserRoleCell({ user, isCallingUserSuperAdmin, onRolesUpdated }: 
             const isDisabled = isLoading ||
                                (isUserBeingEditedSuperAdmin && role === 'admin') ||
                                (role === 'admin' && !isCallingUserSuperAdmin) ||
-                               (role === 'player');
+                               (role === 'player') ||
+                               (role === 'unassigned');
 
             return (
               <div key={role} className="flex items-center space-x-2">
