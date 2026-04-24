@@ -578,87 +578,99 @@ export default function GameDetailsPage() {
       {isEditingSelectors && canManageSelectors && (<Card><CardHeader>
             <CardTitle className="text-xl font-headline text-primary">Manage Game Selectors</CardTitle>
             <CardDescription>
-              Select users with 'selector' or 'Series Admin' role in this organization. Super admins are always included.
-              <span className="block mt-1 text-xs text-muted-foreground">Optionally assign each selector a team to enable scope-based match reporting.</span>
+              Assign selectors and their team scope for this game. Club associations are used to auto-suggest which team each selector should rate.
             </CardDescription>
-          </CardHeader><CardContent className="space-y-3">
-            {/* Locked super admins */}
-            {lockedSuperAdmins.length > 0 && (
-              <div className="rounded-md border bg-muted/30 p-2 space-y-1">
-                <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned)</p>
-                {lockedSuperAdmins.map(user => (
-                  <div key={user.uid} className="flex items-center gap-2 px-2 py-1 rounded opacity-70">
-                    <Checkbox checked disabled />
-                    <span className="text-sm flex-grow">{user.displayName || user.email}</span>
-                    <Badge variant="default" className="text-xs">Super Admin</Badge>
+          </CardHeader><CardContent className="space-y-4">
+
+            {/* Instruction box */}
+            <div className="rounded-md bg-muted/40 border px-3 py-2 text-xs text-muted-foreground">
+              Check a selector to assign them. Their club <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200 mx-0.5">Club</span> is used to suggest which team they should rate, based on your organization's rating scope. You can override the suggestion.
+            </div>
+
+            {/* Selectors section */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Selectors</p>
+              {selectableSelectors.length === 0
+                ? <p className="text-muted-foreground text-sm">No users with 'selector' or 'Series Admin' role found for this organization.</p>
+                : <div className="rounded-md border divide-y">
+                    {selectableSelectors.map(user => {
+                      const isChecked = selectedSelectorUidsForUpdate.includes(user.uid);
+                      const suggested = suggestTeamForSelector(user);
+                      return (
+                        <div key={user.uid} className={`flex items-start gap-3 px-3 py-2.5 ${isChecked ? 'bg-primary/5' : ''}`}>
+                          <Checkbox
+                            id={`selector-${user.uid}`}
+                            checked={isChecked}
+                            className="mt-0.5 shrink-0"
+                            onCheckedChange={(checked) => {
+                              setSelectedSelectorUidsForUpdate(prev => checked ? [...prev, user.uid] : prev.filter(uid => uid !== user.uid));
+                              if (checked) {
+                                setSelectorTeamMap(prev => ({ ...prev, [user.uid]: suggested }));
+                              } else {
+                                setSelectorTeamMap(prev => { const next = { ...prev }; delete next[user.uid]; return next; });
+                              }
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <label htmlFor={`selector-${user.uid}`} className="text-sm font-medium cursor-pointer flex items-center gap-2 flex-wrap">
+                              {user.displayName || user.email}
+                              <span className="text-muted-foreground font-normal text-xs">({user.roles.filter(r => r !== 'admin').join(', ')})</span>
+                              {user.clubName && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200">{user.clubName}</span>
+                              )}
+                            </label>
+                            {/* Suggestion hint — shown when checked and club matched */}
+                            {isChecked && user.clubName && suggested !== 'neutral' && (
+                              <p className="text-xs text-blue-600 mt-0.5 italic">
+                                ↗ Club matched — suggested: {suggested}
+                              </p>
+                            )}
+                            {!user.clubName && !isChecked && (
+                              <p className="text-xs text-muted-foreground mt-0.5">No club set — will default to Neutral if assigned</p>
+                            )}
+                          </div>
+                          {/* Team scope dropdown — shown when checked */}
+                          {isChecked && (
+                            <div className="shrink-0 text-right">
+                              <p className="text-xs text-muted-foreground mb-1">Team scope</p>
+                              <select
+                                value={selectorTeamMap[user.uid] || 'neutral'}
+                                onChange={e => setSelectorTeamMap(prev => ({ ...prev, [user.uid]: e.target.value }))}
+                                className="text-xs border rounded px-1.5 py-1 bg-background text-foreground h-7"
+                              >
+                                <option value="neutral">Neutral</option>
+                                <option value={game.team1}>{game.team1}</option>
+                                <option value={game.team2}>{game.team2}</option>
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
-            )}
-            {selectableSelectors.length === 0 ? (<p className="text-muted-foreground text-sm">No users with 'selector' or 'Series Admin' role found for this organization.</p>)
-            : (<ScrollArea className="h-60 rounded-md border p-4"><div className="space-y-3">
-                {selectableSelectors.map(user => {
-                  const isChecked = selectedSelectorUidsForUpdate.includes(user.uid);
-                  return (
-                    <div key={user.uid} className="flex items-center gap-2 flex-wrap">
-                      <Checkbox id={`selector-${user.uid}`} checked={isChecked}
-                        onCheckedChange={(checked) => {
-                          setSelectedSelectorUidsForUpdate(prev => checked ? [...prev, user.uid] : prev.filter(uid => uid !== user.uid));
-                          if (checked) {
-                            // Auto-suggest team based on club + ratingScope
-                            const suggested = suggestTeamForSelector(user);
-                            setSelectorTeamMap(prev => ({ ...prev, [user.uid]: suggested }));
-                          } else {
-                            // Clear team assignment when unchecked
-                            setSelectorTeamMap(prev => { const next = { ...prev }; delete next[user.uid]; return next; });
-                          }
-                        }} />
-                      <label htmlFor={`selector-${user.uid}`} className="text-sm font-medium leading-none flex-1 peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        {user.displayName || user.email}
-                        <span className="text-muted-foreground ml-1 text-xs">({user.roles.filter(r => r !== 'admin').join(', ')})</span>
-                        {user.clubName && (
-                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200">
-                            {user.clubName}
-                          </span>
-                        )}
-                        {isChecked && user.clubName && (() => {
-                          const suggested = suggestTeamForSelector(user);
-                          if (suggested !== 'neutral') {
-                            return (
-                              <span className="ml-1 text-xs text-muted-foreground italic">
-                                → auto-suggested: {suggested}
-                              </span>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </label>
-                      {/* Team picker — always shown when selector is checked */}
-                      {isChecked && (
-                        <select
-                          value={selectorTeamMap[user.uid] || 'neutral'}
-                          onChange={e => setSelectorTeamMap(prev => ({ ...prev, [user.uid]: e.target.value }))}
-                          className="text-xs border rounded px-1.5 py-1 bg-background text-foreground h-7 shrink-0"
-                        >
-                          <option value="neutral">Neutral</option>
-                          <option value={game.team1}>{game.team1}</option>
-                          <option value={game.team2}>{game.team2}</option>
-                        </select>
-                      )}
-                    </div>
-                  );
-                })}
-              </div></ScrollArea>)}
+              }
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground pt-1">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200">Club</span>
+                Club association
+              </span>
+              <span className="flex items-center gap-1.5 italic text-blue-600">↗ auto-suggested based on club + rating scope</span>
+            </div>
+
           </CardContent><CardFooter className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => {
               setIsEditingSelectors(false);
               setSelectedSelectorUidsForUpdate(game.selectorUserIds || []);
-              // Reset team map to what was saved
               const teamMap: Record<string, string> = {};
               (game.selectorAssignments || []).forEach(a => { teamMap[a.uid] = a.teamAssociation; });
               setSelectorTeamMap(teamMap);
             }}>Cancel</Button>
-            <Button onClick={handleSaveGameSelectors} disabled={isLoadingGameSelectors}>{isLoadingGameSelectors ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Selectors</Button>
+            <Button onClick={handleSaveGameSelectors} disabled={isLoadingGameSelectors}>
+              {isLoadingGameSelectors ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Selectors
+            </Button>
           </CardFooter></Card>
       )}
 
