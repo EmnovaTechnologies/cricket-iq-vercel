@@ -216,11 +216,12 @@ export default function AdminUsersV2Page() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Drawer state
-  const [selectedUser, setSelectedUser] = useState<UserProfileType | null>(null);
+  // Track selected user by UID so drawer stays open across refreshes
+  const [selectedUserUid, setSelectedUserUid] = useState<string | null>(null);
 
   // Filters
   const [nameFilter, setNameFilter] = useState('');
+  const [phoneFilter, setPhoneFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [orgFilter, setOrgFilter] = useState<string>('all');
   const [clubFilter, setClubFilter] = useState<string>('all');
@@ -239,7 +240,7 @@ export default function AdminUsersV2Page() {
       setLoadingUsers(true);
       setFetchError(null);
       setUsers([]);
-      setSelectedUser(null);
+      setSelectedUserUid(null);
 
       try {
         if (isSuperAdmin) {
@@ -271,13 +272,11 @@ export default function AdminUsersV2Page() {
     fetchData();
   }, [currentUser, isAuthLoading, effectivePermissions, activeOrganizationId, router, isSuperAdmin, refreshKey]);
 
-  // Keep drawer in sync after refresh
-  useEffect(() => {
-    if (selectedUser) {
-      const updated = users.find(u => u.uid === selectedUser.uid);
-      if (updated) setSelectedUser(updated);
-    }
-  }, [users]);
+  // selectedUser is always derived from users array — drawer auto-updates after refresh
+  const selectedUser = useMemo(
+    () => users.find(u => u.uid === selectedUserUid) || null,
+    [users, selectedUserUid]
+  );
 
   // All clubs from org documents (not from user data) — used for filter dropdown
   const allOrgClubs = useMemo(() => {
@@ -308,17 +307,20 @@ export default function AdminUsersV2Page() {
 
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
+      if (user.roles.includes('admin')) return false; // never show super admins
       const q = nameFilter.toLowerCase();
       const nameMatch = !q ||
         user.displayName?.toLowerCase().includes(q) ||
         user.email?.toLowerCase().includes(q);
+      const pq = phoneFilter.toLowerCase();
+      const phoneMatch = !pq || (user.phoneNumber || '').toLowerCase().includes(pq);
       const roleMatch = roleFilter === 'all' || user.roles.includes(roleFilter as UserRole);
       const orgMatch = !isSuperAdmin || orgFilter === 'all' ||
         (user.assignedOrganizationIds || []).includes(orgFilter);
       const clubMatch = clubFilter === 'all' || user.clubName === clubFilter;
-      return nameMatch && roleMatch && orgMatch && clubMatch;
+      return nameMatch && phoneMatch && roleMatch && orgMatch && clubMatch;
     });
-  }, [users, nameFilter, roleFilter, orgFilter, clubFilter, isSuperAdmin]);
+  }, [users, nameFilter, phoneFilter, roleFilter, orgFilter, clubFilter, isSuperAdmin]);
 
 
   const renderContent = () => {
@@ -364,7 +366,7 @@ export default function AdminUsersV2Page() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={cn('grid gap-4', isSuperAdmin ? 'grid-cols-1 md:grid-cols-4' : 'grid-cols-1 md:grid-cols-3')}>
+              <div className={cn('grid gap-4', isSuperAdmin ? 'grid-cols-1 md:grid-cols-5' : 'grid-cols-1 md:grid-cols-4')}>
                 {isSuperAdmin && (
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
@@ -389,6 +391,18 @@ export default function AdminUsersV2Page() {
                       placeholder="Search..."
                       value={nameFilter}
                       onChange={e => setNameFilter(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5">Phone</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search phone..."
+                      value={phoneFilter}
+                      onChange={e => setPhoneFilter(e.target.value)}
                       className="pl-9"
                     />
                   </div>
@@ -468,6 +482,9 @@ export default function AdminUsersV2Page() {
                                 <div className="min-w-0">
                                   <p className="font-medium text-sm truncate">{user.displayName || 'No name'}</p>
                                   <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                                  {user.phoneNumber && (
+                                    <p className="text-xs text-muted-foreground truncate">{user.phoneNumber}</p>
+                                  )}
                                 </div>
                               </div>
                             </TableCell>
@@ -495,7 +512,7 @@ export default function AdminUsersV2Page() {
                                 variant={isSelected ? 'default' : 'outline'}
                                 size="sm"
                                 className="h-7 text-xs px-2.5"
-                                onClick={() => setSelectedUser(isSelected ? null : user)}
+                                onClick={() => setSelectedUserUid(isSelected ? null : user.uid)}
                               >
                                 {isSelected ? 'Close' : 'Edit →'}
                               </Button>
@@ -521,7 +538,7 @@ export default function AdminUsersV2Page() {
                 orgClubs={drawerClubs}
                 isSuperAdmin={isSuperAdmin}
                 onUpdated={handleUpdated}
-                onClose={() => setSelectedUser(null)}
+                onClose={() => setSelectedUserUid(null)}
               />
             </Card>
           </div>
