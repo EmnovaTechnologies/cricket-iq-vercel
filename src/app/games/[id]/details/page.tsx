@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { addPlayerToGameRosterAction, updatePlayerGameInclusionAction, updateGameSelectorsAction, bulkSetGameRosterAction } from '@/lib/actions/game-actions';
 import { getScorecardForGameAction, getScorecardByIdAction } from '@/lib/actions/scorecard-actions';
@@ -365,6 +365,28 @@ export default function GameDetailsPage() {
     potentialGameSelectorsToAssign.filter(u => !u.roles.includes('admin')),
     [potentialGameSelectorsToAssign]
   );
+
+  // Auto-suggest team assignment based on selector's club and org ratingScope
+  const suggestTeamForSelector = useCallback((user: UserProfile): string => {
+    if (!user.clubName || !game) return 'neutral';
+    const norm = (s: string) => s.trim().toLowerCase();
+    const club = norm(user.clubName);
+    const t1 = norm(game.team1);
+    const t2 = norm(game.team2);
+    const matchesTeam1 = t1.includes(club) || club.includes(t1);
+    const matchesTeam2 = t2.includes(club) || club.includes(t2);
+    const ratingScope = activeOrganizationDetails?.ratingScope;
+
+    if (matchesTeam1) {
+      // Selector belongs to team1's club
+      return ratingScope === 'opposing_only' ? game.team2 : game.team1;
+    }
+    if (matchesTeam2) {
+      // Selector belongs to team2's club
+      return ratingScope === 'opposing_only' ? game.team1 : game.team2;
+    }
+    return 'neutral';
+  }, [game, activeOrganizationDetails]);
   if (isLoadingPageData || isPermissionsLoading) { return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />Loading game data...</div>; }
 
   if (!game) { return <p className="text-center text-muted-foreground">Game not found.</p>; }
@@ -498,40 +520,54 @@ export default function GameDetailsPage() {
               </div>
             ) : canManageSelectors ? (
               <div className="space-y-2">
-                <div className="flex gap-2 items-center">
-                  <Input
-                    placeholder="https://cricclubs.com/..."
-                    value={gameUrl}
-                    onChange={e => setGameUrl(e.target.value)}
-                    className="text-sm h-9 flex-1"
-                  />
-                  {gameUrl && (
-                    <a href={gameUrl} target="_blank" rel="noopener noreferrer">
-                      <Button variant="ghost" size="sm" type="button" title="Open scorecard">
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </a>
-                  )}
-                  <Button size="sm" onClick={handleSaveGameUrl} disabled={isSavingGameUrl} className="shrink-0">
-                    {isSavingGameUrl ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  </Button>
-                </div>
                 {existingScorecardId ? (
-                  <Link href={`/scorecards/${existingScorecardId}`}>
-                    <Button size="sm" variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/10 w-full sm:w-auto">
-                      <Table2 className="h-4 w-4" /> View Scorecard
-                    </Button>
-                  </Link>
+                  // Scorecard already linked — show read-only URL + View Scorecard only
+                  <>
+                    {gameUrl && (
+                      <a href={gameUrl} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-sm text-primary underline hover:text-primary/80 break-all">
+                        <ExternalLink className="h-4 w-4 shrink-0" />
+                        {gameUrl}
+                      </a>
+                    )}
+                    <Link href={`/scorecards/${existingScorecardId}`}>
+                      <Button size="sm" variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/10 w-full sm:w-auto">
+                        <Table2 className="h-4 w-4" /> View Scorecard
+                      </Button>
+                    </Link>
+                    <p className="text-xs text-muted-foreground">A scorecard is already linked to this game. To replace it, unlink it from the scorecard details page first.</p>
+                  </>
                 ) : (
-                  <Link href={`/scorecards/import?gameId=${gameId}&url=${encodeURIComponent(gameUrl)}&team1=${encodeURIComponent(game.team1)}&team2=${encodeURIComponent(game.team2)}&date=${encodeURIComponent(game.date)}&venue=${encodeURIComponent(game.venue)}&seriesId=${encodeURIComponent(game.seriesId || '')}&seriesName=${encodeURIComponent(series?.name || '')}`}
-                    className={!gameUrl ? 'pointer-events-none' : ''}>
-                    <Button size="sm" disabled={!gameUrl} className="bg-primary hover:bg-primary/90 gap-2 w-full sm:w-auto">
-                      <Table2 className="h-4 w-4" /> Import Scorecard
-                    </Button>
-                  </Link>
-                )}
-                {!gameUrl && !existingScorecardId && (
-                  <p className="text-xs text-muted-foreground">Enter and save a CricClubs URL above to enable scorecard import.</p>
+                  // No scorecard — show editable URL + import
+                  <>
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        placeholder="https://cricclubs.com/..."
+                        value={gameUrl}
+                        onChange={e => setGameUrl(e.target.value)}
+                        className="text-sm h-9 flex-1"
+                      />
+                      {gameUrl && (
+                        <a href={gameUrl} target="_blank" rel="noopener noreferrer">
+                          <Button variant="ghost" size="sm" type="button" title="Open scorecard">
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </a>
+                      )}
+                      <Button size="sm" onClick={handleSaveGameUrl} disabled={isSavingGameUrl} className="shrink-0">
+                        {isSavingGameUrl ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <Link href={`/scorecards/import?gameId=${gameId}&url=${encodeURIComponent(gameUrl)}&team1=${encodeURIComponent(game.team1)}&team2=${encodeURIComponent(game.team2)}&date=${encodeURIComponent(game.date)}&venue=${encodeURIComponent(game.venue)}&seriesId=${encodeURIComponent(game.seriesId || '')}&seriesName=${encodeURIComponent(series?.name || '')}`}
+                      className={!gameUrl ? 'pointer-events-none' : ''}>
+                      <Button size="sm" disabled={!gameUrl} className="bg-primary hover:bg-primary/90 gap-2 w-full sm:w-auto">
+                        <Table2 className="h-4 w-4" /> Import Scorecard
+                      </Button>
+                    </Link>
+                    {!gameUrl && (
+                      <p className="text-xs text-muted-foreground">Enter and save a CricClubs URL above to enable scorecard import.</p>
+                    )}
+                  </>
                 )}
               </div>
             ) : (
@@ -539,9 +575,43 @@ export default function GameDetailsPage() {
             )}
           </div>
 
-          <div className="pt-2"><h4 className="text-sm font-semibold text-muted-foreground mb-1">Selectors:</h4>
-            {gameSelectors.length > 0 ? (<ul className="list-disc list-inside text-sm text-foreground space-y-0.5">{gameSelectors.map(s => <li key={s.uid}>{s.displayName || s.email}</li>)}</ul>)
-            : (<p className="text-sm text-muted-foreground">No selectors assigned.</p>)}
+          <div className="pt-2">
+            <h4 className="text-sm font-semibold text-muted-foreground mb-2">Selectors</h4>
+            {gameSelectors.filter(s => !s.roles?.includes('admin')).length > 0 ? (
+              <div className="space-y-1.5">
+                {gameSelectors.filter(s => !s.roles?.includes('admin')).map(s => {
+                  const assignment = (game.selectorAssignments || []).find(a => a.uid === s.uid);
+                  const teamScope = assignment?.teamAssociation;
+                  return (
+                    <div key={s.uid} className="flex items-center gap-2 flex-wrap text-sm">
+                      <span className="font-medium">{s.displayName || s.email}</span>
+                      {s.clubName && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200">
+                          {s.clubName}
+                        </span>
+                      )}
+                      {teamScope && teamScope !== 'neutral' ? (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700 border border-blue-200">
+                          → {teamScope}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-muted text-muted-foreground border">
+                          Neutral
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+                {/* Legend */}
+                <div className="flex flex-wrap gap-3 pt-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1"><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200">Club</span> club association</span>
+                  <span className="flex items-center gap-1"><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">→ Team</span> scoped to rate this team</span>
+                  <span className="flex items-center gap-1"><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted text-muted-foreground border">Neutral</span> no scope set</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No selectors assigned.</p>
+            )}
           </div>
         </CardContent>
         {canManageSelectors && !isEditingSelectors && (<CardFooter className="border-t pt-4 flex gap-2 justify-between items-center">
@@ -556,65 +626,99 @@ export default function GameDetailsPage() {
       {isEditingSelectors && canManageSelectors && (<Card><CardHeader>
             <CardTitle className="text-xl font-headline text-primary">Manage Game Selectors</CardTitle>
             <CardDescription>
-              Select users with 'selector' or 'Series Admin' role in this organization. Super admins are always included.
-              <span className="block mt-1 text-xs text-muted-foreground">Optionally assign each selector a team to enable scope-based match reporting.</span>
+              Assign selectors and their team scope for this game. Club associations are used to auto-suggest which team each selector should rate.
             </CardDescription>
-          </CardHeader><CardContent className="space-y-3">
-            {/* Locked super admins */}
-            {lockedSuperAdmins.length > 0 && (
-              <div className="rounded-md border bg-muted/30 p-2 space-y-1">
-                <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Super Admins (always assigned)</p>
-                {lockedSuperAdmins.map(user => (
-                  <div key={user.uid} className="flex items-center gap-2 px-2 py-1 rounded opacity-70">
-                    <Checkbox checked disabled />
-                    <span className="text-sm flex-grow">{user.displayName || user.email}</span>
-                    <Badge variant="default" className="text-xs">Super Admin</Badge>
+          </CardHeader><CardContent className="space-y-4">
+
+            {/* Instruction box */}
+            <div className="rounded-md bg-muted/40 border px-3 py-2 text-xs text-muted-foreground">
+              Check a selector to assign them. Their club <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200 mx-0.5">Club</span> is used to suggest which team they should rate, based on your organization's rating scope. You can override the suggestion.
+            </div>
+
+            {/* Selectors section */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Selectors</p>
+              {selectableSelectors.length === 0
+                ? <p className="text-muted-foreground text-sm">No users with 'selector' or 'Series Admin' role found for this organization.</p>
+                : <div className="rounded-md border divide-y">
+                    {selectableSelectors.map(user => {
+                      const isChecked = selectedSelectorUidsForUpdate.includes(user.uid);
+                      const suggested = suggestTeamForSelector(user);
+                      return (
+                        <div key={user.uid} className={`flex items-start gap-3 px-3 py-2.5 ${isChecked ? 'bg-primary/5' : ''}`}>
+                          <Checkbox
+                            id={`selector-${user.uid}`}
+                            checked={isChecked}
+                            className="mt-0.5 shrink-0"
+                            onCheckedChange={(checked) => {
+                              setSelectedSelectorUidsForUpdate(prev => checked ? [...prev, user.uid] : prev.filter(uid => uid !== user.uid));
+                              if (checked) {
+                                setSelectorTeamMap(prev => ({ ...prev, [user.uid]: suggested }));
+                              } else {
+                                setSelectorTeamMap(prev => { const next = { ...prev }; delete next[user.uid]; return next; });
+                              }
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <label htmlFor={`selector-${user.uid}`} className="text-sm font-medium cursor-pointer flex items-center gap-2 flex-wrap">
+                              {user.displayName || user.email}
+                              <span className="text-muted-foreground font-normal text-xs">({user.roles.filter(r => r !== 'admin').join(', ')})</span>
+                              {user.clubName && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200">{user.clubName}</span>
+                              )}
+                            </label>
+                            {/* Suggestion hint — shown when checked and club matched */}
+                            {isChecked && user.clubName && suggested !== 'neutral' && (
+                              <p className="text-xs text-blue-600 mt-0.5 italic">
+                                ↗ Club matched — suggested: {suggested}
+                              </p>
+                            )}
+                            {!user.clubName && !isChecked && (
+                              <p className="text-xs text-muted-foreground mt-0.5">No club set — will default to Neutral if assigned</p>
+                            )}
+                          </div>
+                          {/* Team scope dropdown — shown when checked */}
+                          {isChecked && (
+                            <div className="shrink-0 text-right">
+                              <p className="text-xs text-muted-foreground mb-1">Team scope</p>
+                              <select
+                                value={selectorTeamMap[user.uid] || 'neutral'}
+                                onChange={e => setSelectorTeamMap(prev => ({ ...prev, [user.uid]: e.target.value }))}
+                                className="text-xs border rounded px-1.5 py-1 bg-background text-foreground h-7"
+                              >
+                                <option value="neutral">Neutral</option>
+                                <option value={game.team1}>{game.team1}</option>
+                                <option value={game.team2}>{game.team2}</option>
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
-            )}
-            {selectableSelectors.length === 0 ? (<p className="text-muted-foreground text-sm">No users with 'selector' or 'Series Admin' role found for this organization.</p>)
-            : (<ScrollArea className="h-60 rounded-md border p-4"><div className="space-y-3">
-                {selectableSelectors.map(user => {
-                  const isChecked = selectedSelectorUidsForUpdate.includes(user.uid);
-                  return (
-                    <div key={user.uid} className="flex items-center gap-2 flex-wrap">
-                      <Checkbox id={`selector-${user.uid}`} checked={isChecked}
-                        onCheckedChange={(checked) => {
-                          setSelectedSelectorUidsForUpdate(prev => checked ? [...prev, user.uid] : prev.filter(uid => uid !== user.uid));
-                          // Clear team assignment when unchecked
-                          if (!checked) setSelectorTeamMap(prev => { const next = { ...prev }; delete next[user.uid]; return next; });
-                        }} />
-                      <label htmlFor={`selector-${user.uid}`} className="text-sm font-medium leading-none flex-1 peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        {user.displayName || user.email}
-                        <span className="text-muted-foreground ml-1 text-xs">({user.roles.filter(r => r !== 'admin').join(', ')})</span>
-                      </label>
-                      {/* Team picker — always shown when selector is checked */}
-                      {isChecked && (
-                        <select
-                          value={selectorTeamMap[user.uid] || 'neutral'}
-                          onChange={e => setSelectorTeamMap(prev => ({ ...prev, [user.uid]: e.target.value }))}
-                          className="text-xs border rounded px-1.5 py-1 bg-background text-foreground h-7 shrink-0"
-                        >
-                          <option value="neutral">Neutral</option>
-                          <option value={game.team1}>{game.team1}</option>
-                          <option value={game.team2}>{game.team2}</option>
-                        </select>
-                      )}
-                    </div>
-                  );
-                })}
-              </div></ScrollArea>)}
+              }
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground pt-1">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200">Club</span>
+                Club association
+              </span>
+              <span className="flex items-center gap-1.5 italic text-blue-600">↗ auto-suggested based on club + rating scope</span>
+            </div>
+
           </CardContent><CardFooter className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => {
               setIsEditingSelectors(false);
               setSelectedSelectorUidsForUpdate(game.selectorUserIds || []);
-              // Reset team map to what was saved
               const teamMap: Record<string, string> = {};
               (game.selectorAssignments || []).forEach(a => { teamMap[a.uid] = a.teamAssociation; });
               setSelectorTeamMap(teamMap);
             }}>Cancel</Button>
-            <Button onClick={handleSaveGameSelectors} disabled={isLoadingGameSelectors}>{isLoadingGameSelectors ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Selectors</Button>
+            <Button onClick={handleSaveGameSelectors} disabled={isLoadingGameSelectors}>
+              {isLoadingGameSelectors ? <Save className="animate-spin mr-2" /> : <Save className="mr-2" />} Save Selectors
+            </Button>
           </CardFooter></Card>
       )}
 
