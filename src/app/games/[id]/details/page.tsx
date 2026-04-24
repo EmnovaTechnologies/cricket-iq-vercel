@@ -324,6 +324,8 @@ export default function GameDetailsPage() {
     }
     setIsUpdatingRoster(false);
   };
+
+  const handleAddPlayerToGameViaDropdown = async (playerId: string, teamIdentifier: 'team1' | 'team2') => {
     if (!gameId || !playerId) { toast({ title: "Error", description: "Game or Player not selected.", variant: "destructive" }); return; }
     setIsUpdatingRoster(true);
     const result = await addPlayerToGameRosterAction(gameId, playerId, teamIdentifier);

@@ -196,7 +196,9 @@ export async function bulkSetGameRosterAction(
     console.error('Error in bulkSetGameRosterAction:', error);
     return { success: false, message: error instanceof Error ? error.message : 'Unexpected error.' };
   }
-}(gameId: string, playerId: string, teamIdentifier: 'team1' | 'team2'): Promise<{ success: boolean; message: string; playerName?: string; teamName?: string }> {
+}
+
+export async function addPlayerToGameRosterAction(gameId: string, playerId: string, teamIdentifier: 'team1' | 'team2'): Promise<{ success: boolean; message: string; playerName?: string; teamName?: string }> {
   const result = await updatePlayerGameInclusionAction(gameId, playerId, teamIdentifier, true);
   if (result.success) {
     const player = await getPlayerByIdFromDB(playerId);
