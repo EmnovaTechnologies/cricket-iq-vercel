@@ -562,8 +562,7 @@ export default function GameDetailsPage() {
           </div>
 
           <div className="pt-2">
-            <h4 className="text-sm font-semibold text-muted-foreground mb-1">Selectors</h4>
-            <p className="text-xs text-muted-foreground mb-2">Assigned selectors and the team they are scoped to rate for this game.</p>
+            <h4 className="text-sm font-semibold text-muted-foreground mb-2">Selectors</h4>
             {gameSelectors.filter(s => !s.roles?.includes('admin')).length > 0 ? (
               <div className="space-y-1.5">
                 {gameSelectors.filter(s => !s.roles?.includes('admin')).map(s => {
@@ -589,6 +588,12 @@ export default function GameDetailsPage() {
                     </div>
                   );
                 })}
+                {/* Legend */}
+                <div className="flex flex-wrap gap-3 pt-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1"><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200">Club</span> club association</span>
+                  <span className="flex items-center gap-1"><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">→ Team</span> scoped to rate this team</span>
+                  <span className="flex items-center gap-1"><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted text-muted-foreground border">Neutral</span> no scope set</span>
+                </div>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No selectors assigned.</p>
