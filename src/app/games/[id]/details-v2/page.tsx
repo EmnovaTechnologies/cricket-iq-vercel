@@ -561,9 +561,37 @@ export default function GameDetailsPage() {
             )}
           </div>
 
-          <div className="pt-2"><h4 className="text-sm font-semibold text-muted-foreground mb-1">Selectors:</h4>
-            {gameSelectors.length > 0 ? (<ul className="list-disc list-inside text-sm text-foreground space-y-0.5">{gameSelectors.map(s => <li key={s.uid}>{s.displayName || s.email}</li>)}</ul>)
-            : (<p className="text-sm text-muted-foreground">No selectors assigned.</p>)}
+          <div className="pt-2">
+            <h4 className="text-sm font-semibold text-muted-foreground mb-2">Selectors</h4>
+            {gameSelectors.filter(s => !s.roles?.includes('admin')).length > 0 ? (
+              <div className="space-y-1.5">
+                {gameSelectors.filter(s => !s.roles?.includes('admin')).map(s => {
+                  const assignment = (game.selectorAssignments || []).find(a => a.uid === s.uid);
+                  const teamScope = assignment?.teamAssociation;
+                  return (
+                    <div key={s.uid} className="flex items-center gap-2 flex-wrap text-sm">
+                      <span className="font-medium">{s.displayName || s.email}</span>
+                      {s.clubName && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200">
+                          {s.clubName}
+                        </span>
+                      )}
+                      {teamScope && teamScope !== 'neutral' ? (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700 border border-blue-200">
+                          → {teamScope}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-muted text-muted-foreground border">
+                          Neutral
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No selectors assigned.</p>
+            )}
           </div>
         </CardContent>
         {canManageSelectors && !isEditingSelectors && (<CardFooter className="border-t pt-4 flex gap-2 justify-between items-center">
