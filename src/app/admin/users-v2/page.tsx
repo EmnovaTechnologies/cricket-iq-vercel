@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import { getAllUsersFromDB, getUsersForOrgAdminViewFromDB, getAllOrganizationsFromDB } from '@/lib/db';
-import { updateUserClubAction } from '@/lib/actions/user-actions';
+import { updateUserClubAdminAction } from '@/lib/actions/update-user-club-action';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
@@ -72,7 +72,7 @@ function UserDrawer({ user, allOrgs, orgClubs, isSuperAdmin, onUpdated, onClose 
   const handleSaveClub = async () => {
     setIsSavingClub(true);
     const newClub = clubValue === NO_CLUB ? null : clubValue;
-    const res = await updateUserClubAction(user.uid, newClub);
+    const res = await updateUserClubAdminAction(user.uid, newClub);
     if (res.success) {
       toast({ title: 'Club updated', description: newClub ? `Club set to ${newClub}.` : 'Club association removed.' });
       onUpdated();
