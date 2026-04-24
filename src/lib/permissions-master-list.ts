@@ -31,6 +31,7 @@ export const PERMISSIONS = {
   PAGE_VIEW_VENUES_LIST: 'page:view:venues_list',
   PAGE_VIEW_VENUE_ADD: 'page:view:venue_add',
   PAGE_VIEW_TEAM_COMPOSITION: 'page:view:team_composition',
+  PAGE_VIEW_XI_SELECTOR: 'page:view:xi_selector',
   PAGE_VIEW_ADMIN_USERS_LIST: 'page:view:admin_users_list',
   PAGE_VIEW_ADMIN_ROLE_MANAGEMENT_LIST: 'page:view:admin_role_management_list',
   PAGE_VIEW_ADMIN_ROLE_MANAGEMENT_EDIT: 'page:view:admin_role_management_edit',
@@ -143,6 +144,7 @@ export const PERMISSION_CATEGORIES = {
       PERMISSIONS.PAGE_VIEW_LOGIN,
       PERMISSIONS.PAGE_VIEW_SIGNUP,
       PERMISSIONS.PAGE_VIEW_TEAM_COMPOSITION,
+      PERMISSIONS.PAGE_VIEW_XI_SELECTOR,
       PERMISSIONS.AI_USE_TEAM_COMPOSITION,
     ]
   },
@@ -325,6 +327,7 @@ export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
   [PERMISSIONS.PAGE_VIEW_VENUES_LIST]: "View list of venues",
   [PERMISSIONS.PAGE_VIEW_VENUE_ADD]: "View 'Add New Venue' page",
   [PERMISSIONS.PAGE_VIEW_TEAM_COMPOSITION]: "Access AI Team Composition tool",
+  [PERMISSIONS.PAGE_VIEW_XI_SELECTOR]: "View XI Selector page (performance/hybrid orgs only)",
   [PERMISSIONS.PAGE_VIEW_ADMIN_USERS_LIST]: "View User Management list (Admin)",
   [PERMISSIONS.PAGE_VIEW_ADMIN_ROLE_MANAGEMENT_LIST]: "View Role Management list (Admin)",
   [PERMISSIONS.PAGE_VIEW_ADMIN_ROLE_MANAGEMENT_EDIT]: "View Role Permission Editing page (Admin)",
