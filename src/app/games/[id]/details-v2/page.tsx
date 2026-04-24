@@ -520,40 +520,54 @@ export default function GameDetailsPage() {
               </div>
             ) : canManageSelectors ? (
               <div className="space-y-2">
-                <div className="flex gap-2 items-center">
-                  <Input
-                    placeholder="https://cricclubs.com/..."
-                    value={gameUrl}
-                    onChange={e => setGameUrl(e.target.value)}
-                    className="text-sm h-9 flex-1"
-                  />
-                  {gameUrl && (
-                    <a href={gameUrl} target="_blank" rel="noopener noreferrer">
-                      <Button variant="ghost" size="sm" type="button" title="Open scorecard">
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </a>
-                  )}
-                  <Button size="sm" onClick={handleSaveGameUrl} disabled={isSavingGameUrl} className="shrink-0">
-                    {isSavingGameUrl ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  </Button>
-                </div>
                 {existingScorecardId ? (
-                  <Link href={`/scorecards/${existingScorecardId}`}>
-                    <Button size="sm" variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/10 w-full sm:w-auto">
-                      <Table2 className="h-4 w-4" /> View Scorecard
-                    </Button>
-                  </Link>
+                  // Scorecard already linked — show read-only URL + View Scorecard only
+                  <>
+                    {gameUrl && (
+                      <a href={gameUrl} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-sm text-primary underline hover:text-primary/80 break-all">
+                        <ExternalLink className="h-4 w-4 shrink-0" />
+                        {gameUrl}
+                      </a>
+                    )}
+                    <Link href={`/scorecards/${existingScorecardId}`}>
+                      <Button size="sm" variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/10 w-full sm:w-auto">
+                        <Table2 className="h-4 w-4" /> View Scorecard
+                      </Button>
+                    </Link>
+                    <p className="text-xs text-muted-foreground">A scorecard is already linked to this game. To replace it, unlink it from the scorecard details page first.</p>
+                  </>
                 ) : (
-                  <Link href={`/scorecards/import?gameId=${gameId}&url=${encodeURIComponent(gameUrl)}&team1=${encodeURIComponent(game.team1)}&team2=${encodeURIComponent(game.team2)}&date=${encodeURIComponent(game.date)}&venue=${encodeURIComponent(game.venue)}&seriesId=${encodeURIComponent(game.seriesId || '')}&seriesName=${encodeURIComponent(series?.name || '')}`}
-                    className={!gameUrl ? 'pointer-events-none' : ''}>
-                    <Button size="sm" disabled={!gameUrl} className="bg-primary hover:bg-primary/90 gap-2 w-full sm:w-auto">
-                      <Table2 className="h-4 w-4" /> Import Scorecard
-                    </Button>
-                  </Link>
-                )}
-                {!gameUrl && !existingScorecardId && (
-                  <p className="text-xs text-muted-foreground">Enter and save a CricClubs URL above to enable scorecard import.</p>
+                  // No scorecard — show editable URL + import
+                  <>
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        placeholder="https://cricclubs.com/..."
+                        value={gameUrl}
+                        onChange={e => setGameUrl(e.target.value)}
+                        className="text-sm h-9 flex-1"
+                      />
+                      {gameUrl && (
+                        <a href={gameUrl} target="_blank" rel="noopener noreferrer">
+                          <Button variant="ghost" size="sm" type="button" title="Open scorecard">
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </a>
+                      )}
+                      <Button size="sm" onClick={handleSaveGameUrl} disabled={isSavingGameUrl} className="shrink-0">
+                        {isSavingGameUrl ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <Link href={`/scorecards/import?gameId=${gameId}&url=${encodeURIComponent(gameUrl)}&team1=${encodeURIComponent(game.team1)}&team2=${encodeURIComponent(game.team2)}&date=${encodeURIComponent(game.date)}&venue=${encodeURIComponent(game.venue)}&seriesId=${encodeURIComponent(game.seriesId || '')}&seriesName=${encodeURIComponent(series?.name || '')}`}
+                      className={!gameUrl ? 'pointer-events-none' : ''}>
+                      <Button size="sm" disabled={!gameUrl} className="bg-primary hover:bg-primary/90 gap-2 w-full sm:w-auto">
+                        <Table2 className="h-4 w-4" /> Import Scorecard
+                      </Button>
+                    </Link>
+                    {!gameUrl && (
+                      <p className="text-xs text-muted-foreground">Enter and save a CricClubs URL above to enable scorecard import.</p>
+                    )}
+                  </>
                 )}
               </div>
             ) : (
