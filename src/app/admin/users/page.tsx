@@ -233,7 +233,6 @@ export default function AdminUsersV2Page() {
       setLoadingUsers(true);
       setFetchError(null);
       setUsers([]);
-      setSelectedUserUid(null);
 
       try {
         if (isSuperAdmin) {
