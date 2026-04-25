@@ -178,10 +178,7 @@ export function ScorecardImportForm() {
   useEffect(() => {
     if (!parsedSeriesNameRaw || !availableSeries.length) return;
     if (matchedSeries) return; // already matched
-    console.log('[ScoreCard retry] seriesNameRaw:', JSON.stringify(parsedSeriesNameRaw));
-    console.log('[ScoreCard retry] availableSeries:', availableSeries.map(s => `${JSON.stringify(s.name)} (${s.id})`));
     const matched = bestMatch(parsedSeriesNameRaw, availableSeries);
-    console.log('[ScoreCard retry] matched:', matched?.name, matched?.id);
     if (matched) {
       setMatchedSeries(matched);
       setSeriesId(matched.id);
@@ -246,10 +243,7 @@ export function ScorecardImportForm() {
       // Option C: fuzzy match series and teams
       if (parsed.seriesNameRaw) {
         setParsedSeriesNameRaw(parsed.seriesNameRaw);
-        console.log('[ScoreCard] seriesNameRaw:', JSON.stringify(parsed.seriesNameRaw));
-        console.log('[ScoreCard] availableSeries:', availableSeries.map(s => JSON.stringify(s.name)));
         const matched = bestMatch(parsed.seriesNameRaw, availableSeries);
-        console.log('[ScoreCard] matched:', matched?.name);
         if (matched) {
           setMatchedSeries(matched);
           setSeriesId(matched.id);

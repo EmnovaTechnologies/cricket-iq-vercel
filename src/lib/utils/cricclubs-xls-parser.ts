@@ -74,7 +74,8 @@ export function parseCricClubsCsv(csvText: string): ParsedCricClubsScorecard {
     if (idx > 0) seriesNameRaw = headerLine.slice(0, idx).trim().replace(/:?\s*$/, '').trim();
   }
   // Strip trailing "League" or "league" that CricClubs sometimes appends before team name
-  seriesNameRaw = seriesNameRaw.replace(/\s*League\s*$/i, '').trim();
+  // Also strip any trailing colon or whitespace
+  seriesNameRaw = seriesNameRaw.replace(/\s*League\s*$/i, '').replace(/:+\s*$/, '').trim();
 
   // ── Section detection ───────────────────────────────────────────────────────
   // Find all section header line indices
