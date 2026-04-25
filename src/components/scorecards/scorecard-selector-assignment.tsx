@@ -30,8 +30,9 @@ interface ScorecardSelectorAssignmentProps {
   team1: string;
   team2: string;
   assignments: ScorecardSelectorAssignment[];
-  availableSelectors: UserProfile[]; // fetched by parent
+  availableSelectors: UserProfile[];
   onAssignmentsChanged: (updated: ScorecardSelectorAssignment[]) => void;
+  ratingScope?: 'opposing_only' | 'own_team' | 'both_teams' | null;
 }
 
 export function ScorecardSelectorAssignmentPanel({
@@ -41,6 +42,7 @@ export function ScorecardSelectorAssignmentPanel({
   assignments,
   availableSelectors,
   onAssignmentsChanged,
+  ratingScope,
 }: ScorecardSelectorAssignmentProps) {
   const { toast } = useToast();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -51,6 +53,27 @@ export function ScorecardSelectorAssignmentPanel({
 
   const assignedUids = new Set(assignments.map(a => a.uid));
   const unassigned = availableSelectors.filter(u => !assignedUids.has(u.uid));
+
+  // Auto-suggest team scope when selector is picked
+  const suggestTeam = (uid: string): string => {
+    const user = availableSelectors.find(u => u.uid === uid);
+    if (!user?.clubName) return 'neutral';
+    const norm = (s: string) => s.trim().toLowerCase();
+    const club = norm(user.clubName);
+    const t1 = norm(team1);
+    const t2 = norm(team2);
+    const matchesTeam1 = t1.includes(club) || club.includes(t1);
+    const matchesTeam2 = t2.includes(club) || club.includes(t2);
+    if (matchesTeam1) return ratingScope === 'opposing_only' ? team2 : team1;
+    if (matchesTeam2) return ratingScope === 'opposing_only' ? team1 : team2;
+    return 'neutral';
+  };
+
+  // Auto-suggest when selector changes
+  useEffect(() => {
+    if (selectedUid) setSelectedTeam(suggestTeam(selectedUid));
+    else setSelectedTeam('neutral');
+  }, [selectedUid]);
 
   const handleAssign = async () => {
     if (!selectedUid) return;
@@ -131,29 +154,37 @@ export function ScorecardSelectorAssignmentPanel({
             </p>
           ) : (
             <div className="space-y-1.5">
-              {assignments.map(a => (
-                <div key={a.uid} className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-sm font-medium truncate">{a.name}</span>
-                    <Badge
-                      variant="outline"
-                      className={cn('text-xs shrink-0', teamColor(a.teamAssociation))}
+              {assignments.map(a => {
+                const profile = availableSelectors.find(u => u.uid === a.uid);
+                return (
+                  <div key={a.uid} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
+                      <span className="text-sm font-medium truncate">{a.name}</span>
+                      {profile?.clubName && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200 shrink-0">
+                          {profile.clubName}
+                        </span>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className={cn('text-xs shrink-0', teamColor(a.teamAssociation))}
+                      >
+                        {a.teamAssociation === 'neutral' ? 'Neutral' : a.teamAssociation}
+                      </Badge>
+                    </div>
+                    <button
+                      onClick={() => handleRemove(a.uid)}
+                      disabled={removingUid === a.uid}
+                      className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                      title="Remove selector"
                     >
-                      {a.teamAssociation === 'neutral' ? 'Neutral' : a.teamAssociation}
-                    </Badge>
+                      {removingUid === a.uid
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <X className="h-3.5 w-3.5" />}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleRemove(a.uid)}
-                    disabled={removingUid === a.uid}
-                    className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                    title="Remove selector"
-                  >
-                    {removingUid === a.uid
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <X className="h-3.5 w-3.5" />}
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -161,6 +192,9 @@ export function ScorecardSelectorAssignmentPanel({
           {unassigned.length > 0 && (
             <div className="border-t pt-3 space-y-2">
               <p className="text-xs font-medium text-muted-foreground">Add selector</p>
+              <p className="text-xs text-muted-foreground">
+                Club association is used to auto-suggest team scope. You can override it.
+              </p>
               <div className="flex gap-2">
                 <Select value={selectedUid} onValueChange={setSelectedUid}>
                   <SelectTrigger className="h-8 text-xs flex-1">
@@ -169,7 +203,14 @@ export function ScorecardSelectorAssignmentPanel({
                   <SelectContent>
                     {unassigned.map(u => (
                       <SelectItem key={u.uid} value={u.uid} className="text-xs">
-                        {u.displayName || u.email}
+                        <span className="flex items-center gap-2">
+                          {u.displayName || u.email}
+                          {u.clubName && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200">
+                              {u.clubName}
+                            </span>
+                          )}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -197,6 +238,19 @@ export function ScorecardSelectorAssignmentPanel({
                     : <UserPlus className="h-3.5 w-3.5" />}
                 </Button>
               </div>
+              {/* Suggestion hint */}
+              {selectedUid && (() => {
+                const suggested = suggestTeam(selectedUid);
+                const user = availableSelectors.find(u => u.uid === selectedUid);
+                if (user?.clubName && suggested !== 'neutral') {
+                  return (
+                    <p className="text-xs text-blue-600 italic">
+                      ↗ Club matched — suggested team scope: {suggested}
+                    </p>
+                  );
+                }
+                return null;
+              })()}
             </div>
           )}
 

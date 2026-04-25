@@ -453,6 +453,7 @@ export default function ScorecardDetailsPage() {
                 assignments={selectorAssignments}
                 availableSelectors={availableSelectors}
                 onAssignmentsChanged={setSelectorAssignments}
+                ratingScope={activeOrganizationDetails?.ratingScope}
               />
             </div>
           )}
