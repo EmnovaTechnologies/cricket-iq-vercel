@@ -214,6 +214,7 @@ export async function getUsersForOrgAdminViewFromDB(organizationId: string): Pro
       createdAt: createdAtTimestamp?.toDate?.().toISOString() || null,
       lastLogin: lastLoginTimestamp?.toDate?.().toISOString() || null,
       phoneNumber: data.phoneNumber || null,
+      clubName: data.clubName || null,
     });
   });
 
