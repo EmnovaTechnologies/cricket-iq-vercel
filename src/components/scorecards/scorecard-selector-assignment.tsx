@@ -54,9 +54,12 @@ export function ScorecardSelectorAssignmentPanel({
   const assignedUids = new Set(assignments.map(a => a.uid));
   const unassigned = availableSelectors.filter(u => !assignedUids.has(u.uid));
 
+  // Full lookup map including already-assigned selectors
+  const selectorMap = new Map(availableSelectors.map(u => [u.uid, u]));
+
   // Auto-suggest team scope when selector is picked
   const suggestTeam = (uid: string): string => {
-    const user = availableSelectors.find(u => u.uid === uid);
+    const user = selectorMap.get(uid);
     if (!user?.clubName) return 'neutral';
     const norm = (s: string) => s.trim().toLowerCase();
     const club = norm(user.clubName);
@@ -155,7 +158,7 @@ export function ScorecardSelectorAssignmentPanel({
           ) : (
             <div className="space-y-1.5">
               {assignments.map(a => {
-                const profile = availableSelectors.find(u => u.uid === a.uid);
+                const profile = selectorMap.get(a.uid);
                 return (
                   <div key={a.uid} className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
@@ -241,7 +244,7 @@ export function ScorecardSelectorAssignmentPanel({
               {/* Suggestion hint */}
               {selectedUid && (() => {
                 const suggested = suggestTeam(selectedUid);
-                const user = availableSelectors.find(u => u.uid === selectedUid);
+                const user = selectorMap.get(selectedUid);
                 if (user?.clubName && suggested !== 'neutral') {
                   return (
                     <p className="text-xs text-blue-600 italic">
