@@ -232,7 +232,7 @@ export default function AdminUsersV2Page() {
     const fetchData = async () => {
       setLoadingUsers(true);
       setFetchError(null);
-      setUsers([]);
+      // Don't clear users here — preserves drawer state during refresh
 
       try {
         if (isSuperAdmin) {

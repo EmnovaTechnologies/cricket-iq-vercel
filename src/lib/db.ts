@@ -184,6 +184,8 @@ export async function getAllUsersFromDB(): Promise<UserProfile[]> {
       createdAt: createdAtTimestamp?.toDate?.().toISOString() || null,
       lastLogin: lastLoginTimestamp?.toDate?.().toISOString() || null,
       phoneNumber: data.phoneNumber || null,
+      playerId: data.playerId || null,
+      clubName: data.clubName || null,
     });
   });
   // Perform sorting in the code instead of the database query
