@@ -44,6 +44,7 @@ import type {
 import {
   getAllSeriesFromDB,
   getTeamByNameFromDB, // Now used directly in loop
+  getTeamByNameAndEligibilityFromDB,
   // getVenueByIdFromDB, // Not directly used here, but kept for other actions if needed
   getPlayersFromIds,
   getSeriesByNameFromDB,
@@ -479,7 +480,14 @@ export async function importPlayersAction(playersData: CsvPlayerImportRow[], org
         
         let primaryTeamIdToLink: string | undefined = undefined;
         if (PrimaryTeamName && PrimaryTeamName !== "") {
-            const team = await getTeamByNameFromDB(PrimaryTeamName, organizationIdForImport); 
+            // Use DOB + gender aware lookup to disambiguate teams with same name
+            // across different age categories (e.g. U13 vs U15 San Diego Bolts BLUE)
+            const team = await getTeamByNameAndEligibilityFromDB(
+              PrimaryTeamName,
+              organizationIdForImport,
+              dateOfBirth,
+              gender
+            );
             if (!team) {
                 errors.push({ rowNumber, csvRow: row, error: `PrimaryTeamName "${PrimaryTeamName}" not found in the active organization.` });
                 continue;

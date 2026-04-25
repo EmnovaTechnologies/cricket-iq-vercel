@@ -476,6 +476,109 @@ export async function getPlayersForTeamFromDB(teamId: string): Promise<Player[]>
   return players.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// ─── DOB + Gender aware team lookup ──────────────────────────────────────────
+/**
+ * Like getTeamByNameFromDB but when multiple teams match the normalized name,
+ * uses the player's DOB and gender to pick the correct one by checking age
+ * eligibility against each team's associated series cutoff dates.
+ *
+ * Resolution order when multiple name matches found:
+ * 1. Filter to teams where the player is age-eligible (via series cutoffs)
+ * 2. Among eligible teams, pick the most restrictive age category (smallest U-number)
+ * 3. If still tied or no series found, fall back to first match
+ */
+export async function getTeamByNameAndEligibilityFromDB(
+  name: string,
+  organizationId: string,
+  dateOfBirth: string,  // yyyy-MM-dd
+  gender: 'Male' | 'Female'
+): Promise<Team | undefined> {
+  if (!name || name.trim() === '') return undefined;
+  const normalize = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+  const normalizedInput = normalize(name);
+
+  // Fetch all org teams and find name matches
+  const teamsSnap = await getDocs(
+    query(collection(db, 'teams'), where('organizationId', '==', organizationId))
+  );
+  const matches = teamsSnap.docs
+    .filter(d => typeof d.data().name === 'string' && normalize(d.data().name) === normalizedInput)
+    .map(d => ({ id: d.id, ...d.data() } as Team));
+
+  if (matches.length === 0) return undefined;
+  if (matches.length === 1) return matches[0];
+
+  // Multiple matches — need DOB eligibility check
+  // For each matching team, find its series and check cutoff dates
+  const playerDOB = parseISO(dateOfBirth);
+  if (!isValid(playerDOB)) return matches[0]; // fallback if DOB invalid
+
+  const eligibleTeams: Array<{ team: Team; ageLimit: number }> = [];
+
+  for (const team of matches) {
+    // Find active series that contain this team
+    const seriesSnap = await getDocs(
+      query(
+        collection(db, 'series'),
+        where('organizationId', '==', organizationId),
+        where('participatingTeams', 'array-contains', team.id),
+        where('status', '==', 'active')
+      )
+    );
+
+    if (seriesSnap.empty) {
+      // No series found — fall back to ageCategory check
+      const ageMatch = (team.ageCategory || '').match(/Under (\d+)/);
+      const ageLimit = ageMatch ? parseInt(ageMatch[1]) : 99;
+      const playerAge = new Date().getFullYear() - playerDOB.getFullYear();
+      if (playerAge <= ageLimit) {
+        eligibleTeams.push({ team, ageLimit });
+      }
+      continue;
+    }
+
+    // Check eligibility against each series
+    for (const seriesDoc of seriesSnap.docs) {
+      const s = seriesDoc.data();
+      const series = {
+        id: seriesDoc.id,
+        name: s.name,
+        ageCategory: s.ageCategory,
+        year: s.year,
+        maleCutoffDate: s.maleCutoffDate || null,
+        femaleCutoffDate: s.femaleCutoffDate || null,
+      } as Series;
+
+      const cutoffDateStr = gender === 'Male' ? series.maleCutoffDate : series.femaleCutoffDate;
+
+      let eligible = false;
+      if (cutoffDateStr) {
+        const cutoff = parseISO(cutoffDateStr);
+        eligible = isValid(cutoff) && playerDOB.getTime() >= cutoff.getTime();
+      } else {
+        // No cutoff — use ageCategory
+        eligible = isPlayerAgeEligibleForTeamCategory(
+          { dateOfBirth, gender } as Player,
+          series.ageCategory,
+          series.year
+        );
+      }
+
+      if (eligible) {
+        const ageMatch = (series.ageCategory || '').match(/Under (\d+)/);
+        const ageLimit = ageMatch ? parseInt(ageMatch[1]) : 99;
+        eligibleTeams.push({ team, ageLimit });
+        break; // one eligible series is enough for this team
+      }
+    }
+  }
+
+  if (eligibleTeams.length === 0) return matches[0]; // no eligible match — fallback
+  // Pick most restrictive (smallest age limit) — U13 over U15
+  eligibleTeams.sort((a, b) => a.ageLimit - b.ageLimit);
+  return eligibleTeams[0].team;
+}
+
 export async function getTeamsByAgeCategoryFromDB(ageCategory: AgeCategory, organizationId?: string): Promise<Team[]> {
   const queryConstraints: QueryConstraint[] = [where('ageCategory', '==', ageCategory), orderBy('name')];
   if (organizationId) {
