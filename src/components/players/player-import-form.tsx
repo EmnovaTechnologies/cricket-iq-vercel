@@ -191,7 +191,7 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array', raw: false });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         // Use 'Players Import' sheet if present, else first sheet
         const sheetName = workbook.SheetNames.find(n => n === 'Players Import') || workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
@@ -211,11 +211,27 @@ export function PlayerImportForm({ mode = 'csv' }: PlayerImportFormProps) {
           setXlsxFile(null); setXlsxFileName(null); event.target.value = '';
           return;
         }
-        const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false, header: headers });
-        // Skip header row (index 0), filter empty rows
-        const validRows = rows.slice(1).filter(row =>
-          EXPECTED_HEADERS.some(h => row[h] && String(row[h]).trim() !== '')
-        ) as CsvPlayerImportRow[];
+        // Use raw:true so we get native values including Date objects for date cells
+        const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: true, header: headers });
+        // Skip header row, filter empty rows, and normalize date cells to MM/DD/YYYY strings
+        const validRows = rows.slice(1)
+          .filter(row => EXPECTED_HEADERS.some(h => row[h] && String(row[h]).trim() !== ''))
+          .map(row => {
+            const normalized: Record<string, string> = {};
+            for (const key of Object.keys(row)) {
+              const val = row[key];
+              if (key === 'DateOfBirth' && val instanceof Date) {
+                // Format JS Date to MM/DD/YYYY
+                const m = String(val.getMonth() + 1).padStart(2, '0');
+                const d = String(val.getDate()).padStart(2, '0');
+                const y = val.getFullYear();
+                normalized[key] = `${m}/${d}/${y}`;
+              } else {
+                normalized[key] = val == null ? '' : String(val);
+              }
+            }
+            return normalized;
+          }) as CsvPlayerImportRow[];
         setXlsxParsedData(validRows);
         toast({ title: 'Excel file ready', description: `${validRows.length} rows found. Click Import to proceed.` });
       } catch (err) {
