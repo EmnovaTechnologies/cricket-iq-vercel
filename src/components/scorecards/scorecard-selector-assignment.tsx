@@ -164,7 +164,7 @@ export function ScorecardSelectorAssignmentPanel({
                     <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
                       <span className="text-sm font-medium truncate">{a.name}</span>
                       {profile?.clubName && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200 shrink-0">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                           {profile.clubName}
                         </span>
                       )}
@@ -192,12 +192,14 @@ export function ScorecardSelectorAssignmentPanel({
           )}
 
           {/* Add selector */}
+          {/* Instruction */}
+          <p className="text-xs text-muted-foreground border-t pt-2">
+            Club associations (shown in green) are used to auto-suggest team scope based on your org's rating settings.
+          </p>
+
           {unassigned.length > 0 && (
             <div className="border-t pt-3 space-y-2">
               <p className="text-xs font-medium text-muted-foreground">Add selector</p>
-              <p className="text-xs text-muted-foreground">
-                Club association is used to auto-suggest team scope. You can override it.
-              </p>
               <div className="flex gap-2">
                 <Select value={selectedUid} onValueChange={setSelectedUid}>
                   <SelectTrigger className="h-8 text-xs flex-1">
@@ -209,7 +211,7 @@ export function ScorecardSelectorAssignmentPanel({
                         <span className="flex items-center gap-2">
                           {u.displayName || u.email}
                           {u.clubName && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-50 text-amber-700 border border-amber-200">
                               {u.clubName}
                             </span>
                           )}
