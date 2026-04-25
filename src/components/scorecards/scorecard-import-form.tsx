@@ -100,8 +100,9 @@ export function ScorecardImportForm() {
 
   // Option C: matched/unmatched state
   const [matchedSeries, setMatchedSeries] = useState<Series | null>(null);
-  const [unmatchedSeries, setUnmatchedSeries] = useState<string>(''); // raw name from file
+  const [unmatchedSeries, setUnmatchedSeries] = useState<string>('');
   const [createNewSeries, setCreateNewSeries] = useState(false);
+  const [parsedSeriesNameRaw, setParsedSeriesNameRaw] = useState<string>(''); // retained for retry
 
   const [matchedTeam1, setMatchedTeam1] = useState<Team | null>(null);
   const [matchedTeam2, setMatchedTeam2] = useState<Team | null>(null);
@@ -173,7 +174,23 @@ export function ScorecardImportForm() {
     reader.readAsDataURL(file);
   };
 
-  // ── Auto-match game when series/teams/date are known ────────────────────
+  // ── Retry series auto-match when availableSeries loads (race condition fix) ─
+  useEffect(() => {
+    if (!parsedSeriesNameRaw || !availableSeries.length) return;
+    if (matchedSeries) return; // already matched
+    const matched = bestMatch(parsedSeriesNameRaw, availableSeries);
+    if (matched) {
+      setMatchedSeries(matched);
+      setSeriesId(matched.id);
+      setSeriesName(matched.name);
+      setUnmatchedSeries('');
+      setCreateNewSeries(false);
+      // Also trigger game auto-match if teams and date are known
+      if (activeOrganizationId && team1 && team2 && date) {
+        tryAutoMatchGame(activeOrganizationId, matched.id, team1, team2, date);
+      }
+    }
+  }, [availableSeries, parsedSeriesNameRaw]);
   const tryAutoMatchGame = useCallback(async (
     orgId: string, sid: string, t1: string, t2: string, d: string
   ) => {
@@ -225,6 +242,7 @@ export function ScorecardImportForm() {
 
       // Option C: fuzzy match series and teams
       if (parsed.seriesNameRaw) {
+        setParsedSeriesNameRaw(parsed.seriesNameRaw);
         const matched = bestMatch(parsed.seriesNameRaw, availableSeries);
         if (matched) {
           setMatchedSeries(matched);
