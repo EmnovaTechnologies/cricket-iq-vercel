@@ -38,6 +38,7 @@ import {
 } from '../db';
 import { getUserProfile } from '../user-actions'; // For admin checks or getting display names
 import { isValid, parse, format } from 'date-fns';
+import { syncGameSelectorsToScorecard } from './selector-sync-actions';
 
 // --- Game Actions ---
 export async function addGameAction(gameData: GameFormValuesType & { selectorUserIds?: string[] }): Promise<Game> {
@@ -270,27 +271,10 @@ export async function updateGameSelectorsAction(
 
     await batch.commit();
 
-    // ── Sync to linked scorecard (skip to prevent loop) ─────────────────────
-    const existingScorecardId = (currentGameData as any).existingScorecardId as string | undefined;
-    if (existingScorecardId) {
-      try {
-        const scRef = doc(db, 'matchScorecards', existingScorecardId);
-        const scSnap = await getDoc(scRef);
-        if (scSnap.exists()) {
-          const scData = scSnap.data()!;
-          const scAssignments: any[] = scData.selectorAssignments || [];
-          // Remove uids no longer in game selectors, then merge game assignments
-          const filtered = scAssignments.filter((a: any) => newSelectorUserIds.includes(a.uid));
-          const filteredUids = new Set(filtered.map((a: any) => a.uid));
-          for (const ga of (newSelectorAssignments || [])) {
-            if (!filteredUids.has(ga.uid)) filtered.push(ga);
-          }
-          await updateDoc(scRef, { selectorAssignments: filtered });
-        }
-      } catch (syncErr) {
-        console.error('[updateGameSelectorsAction] Scorecard sync failed (non-fatal):', syncErr);
-      }
-    }
+    // Sync to linked scorecard (non-fatal)
+    syncGameSelectorsToScorecard(gameId, newSelectorUserIds, newSelectorAssignments || []).catch(e =>
+      console.error('[updateGameSelectorsAction] Scorecard sync failed:', e)
+    );
 
     return { success: true, message: "Game selectors updated successfully." };
   } catch (error) {
