@@ -164,7 +164,7 @@ export function ScorecardSelectorAssignmentPanel({
                     <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
                       <span className="text-sm font-medium truncate">{a.name}</span>
                       {profile?.clubName && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200 shrink-0">
                           {profile.clubName}
                         </span>
                       )}
@@ -191,11 +191,21 @@ export function ScorecardSelectorAssignmentPanel({
             </div>
           )}
 
-          {/* Add selector */}
-          {/* Instruction */}
-          <p className="text-xs text-muted-foreground border-t pt-2">
-            Club associations (shown in green) are used to auto-suggest team scope based on your org's rating settings.
-          </p>
+          {/* Legend */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-xs">Club</span>
+              club association
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 text-xs">→ Team</span>
+              scoped to rate this team
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted text-muted-foreground border text-xs">Neutral</span>
+              no scope set
+            </span>
+          </div>
 
           {unassigned.length > 0 && (
             <div className="border-t pt-3 space-y-2">
@@ -211,7 +221,7 @@ export function ScorecardSelectorAssignmentPanel({
                         <span className="flex items-center gap-2">
                           {u.displayName || u.email}
                           {u.clubName && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-50 text-amber-700 border border-amber-200">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200">
                               {u.clubName}
                             </span>
                           )}
