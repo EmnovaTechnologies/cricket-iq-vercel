@@ -580,7 +580,7 @@ export async function autoMatchGameAction(params: {
 }): Promise<{ gameId?: string; gameName?: string; error?: string }> {
   try {
     const { organizationId, seriesId, team1, team2, date } = params;
-    const normalize = (s: string) => s.trim().toLowerCase();
+    const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
 
     let q = adminDb.collection('games')
       .where('organizationId', '==', organizationId);

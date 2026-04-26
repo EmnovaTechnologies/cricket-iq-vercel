@@ -48,8 +48,8 @@ export function parseCricClubsCsv(csvText: string): ParsedCricClubsScorecard {
 
   // Extract team names from "Team1 Vs Team2"
   const vsMatch = teamVsLine.match(/^(.+?)\s+[Vv][Ss]\.?\s+(.+)$/);
-  const team1 = vsMatch ? vsMatch[1].trim() : '';
-  const team2 = vsMatch ? vsMatch[2].trim() : '';
+  const team1 = vsMatch ? vsMatch[1].trim().replace(/\s+/g, ' ') : '';
+  const team2 = vsMatch ? vsMatch[2].trim().replace(/\s+/g, ' ') : '';
 
   // Extract date from header "(MM/DD/YYYY)" or "(YYYY-MM-DD)"
   const dateMatch = headerLine.match(/\((\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\)/);
