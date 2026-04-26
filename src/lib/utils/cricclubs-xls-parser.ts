@@ -86,9 +86,9 @@ export function parseCricClubsCsv(csvText: string): ParsedCricClubsScorecard {
     const battingMatch = cl.match(/^(.+?)\s+Batting[\s,]*$/i);
     const bowlingMatch = cl.match(/^(.+?)\s+Bowling[\s,]*$/i);
     const fowMatch = cl.match(/^(.+?)\s+Fall\s+of\s+[Ww]ickets?[\s,]*$/i);
-    if (battingMatch) sections.push({ type: 'batting', team: battingMatch[1].trim(), lineIdx: i });
-    else if (bowlingMatch) sections.push({ type: 'bowling', team: bowlingMatch[1].trim(), lineIdx: i });
-    else if (fowMatch) sections.push({ type: 'fow', team: fowMatch[1].trim(), lineIdx: i });
+    if (battingMatch) sections.push({ type: 'batting', team: battingMatch[1].trim().replace(/\s+/g, ' '), lineIdx: i });
+    else if (bowlingMatch) sections.push({ type: 'bowling', team: bowlingMatch[1].trim().replace(/\s+/g, ' '), lineIdx: i });
+    else if (fowMatch) sections.push({ type: 'fow', team: fowMatch[1].trim().replace(/\s+/g, ' '), lineIdx: i });
   }
 
   // ── Build innings ───────────────────────────────────────────────────────────
