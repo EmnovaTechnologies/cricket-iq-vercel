@@ -41,6 +41,8 @@ export default function ScorecardsPage() {
   const [mounted, setMounted] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedSeries, setSelectedSeries] = useState<string>('all');
+  const [selectedTeam, setSelectedTeam] = useState<string>('all');
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -148,6 +150,38 @@ export default function ScorecardsPage() {
     }
   }, [selectedYear, activeOrganizationId]);
 
+  // Reset team/date when series or year changes
+  useEffect(() => {
+    setSelectedTeam('all');
+    setSelectedDate('');
+  }, [selectedSeries, selectedYear]);
+
+  const availableTeams = useMemo(() => {
+    const teams = new Set<string>();
+    scorecards.forEach(sc => {
+      const yearOk = selectedYear === 'all' || (sc.date && (() => { try { return parseISO(sc.date).getFullYear().toString() === selectedYear; } catch { return false; } })());
+      const seriesOk = selectedSeries === 'all' || (selectedSeries === 'none' && !sc.seriesId) || sc.seriesId === selectedSeries;
+      if (yearOk && seriesOk) {
+        if (sc.team1) teams.add(sc.team1);
+        if (sc.team2) teams.add(sc.team2);
+      }
+    });
+    return Array.from(teams).sort((a, b) => a.localeCompare(b));
+  }, [scorecards, selectedYear, selectedSeries]);
+
+  const availableDates = useMemo(() => {
+    const dates = new Set<string>();
+    scorecards.forEach(sc => {
+      const yearOk = selectedYear === 'all' || (sc.date && (() => { try { return parseISO(sc.date).getFullYear().toString() === selectedYear; } catch { return false; } })());
+      const seriesOk = selectedSeries === 'all' || (selectedSeries === 'none' && !sc.seriesId) || sc.seriesId === selectedSeries;
+      const teamOk = selectedTeam === 'all' || sc.team1 === selectedTeam || sc.team2 === selectedTeam;
+      if (yearOk && seriesOk && teamOk && sc.date) {
+        dates.add(sc.date.slice(0, 10));
+      }
+    });
+    return Array.from(dates).sort((a, b) => b.localeCompare(a));
+  }, [scorecards, selectedYear, selectedSeries, selectedTeam]);
+
   const filteredScorecards = useMemo(() => {
     return scorecards.filter(sc => {
       // When a specific series is selected, skip year filter —
@@ -160,9 +194,11 @@ export default function ScorecardsPage() {
       const seriesMatch = selectedSeries === 'all'
         || (selectedSeries === 'none' && !sc.seriesId)
         || sc.seriesId === selectedSeries;
-      return yearMatch && seriesMatch;
+      const teamMatch = selectedTeam === 'all' || sc.team1 === selectedTeam || sc.team2 === selectedTeam;
+      const dateMatch = !selectedDate || sc.date?.slice(0, 10) === selectedDate;
+      return yearMatch && seriesMatch && teamMatch && dateMatch;
     });
-  }, [scorecards, selectedYear, selectedSeries]);
+  }, [scorecards, selectedYear, selectedSeries, selectedTeam, selectedDate]);
 
   // Games with no imported scorecard in the selected series
   const missingGames = useMemo(() => {
@@ -252,6 +288,29 @@ export default function ScorecardsPage() {
                         {filteredSeriesOptions.map(s => (
                           <SelectItem key={s.id} value={s.id}>{s.name} ({s.year})</SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Team</label>
+                    <Select value={selectedTeam} onValueChange={setSelectedTeam} disabled={availableTeams.length === 0}>
+                      <SelectTrigger><SelectValue placeholder={availableTeams.length === 0 ? 'No teams' : 'Select Team'} /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Teams</SelectItem>
+                        {availableTeams.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Date</label>
+                    <Select value={selectedDate || 'all'} onValueChange={v => setSelectedDate(v === 'all' ? '' : v)} disabled={availableDates.length === 0}>
+                      <SelectTrigger><SelectValue placeholder={availableDates.length === 0 ? 'No dates' : 'Select Date'} /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Dates</SelectItem>
+                        {availableDates.map(d => {
+                          const label = (() => { try { return format(parseISO(d), 'MMM d, yyyy'); } catch { return d; } })();
+                          return <SelectItem key={d} value={d}>{label}</SelectItem>;
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
