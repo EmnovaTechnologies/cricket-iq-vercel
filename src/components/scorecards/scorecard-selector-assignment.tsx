@@ -120,8 +120,7 @@ export function ScorecardSelectorAssignmentPanel({
   };
 
   const teamColor = (team: string) => {
-    if (team === team1) return 'bg-blue-100 text-blue-700 border-blue-200';
-    if (team === team2) return 'bg-green-100 text-green-700 border-green-200';
+    if (team === team1 || team === team2) return 'bg-blue-100 text-blue-700 border-blue-200';
     return 'bg-muted text-muted-foreground';
   };
 
@@ -172,7 +171,7 @@ export function ScorecardSelectorAssignmentPanel({
                         variant="outline"
                         className={cn('text-xs shrink-0', teamColor(a.teamAssociation))}
                       >
-                        {a.teamAssociation === 'neutral' ? 'Neutral' : a.teamAssociation}
+                        {a.teamAssociation === 'neutral' ? 'Neutral' : `→ ${a.teamAssociation}`}
                       </Badge>
                     </div>
                     <button
@@ -191,21 +190,11 @@ export function ScorecardSelectorAssignmentPanel({
             </div>
           )}
 
-          {/* Legend */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-xs">Club</span>
-              club association
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 text-xs">→ Team</span>
-              scoped to rate this team
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted text-muted-foreground border text-xs">Neutral</span>
-              no scope set
-            </span>
-          </div>
+          {/* Add selector */}
+          {/* Instruction */}
+          <p className="text-xs text-muted-foreground border-t pt-2">
+            Club associations (shown in green) are used to auto-suggest team scope based on your org's rating settings.
+          </p>
 
           {unassigned.length > 0 && (
             <div className="border-t pt-3 space-y-2">
