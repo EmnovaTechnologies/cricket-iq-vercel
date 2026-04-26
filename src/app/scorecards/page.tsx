@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
-import { getScorecardsForOrgAction, deleteScorecardAction } from '@/lib/actions/scorecard-actions';
+import { getScorecardsForOrgAction, getScorecardsForSelectorAction, deleteScorecardAction } from '@/lib/actions/scorecard-actions';
 import { getMatchReportsForScorecardAction } from '@/lib/actions/match-report-actions';
 import { getGamesForSeriesAction } from '@/lib/actions/series-actions';
 import { getAllSeriesFromDB } from '@/lib/db';
@@ -66,12 +66,23 @@ export default function ScorecardsPage() {
   const isSelector = userProfile?.roles?.includes('selector') || userProfile?.roles?.includes('Series Admin') || userProfile?.roles?.includes('Organization Admin');
 
   const fetchScorecards = useCallback(async () => {
-    if (!activeOrganizationId) { setScorecards([]); setAllSeries([]); setIsLoading(false); return; }
+    if (!activeOrganizationId || !currentUser) { setScorecards([]); setAllSeries([]); setIsLoading(false); return; }
     setIsLoading(true);
+
+    // Pure selectors (no admin/org-admin/series-admin role) only see scorecards they are assigned to
+    const isSelectorOnly =
+      !!userProfile?.roles?.includes('selector') &&
+      !userProfile?.roles?.includes('admin') &&
+      !userProfile?.roles?.includes('Organization Admin') &&
+      !userProfile?.roles?.includes('Series Admin');
+
     const [result, series] = await Promise.all([
-      getScorecardsForOrgAction(activeOrganizationId),
+      isSelectorOnly
+        ? getScorecardsForSelectorAction(currentUser.uid, activeOrganizationId)
+        : getScorecardsForOrgAction(activeOrganizationId),
       getAllSeriesFromDB('all', activeOrganizationId),
     ]);
+
     const loadedScorecards = result.success ? result.scorecards || [] : [];
     if (result.success) setScorecards(loadedScorecards);
     setAllSeries(series || []);
@@ -86,7 +97,7 @@ export default function ScorecardsPage() {
       setScorecardsWithReports(new Set(reportChecks.filter(c => c.hasReports).map(c => c.id)));
     }
     setIsLoading(false);
-  }, [activeOrganizationId]);
+  }, [activeOrganizationId, currentUser, userProfile]);
 
   useEffect(() => { fetchScorecards(); }, [fetchScorecards]);
 
