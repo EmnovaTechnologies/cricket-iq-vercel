@@ -66,6 +66,11 @@ export default function ScorecardsPage() {
 
   const canImport = effectivePermissions[PERMISSIONS.SCORECARDS_IMPORT];
   const isSelector = userProfile?.roles?.includes('selector') || userProfile?.roles?.includes('Series Admin') || userProfile?.roles?.includes('Organization Admin');
+  const isSelectorOnly =
+    !!userProfile?.roles?.includes('selector') &&
+    !userProfile?.roles?.includes('admin') &&
+    !userProfile?.roles?.includes('Organization Admin') &&
+    !userProfile?.roles?.includes('Series Admin');
 
   const fetchScorecards = useCallback(async () => {
     if (!activeOrganizationId || !currentUser) { setScorecards([]); setAllSeries([]); setIsLoading(false); return; }
@@ -217,7 +222,7 @@ export default function ScorecardsPage() {
     });
   }, [seriesGames, scorecards, selectedSeries]);
 
-  const showMissingTab = selectedSeries && selectedSeries !== 'all' && selectedSeries !== 'none';
+  const showMissingTab = !isSelectorOnly && selectedSeries && selectedSeries !== 'all' && selectedSeries !== 'none';
 
   if (!mounted) return <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   if (authLoading || isPermissionsLoading || (isLoading && !!activeOrganizationId)) return <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
