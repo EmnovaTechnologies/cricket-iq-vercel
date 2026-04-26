@@ -94,22 +94,30 @@ export default function SelectorDashboard() {
         // 1. Directly assigned (via selectorAssignments)
         // 2. Game-linked (via assigned games)
         // 3. All org scorecards (fallback — matching web behavior)
+        // Determine if pure selector (no admin/org-admin/series-admin)
+        const isSelectorOnly =
+          !!userProfile?.roles?.includes('selector') &&
+          !userProfile?.roles?.includes('admin') &&
+          !userProfile?.roles?.includes('Organization Admin') &&
+          !userProfile?.roles?.includes('Series Admin');
+
         const assignedGameIds = new Set(assignedGames.map(g => g.id));
         const direct = directScorecardsResult.success ? directScorecardsResult.scorecards || [] : [];
         const directIds = new Set(direct.map((sc: any) => sc.id));
         const gameLinked = (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
           .filter((sc: any) => sc.linkedGameId && assignedGameIds.has(sc.linkedGameId) && !directIds.has(sc.id));
         const gameLinkedIds = new Set(gameLinked.map((sc: any) => sc.id));
-        // All remaining org scorecards
-        const allOthers = (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
+
+        // Pure selectors only see their assigned + game-linked scorecards
+        // Admins/org-admins/series-admins see all org scorecards
+        const allOthers = isSelectorOnly ? [] : (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
           .filter((sc: any) => !directIds.has(sc.id) && !gameLinkedIds.has(sc.id));
-        // Merge: assigned first, then game-linked, then all others
+
         const merged = [
           ...direct,
           ...gameLinked,
           ...allOthers,
         ].sort((a: any, b: any) => {
-          // Assigned scorecards sort first
           const aAssigned = directIds.has(a.id);
           const bAssigned = directIds.has(b.id);
           if (aAssigned && !bAssigned) return -1;
