@@ -136,9 +136,9 @@ export function ScorecardSelectorAssignmentPanel({
           <span className="text-xs font-medium">
             Assigned Selectors
           </span>
-          {assignments.filter(a => !selectorMap.get(a.uid)?.roles?.includes('admin')).length > 0 && (
+          {assignments.filter(a => selectorMap.has(a.uid)).length > 0 && (
             <Badge variant="secondary" className="text-xs h-4 px-1.5">
-              {assignments.filter(a => !selectorMap.get(a.uid)?.roles?.includes('admin')).length}
+              {assignments.filter(a => selectorMap.has(a.uid)).length}
             </Badge>
           )}
         </div>
@@ -150,13 +150,13 @@ export function ScorecardSelectorAssignmentPanel({
       {isExpanded && (
         <div className="px-3 py-3 space-y-3">
           {/* Current assignments */}
-          {assignments.filter(a => !selectorMap.get(a.uid)?.roles?.includes('admin')).length === 0 ? (
+          {assignments.filter(a => selectorMap.has(a.uid)).length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-1">
               No selectors assigned yet.
             </p>
           ) : (
             <div className="space-y-1.5">
-              {assignments.filter(a => !selectorMap.get(a.uid)?.roles?.includes('admin')).map(a => {
+              {assignments.filter(a => selectorMap.has(a.uid)).map(a => {
                 const profile = selectorMap.get(a.uid);
                 return (
                   <div key={a.uid} className="flex items-center justify-between gap-2">
