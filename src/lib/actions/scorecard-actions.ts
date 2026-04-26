@@ -488,24 +488,46 @@ export async function unlinkScorecardPlayerAction(
 
 export async function assignSelectorToScorecardAction(
   scorecardId: string,
-  assignment: { uid: string; name: string; teamAssociation: string }
+  assignment: { uid: string; name: string; teamAssociation: string },
+  skipSync = false
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const ref = adminDb.collection('matchScorecards').doc(scorecardId);
-    const doc = await ref.get();
-    if (!doc.exists) return { success: false, error: 'Scorecard not found.' };
+    const scDoc = await ref.get();
+    if (!scDoc.exists) return { success: false, error: 'Scorecard not found.' };
 
-    const existing: any[] = doc.data()?.selectorAssignments || [];
+    const existing: any[] = scDoc.data()?.selectorAssignments || [];
     if (existing.some((a: any) => a.uid === assignment.uid)) {
       return { success: false, error: 'Selector already assigned to this scorecard.' };
     }
 
+    const newAssignment = { ...assignment, assignedAt: new Date().toISOString() };
     await ref.update({
-      selectorAssignments: admin.firestore.FieldValue.arrayUnion({
-        ...assignment,
-        assignedAt: new Date().toISOString(),
-      }),
+      selectorAssignments: admin.firestore.FieldValue.arrayUnion(newAssignment),
     });
+
+    // ── Sync to linked game (skip to prevent loop) ──────────────────────────
+    if (!skipSync) {
+      const linkedGameId = scDoc.data()?.linkedGameId;
+      if (linkedGameId) {
+        const gameRef = adminDb.collection('games').doc(linkedGameId);
+        const gameSnap = await gameRef.get();
+        if (gameSnap.exists) {
+          const gameData = gameSnap.data()!;
+          const gameAssignments: any[] = gameData.selectorAssignments || [];
+          const gameSelectorIds: string[] = gameData.selectorUserIds || [];
+          if (!gameAssignments.some((a: any) => a.uid === assignment.uid)) {
+            await gameRef.update({
+              selectorAssignments: admin.firestore.FieldValue.arrayUnion(newAssignment),
+              selectorUserIds: gameSelectorIds.includes(assignment.uid)
+                ? gameSelectorIds
+                : admin.firestore.FieldValue.arrayUnion(assignment.uid),
+            });
+          }
+        }
+      }
+    }
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -514,7 +536,8 @@ export async function assignSelectorToScorecardAction(
 
 export async function removeSelectorFromScorecardAction(
   scorecardId: string,
-  uid: string
+  uid: string,
+  skipSync = false
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const ref = adminDb.collection('matchScorecards').doc(scorecardId);
@@ -524,6 +547,25 @@ export async function removeSelectorFromScorecardAction(
     const existing: any[] = snap.data()?.selectorAssignments || [];
     const updated = existing.filter((a: any) => a.uid !== uid);
     await ref.update({ selectorAssignments: updated });
+
+    // ── Sync removal to linked game ─────────────────────────────────────────
+    if (!skipSync) {
+      const linkedGameId = snap.data()?.linkedGameId;
+      if (linkedGameId) {
+        const gameRef = adminDb.collection('games').doc(linkedGameId);
+        const gameSnap = await gameRef.get();
+        if (gameSnap.exists) {
+          const gameData = gameSnap.data()!;
+          const gameAssignments: any[] = gameData.selectorAssignments || [];
+          const gameSelectorIds: string[] = gameData.selectorUserIds || [];
+          await gameRef.update({
+            selectorAssignments: gameAssignments.filter((a: any) => a.uid !== uid),
+            selectorUserIds: gameSelectorIds.filter((id: string) => id !== uid),
+          });
+        }
+      }
+    }
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
