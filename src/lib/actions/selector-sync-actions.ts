@@ -46,9 +46,7 @@ export async function syncSelectorAssignToGame(
 
     await gameRef.update({
       selectorAssignments: admin.firestore.FieldValue.arrayUnion(assignment),
-      selectorUserIds: gameSelectorIds.includes(assignment.uid)
-        ? gameSelectorIds
-        : admin.firestore.FieldValue.arrayUnion(assignment.uid),
+      selectorUserIds: admin.firestore.FieldValue.arrayUnion(assignment.uid),
     });
 
     return { success: true };

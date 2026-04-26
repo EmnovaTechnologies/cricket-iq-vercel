@@ -272,9 +272,9 @@ export async function updateGameSelectorsAction(
     await batch.commit();
 
     // Sync to linked scorecard (non-fatal)
-    syncGameSelectorsToScorecard(gameId, newSelectorUserIds, newSelectorAssignments || []).catch(e =>
-      console.error('[updateGameSelectorsAction] Scorecard sync failed:', e)
-    );
+    try { await syncGameSelectorsToScorecard(gameId, newSelectorUserIds, newSelectorAssignments || []); } catch (e) {
+      console.error('[updateGameSelectorsAction] Scorecard sync failed:', e);
+    }
 
     return { success: true, message: "Game selectors updated successfully." };
   } catch (error) {

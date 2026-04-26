@@ -507,9 +507,9 @@ export async function assignSelectorToScorecardAction(
     });
 
     // Sync to linked game (non-fatal)
-    syncSelectorAssignToGame(scorecardId, newAssignment).catch(e =>
-      console.error('[assignSelectorToScorecardAction] Sync failed:', e)
-    );
+    try { await syncSelectorAssignToGame(scorecardId, newAssignment); } catch (e) {
+      console.error('[assignSelectorToScorecardAction] Sync failed:', e);
+    }
 
     return { success: true };
   } catch (error: any) {
@@ -531,9 +531,9 @@ export async function removeSelectorFromScorecardAction(
     await ref.update({ selectorAssignments: updated });
 
     // Sync removal to linked game (non-fatal)
-    syncSelectorRemoveFromGame(scorecardId, uid).catch(e =>
-      console.error('[removeSelectorFromScorecardAction] Sync failed:', e)
-    );
+    try { await syncSelectorRemoveFromGame(scorecardId, uid); } catch (e) {
+      console.error('[removeSelectorFromScorecardAction] Sync failed:', e);
+    }
 
     return { success: true };
   } catch (error: any) {
