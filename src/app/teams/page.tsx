@@ -31,7 +31,7 @@ export default function TeamsPage() {
 
   useEffect(() => {
     if (!authLoading && !isPermissionsLoading) {
-      const t = setTimeout(() => setOrgCheckReady(true), 300);
+      const t = setTimeout(() => setOrgCheckReady(true), 800);
       return () => clearTimeout(t);
     }
     setOrgCheckReady(false);
