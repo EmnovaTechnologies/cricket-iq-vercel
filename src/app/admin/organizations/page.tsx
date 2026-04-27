@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import OrganizationCard from '@/components/organization-card';
+import OrganizationListRow from '@/components/organization-list-row';
 import { getAllOrganizationsFromDB } from '@/lib/db';
 import type { Organization } from '@/types';
-import { PlusCircle, Building, ShieldAlert, Loader2, AlertCircle } from 'lucide-react';
+import { PlusCircle, Building, ShieldAlert, Loader2, AlertCircle, Filter, Search as SearchIcon, LayoutGrid, List } from 'lucide-react';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
@@ -15,9 +19,11 @@ export default function OrganizationsListPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
   useEffect(() => {
-    // This function runs only after AuthProviderClientComponent has confirmed permissions.
     async function fetchOrganizations() {
       setLoading(true);
       setError(null);
@@ -31,10 +37,16 @@ export default function OrganizationsListPage() {
         setLoading(false);
       }
     }
-    
     fetchOrganizations();
-    
-  }, []); // Run once on mount
+  }, []);
+
+  const filteredOrgs = useMemo(() => {
+    return organizations.filter(org => {
+      const nameMatch = !searchQuery || org.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const statusMatch = selectedStatus === 'all' || org.status === selectedStatus;
+      return nameMatch && statusMatch;
+    });
+  }, [organizations, searchQuery, selectedStatus]);
 
   const renderContent = () => {
     if (loading) {
@@ -46,7 +58,7 @@ export default function OrganizationsListPage() {
       );
     }
     if (error) {
-       return (
+      return (
         <Alert variant="destructive" className="mt-8">
           <AlertCircle className="h-5 w-5" />
           <AlertTitle>Error Loading Organizations</AlertTitle>
@@ -61,15 +73,27 @@ export default function OrganizationsListPage() {
         </p>
       );
     }
-    return (
+    if (filteredOrgs.length === 0) {
+      return (
+        <p className="text-muted-foreground text-center py-6">
+          No organizations match your filters.
+        </p>
+      );
+    }
+    return viewMode === 'cards' ? (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {organizations.map((org) => (
+        {filteredOrgs.map(org => (
           <OrganizationCard key={org.id} organization={org} />
+        ))}
+      </div>
+    ) : (
+      <div className="border rounded-lg overflow-hidden bg-card">
+        {filteredOrgs.map((org, idx) => (
+          <OrganizationListRow key={org.id} organization={org} isLast={idx === filteredOrgs.length - 1} />
         ))}
       </div>
     );
   };
-  
 
   return (
     <AuthProviderClientComponent
@@ -97,6 +121,62 @@ export default function OrganizationsListPage() {
             </Link>
           </Button>
         </div>
+
+        {/* Filters */}
+        <Card className="p-4 sm:p-6 shadow">
+          <CardHeader className="p-0 pb-4 mb-4 border-b">
+            <CardTitle className="text-xl flex items-center gap-2 text-foreground">
+              <Filter className="h-5 w-5" /> Filters
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex-1 min-w-[200px] relative">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Search by Name</label>
+                <SearchIcon className="absolute left-3 top-[calc(50%_+_6px)] -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search organizations..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-10 h-10"
+                  disabled={loading}
+                />
+              </div>
+              <div className="flex-1 min-w-[160px]">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Status</label>
+                <Select value={selectedStatus} onValueChange={v => setSelectedStatus(v as typeof selectedStatus)} disabled={loading}>
+                  <SelectTrigger className="h-10"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col items-end justify-end gap-1">
+                <span className="text-xs text-muted-foreground">{filteredOrgs.length} {filteredOrgs.length === 1 ? 'organization' : 'organizations'}</span>
+                <div className="flex rounded-md border border-input overflow-hidden">
+                  <button
+                    onClick={() => setViewMode('cards')}
+                    className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${viewMode === 'cards' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                    title="Card view"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors border-l border-input ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                    title="List view"
+                  >
+                    <List className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {renderContent()}
       </div>
     </AuthProviderClientComponent>
