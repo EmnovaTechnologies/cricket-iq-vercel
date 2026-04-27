@@ -47,13 +47,13 @@ function GamesPageInner() {
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
 
+  const searchParams = useSearchParams();
   const currentYearString = useMemo(() => new Date().getFullYear().toString(), []);
   const [selectedYear, setSelectedYear] = useState<string>(
     searchParams.get('year') || currentYearString
   );
   const [selectedSeriesId, setSelectedSeriesId] = useState<string>('all');
   const [selectedTeamName, setSelectedTeamName] = useState<string>('all');
-  const searchParams = useSearchParams();
   const [selectedFinalizedStatus, setSelectedFinalizedStatus] = useState<FinalizedStatusFilter>(
     searchParams.get('ratingStatus') === 'unfinalized' ? 'notFinalized' : 'all'
   );
