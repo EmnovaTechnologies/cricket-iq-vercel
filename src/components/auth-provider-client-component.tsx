@@ -21,7 +21,7 @@ export function AuthProviderClientComponent({
   requiredPermission,
   FallbackComponent,
 }: AuthProviderClientComponentProps) {
-  const { currentUser, userProfile, isAuthLoading, logout, effectivePermissions, isLoggingOut } = useAuth();
+  const { currentUser, userProfile, isAuthLoading, isPermissionsLoading, logout, effectivePermissions, isLoggingOut } = useAuth();
 
   if (isLoggingOut) {
     return (
@@ -73,6 +73,15 @@ export function AuthProviderClientComponent({
         <Button variant="outline" onClick={logout}>
           <LogOut className="mr-2 h-4 w-4" /> Logout
         </Button>
+      </div>
+    );
+  }
+
+  if (isPermissionsLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Loading permissions...</p>
       </div>
     );
   }
