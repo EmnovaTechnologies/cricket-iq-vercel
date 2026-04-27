@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { UserProfile as UserProfileType, UserRole, Organization } from '@/types';
@@ -197,7 +197,7 @@ function UserDrawer({ user, allOrgs, orgClubs, isSuperAdmin, onUpdated, onClose 
 }
 
 // ── Main Page ────────────────────────────────────────────────────────────────
-export default function AdminUsersV2Page() {
+function AdminUsersV2PageInner() {
   const { currentUser, userProfile, isAuthLoading, effectivePermissions, activeOrganizationId } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -606,5 +606,13 @@ export default function AdminUsersV2Page() {
         {renderContent()}
       </div>
     </AuthProviderClientComponent>
+  );
+}
+
+export default function AdminUsersV2Page() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+      <AdminUsersV2PageInner />
+    </Suspense>
   );
 }

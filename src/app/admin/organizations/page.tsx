@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import { AuthProviderClientComponent } from '@/components/auth-provider-client-c
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 
-export default function OrganizationsListPage() {
+function OrganizationsListPageInner() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -184,5 +184,13 @@ export default function OrganizationsListPage() {
         {renderContent()}
       </div>
     </AuthProviderClientComponent>
+  );
+}
+
+export default function OrganizationsListPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+      <OrganizationsListPageInner />
+    </Suspense>
   );
 }
