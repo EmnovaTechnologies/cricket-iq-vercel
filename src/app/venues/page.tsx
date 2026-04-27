@@ -4,9 +4,10 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import VenueCard from '@/components/venue-card';
+import VenueListRow from '@/components/venue-list-row';
 import { getAllVenuesFromDB } from '@/lib/db';
 import type { Venue, VenueStatus } from '@/types';
-import { PlusCircle, MapPinned, Search as SearchIcon, Filter, ShieldAlert, Loader2 } from 'lucide-react';
+import { PlusCircle, MapPinned, Search as SearchIcon, Filter, ShieldAlert, Loader2, LayoutGrid, List } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback } from 'react'; // Added useCallback
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -27,6 +28,7 @@ export default function VenuesPage() {
   const [searchAddress, setSearchAddress] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<VenueStatus | 'all'>('active');
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const { toast } = useToast();
   const { effectivePermissions, isPermissionsLoading, loading: authLoading, activeOrganizationId, userProfile } = useAuth();
 
@@ -146,8 +148,8 @@ export default function VenuesPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="flex-1 min-w-[180px]">
                     <label htmlFor="venue-name-search" className="block text-sm font-medium text-muted-foreground mb-1">Search by Name</label>
                     <div className="relative">
                       <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -161,7 +163,7 @@ export default function VenuesPage() {
                       />
                     </div>
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-[180px]">
                     <label htmlFor="venue-address-search" className="block text-sm font-medium text-muted-foreground mb-1">Search by Address</label>
                     <div className="relative">
                       <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -175,7 +177,7 @@ export default function VenuesPage() {
                       />
                     </div>
                   </div>
-                   <div>
+                  <div className="flex-1 min-w-[150px]">
                     <label htmlFor="venue-status-filter" className="block text-sm font-medium text-muted-foreground mb-1">Filter by Status</label>
                     <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as VenueStatus | 'all')}>
                       <SelectTrigger id="venue-status-filter" className="w-full h-10 rounded-md shadow-sm">
@@ -189,6 +191,25 @@ export default function VenuesPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="flex flex-col items-end justify-end gap-1">
+                    <span className="text-xs text-muted-foreground">{filteredVenues.length} {filteredVenues.length === 1 ? 'venue' : 'venues'}</span>
+                    <div className="flex rounded-md border border-input overflow-hidden">
+                      <button
+                        onClick={() => setViewMode('cards')}
+                        className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${viewMode === 'cards' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                        title="Card view"
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode('list')}
+                        className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors border-l border-input ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                        title="List view"
+                      >
+                        <List className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -200,11 +221,25 @@ export default function VenuesPage() {
                 {searchName || searchAddress || selectedStatus !== 'all' ? 'No venues found matching your criteria for this organization.' : 'No venues found for this organization. Add some to get started.'}
               </p>
             ) : canViewPage ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredVenues.map((venueItem) => (
-                  <VenueCard key={venueItem.id} venue={venueItem} onStatusChange={fetchVenues} canDelete={venueDeletable[venueItem.id] ?? null} />
-                ))}
-              </div>
+              viewMode === 'cards' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredVenues.map((venueItem) => (
+                    <VenueCard key={venueItem.id} venue={venueItem} onStatusChange={fetchVenues} canDelete={venueDeletable[venueItem.id] ?? null} />
+                  ))}
+                </div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden bg-card">
+                  {filteredVenues.map((venueItem, idx) => (
+                    <VenueListRow
+                      key={venueItem.id}
+                      venue={venueItem}
+                      onStatusChange={fetchVenues}
+                      canDelete={venueDeletable[venueItem.id] ?? null}
+                      isLast={idx === filteredVenues.length - 1}
+                    />
+                  ))}
+                </div>
+              )
             ) : null}
           </>
         )}
