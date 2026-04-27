@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { addPlayerToGameRosterAction, updatePlayerGameInclusionAction, updateGameSelectorsAction, bulkSetGameRosterAction } from '@/lib/actions/game-actions';
+import { addPlayerToGameRosterAction, updatePlayerGameInclusionAction, updateGameSelectorsAction } from '@/lib/actions/game-actions';
 import { getScorecardForGameAction, getScorecardByIdAction } from '@/lib/actions/scorecard-actions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MatchReportTab } from '@/components/match-report-tab';
@@ -293,36 +293,7 @@ export default function GameDetailsPage() {
     const result = await updatePlayerGameInclusionAction(gameId, playerId, teamIdentifier, isIncluded);
     if (result.success) { toast({ title: "Roster Updated", description: result.message }); }
     else { toast({ title: "Error", description: result.message, variant: "destructive" }); setGame(oldGame); }
-    setIsUpdatingRoster(false);
-  };
-
-  const handleAddAllEligiblePlayers = async (teamIdentifier: 'team1' | 'team2') => {
-    if (!gameId || !game) return;
-    setIsUpdatingRoster(true);
-    const team1Players = potentialTeam1Players.map(p => p.id);
-    const team2Players = potentialTeam2Players.map(p => p.id);
-    // Ensure no player is in both teams
-    const finalTeam1 = team1Players.filter(id => !team2Players.includes(id));
-    const finalTeam2 = team2Players.filter(id => !team1Players.includes(id));
-    // Merge with existing roster so we don't lose manually added players
-    const existingTeam1 = game.team1Players || [];
-    const existingTeam2 = game.team2Players || [];
-    const newTeam1 = teamIdentifier === 'team1'
-      ? Array.from(new Set([...existingTeam1, ...finalTeam1]))
-      : existingTeam1;
-    const newTeam2 = teamIdentifier === 'team2'
-      ? Array.from(new Set([...existingTeam2, ...finalTeam2]))
-      : existingTeam2;
-    // Optimistic update
-    setGame(prev => prev ? { ...prev, team1Players: newTeam1, team2Players: newTeam2 } : prev);
-    const result = await bulkSetGameRosterAction(gameId, newTeam1, newTeam2);
-    if (result.success) {
-      toast({ title: 'All eligible players added', description: result.message });
-    } else {
-      toast({ title: 'Error', description: result.message, variant: 'destructive' });
-      setGame(prev => prev ? { ...prev, team1Players: existingTeam1, team2Players: existingTeam2 } : prev);
-    }
-    setIsUpdatingRoster(false);
+    await refreshGameAndPlayerData(); setIsUpdatingRoster(false);
   };
 
   const handleAddPlayerToGameViaDropdown = async (playerId: string, teamIdentifier: 'team1' | 'team2') => {
@@ -682,16 +653,7 @@ export default function GameDetailsPage() {
                   : (<Button variant="default" size="sm" className="bg-primary hover:bg-primary/90" disabled title="Rating not available."><Edit3 className="h-4 w-4 mr-1" /> Rate Players</Button>)
             )}
           </div>
-          <CardDescription className="flex items-center justify-between gap-2">
-            <span>{canManageRoster ? `Select players for ${game.team1}.` : `Players for ${game.team1}.`}</span>
-            {canManageRoster && potentialTeam1Players.length > 0 && (
-              <Button variant="outline" size="sm" className="h-7 text-xs shrink-0"
-                disabled={isUpdatingRoster}
-                onClick={() => handleAddAllEligiblePlayers('team1')}>
-                + Add all eligible
-              </Button>
-            )}
-          </CardDescription>
+          <CardDescription>{canManageRoster ? `Select players for ${game.team1}.` : `Players for ${game.team1}.`}</CardDescription>
         </CardHeader><CardContent>
           {potentialTeam1Players.length > 0 ? renderPlayerTableContent(potentialTeam1Players, 'team1') : <p className="text-muted-foreground">No players for {game.team1}.</p>}
         </CardContent>
@@ -729,16 +691,7 @@ export default function GameDetailsPage() {
                   : (<Button variant="default" size="sm" className="bg-primary hover:bg-primary/90" disabled title="Rating not available."><Edit3 className="h-4 w-4 mr-1" /> Rate Players</Button>)
             )}
           </div>
-          <CardDescription className="flex items-center justify-between gap-2">
-            <span>{canManageRoster ? `Select players for ${game.team2}.` : `Players for ${game.team2}.`}</span>
-            {canManageRoster && potentialTeam2Players.length > 0 && (
-              <Button variant="outline" size="sm" className="h-7 text-xs shrink-0"
-                disabled={isUpdatingRoster}
-                onClick={() => handleAddAllEligiblePlayers('team2')}>
-                + Add all eligible
-              </Button>
-            )}
-          </CardDescription>
+          <CardDescription>{canManageRoster ? `Select players for ${game.team2}.` : `Players for ${game.team2}.`}</CardDescription>
         </CardHeader><CardContent>
           {potentialTeam2Players.length > 0 ? renderPlayerTableContent(potentialTeam2Players, 'team2') : <p className="text-muted-foreground">No players for {game.team2}.</p>}
         </CardContent>

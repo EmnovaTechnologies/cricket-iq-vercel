@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { parseAllScorecardImagesAction, type ImageInput } from '@/lib/actions/parse-scorecard-action';
-import { saveScorecardAction, checkDuplicateScorecardAction } from '@/lib/actions/scorecard-actions';
+import { saveScorecardAction, checkDuplicateScorecardAction, autoMatchGameAction, linkScorecardToGameAction, getUnlinkedGamesForSeriesAction } from '@/lib/actions/scorecard-actions';
 import { parseCricClubsUrl } from '@/lib/utils/cricclubs-utils';
 import { parseCricClubsCsv, xlsxToCsv, type ParsedCricClubsScorecard } from '@/lib/utils/cricclubs-xls-parser';
 import { getAllSeriesFromDB, getAllTeamsFromDB } from '@/lib/db';
@@ -73,6 +73,8 @@ export function ScorecardImportForm() {
   const [importMode, setImportMode] = useState<ImportMode>('screenshot');
   const [isSaving, setIsSaving] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isCheckingDup, setIsCheckingDup] = useState(false);
+  const [dupWarning, setDupWarning] = useState<{ message: string; existingId?: string } | null>(null);
 
   // Pre-fill from URL params
   const rawDate = searchParams.get('date') || '';
@@ -107,6 +109,12 @@ export function ScorecardImportForm() {
   const [unmatchedTeam2, setUnmatchedTeam2] = useState<string>('');
   const [createNewTeam1, setCreateNewTeam1] = useState(false);
   const [createNewTeam2, setCreateNewTeam2] = useState(false);
+
+  // Game auto-match state
+  const [matchedGameId, setMatchedGameId] = useState<string>(linkedGameId || '');
+  const [matchedGameName, setMatchedGameName] = useState<string>('');
+  const [availableGamesForSeries, setAvailableGamesForSeries] = useState<{ id: string; team1: string; team2: string; date: string }[]>([]);
+  const [isAutoMatchingGame, setIsAutoMatchingGame] = useState(false);
 
   const [parsedInnings, setParsedInnings] = useState<ScorecardInnings[]>([]);
   const xlsFileRef = useRef<HTMLInputElement | null>(null);
@@ -165,7 +173,29 @@ export function ScorecardImportForm() {
     reader.readAsDataURL(file);
   };
 
-  // ── XLS file handler ──────────────────────────────────────────────────────
+  // ── Auto-match game when series/teams/date are known ────────────────────
+  const tryAutoMatchGame = useCallback(async (
+    orgId: string, sid: string, t1: string, t2: string, d: string
+  ) => {
+    if (!sid || !t1 || !t2 || !d) return;
+    setIsAutoMatchingGame(true);
+    try {
+      // Fetch unlinked games for the series for the picker
+      const gamesRes = await getUnlinkedGamesForSeriesAction(orgId, sid);
+      setAvailableGamesForSeries(gamesRes.games);
+      // Try auto-match
+      const match = await autoMatchGameAction({ organizationId: orgId, seriesId: sid, team1: t1, team2: t2, date: d });
+      if (match.gameId) {
+        setMatchedGameId(match.gameId);
+        setMatchedGameName(match.gameName || '');
+      } else {
+        setMatchedGameId('');
+        setMatchedGameName('');
+      }
+    } finally {
+      setIsAutoMatchingGame(false);
+    }
+  }, []);
   const handleXlsUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -228,6 +258,14 @@ export function ScorecardImportForm() {
         toast({ title: 'Parsed with warnings', description: parsed.parseWarnings.slice(0, 3).join('; '), variant: 'default' });
       } else {
         toast({ title: 'File parsed', description: `${parsed.innings.length} innings found for ${parsed.team1} vs ${parsed.team2}` });
+      }
+
+      // Auto-match game if series was matched
+      if (activeOrganizationId && parsed.seriesNameRaw) {
+        const matchedS = bestMatch(parsed.seriesNameRaw, availableSeries);
+        if (matchedS && parsed.team1 && parsed.team2 && parsed.date) {
+          tryAutoMatchGame(activeOrganizationId, matchedS.id, parsed.team1, parsed.team2, parsed.date);
+        }
       }
     } catch (err: any) {
       toast({ title: 'Parse failed', description: err.message || 'Could not read the file.', variant: 'destructive' });
@@ -353,7 +391,32 @@ export function ScorecardImportForm() {
       }, currentUser.uid);
 
       if (res.success) {
-        toast({ title: 'Scorecard Saved', description: 'Scorecard imported successfully.' });
+        // Link to game — prefer explicit linkedGameId (from URL), then matched game
+        const gameIdToLink = linkedGameId || matchedGameId;
+        const gameNameToLink = linkedGameId ? '' : matchedGameName;
+        if (gameIdToLink && res.scorecardId) {
+          await linkScorecardToGameAction(res.scorecardId, gameIdToLink);
+          toast({ title: 'Scorecard Saved', description: gameNameToLink
+            ? `Scorecard imported and linked to ${gameNameToLink}.`
+            : 'Scorecard imported and linked to game.' });
+        } else if (!linkedGameId && res.scorecardId && finalSeriesId) {
+          // Fallback: try server-side auto-match if client-side didn't find one
+          const match = await autoMatchGameAction({
+            organizationId: activeOrganizationId,
+            seriesId: finalSeriesId,
+            team1: team1.trim(),
+            team2: team2.trim(),
+            date,
+          });
+          if (match.gameId) {
+            await linkScorecardToGameAction(res.scorecardId, match.gameId);
+            toast({ title: 'Scorecard Saved', description: `Scorecard imported and linked to ${match.gameName}.` });
+          } else {
+            toast({ title: 'Scorecard Saved', description: 'Scorecard imported. No matching game found — you can link it manually from the scorecard details page.' });
+          }
+        } else {
+          toast({ title: 'Scorecard Saved', description: 'Scorecard imported successfully.' });
+        }
         router.push('/scorecards');
       } else {
         toast({ title: 'Save Failed', description: res.error, variant: 'destructive' });
@@ -366,6 +429,33 @@ export function ScorecardImportForm() {
   };
 
   // ─── Step labels ──────────────────────────────────────────────────────────
+  // Duplicate check before advancing from details step
+  const handleNextFromDetails = async () => {
+    if (!activeOrganizationId) return;
+    setIsCheckingDup(true);
+    setDupWarning(null);
+    try {
+      const dupCheck = await checkDuplicateScorecardAction({
+        organizationId: activeOrganizationId,
+        team1: team1.trim(),
+        team2: team2.trim(),
+        date,
+        seriesId: seriesId || undefined,
+        linkedGameId: linkedGameId || undefined,
+      });
+      if (dupCheck.isDuplicate) {
+        setDupWarning({
+          message: dupCheck.message || 'A scorecard already exists for this match.',
+          existingId: dupCheck.existingScorecardId,
+        });
+        setIsCheckingDup(false);
+        return;
+      }
+    } catch {}
+    setIsCheckingDup(false);
+    setStep(importMode === 'excel' ? 'review' : 'upload');
+  };
+
   const stepKeys: Step[] = importMode === 'excel'
     ? ['choose', 'upload', 'details', 'review']
     : ['choose', 'details', 'upload', 'review'];
@@ -498,7 +588,7 @@ export function ScorecardImportForm() {
               {availableSeries.length > 0 && (
                 <div className="space-y-3 border rounded-lg p-3 bg-muted/20">
                   <p className="text-sm font-medium">
-                    Link to Series
+                    Link to Series & Game
                     {!linkedGameId && <span className="text-destructive text-xs ml-1">*</span>}
                   </p>
                   {linkedGameId ? (
@@ -513,8 +603,7 @@ export function ScorecardImportForm() {
                         <Label className="text-xs">Year</Label>
                         <Select value={selectedYear} onValueChange={v => {
                           setSelectedYear(v);
-                          const cur = availableSeries.find(s => s.id === seriesId);
-                          if (cur && cur.year.toString() !== v) { setSeriesId(''); setSeriesName(''); }
+                          // Don't clear series when year changes — series may span year boundaries
                         }}>
                           <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Year" /></SelectTrigger>
                           <SelectContent>{availableYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
@@ -525,12 +614,21 @@ export function ScorecardImportForm() {
                         <Select value={seriesId || 'none'} onValueChange={v => {
                           const val = v === 'none' ? '' : v;
                           setSeriesId(val);
-                          setSeriesName(availableSeries.find(s => s.id === val)?.name || '');
+                          const sName = availableSeries.find(s => s.id === val)?.name || '';
+                          setSeriesName(sName);
+                          // Trigger auto-match when series changes
+                          if (val && team1 && team2 && date && activeOrganizationId) {
+                            tryAutoMatchGame(activeOrganizationId, val, team1, team2, date);
+                          } else {
+                            setMatchedGameId('');
+                            setMatchedGameName('');
+                            setAvailableGamesForSeries([]);
+                          }
                         }}>
                           <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select series" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">None</SelectItem>
-                            {availableSeries.filter(s => !selectedYear || s.year.toString() === selectedYear).map(s => (
+                            {availableSeries.filter(s => !selectedYear || s.year.toString() === selectedYear || s.id === seriesId).map(s => (
                               <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                             ))}
                           </SelectContent>
@@ -538,8 +636,74 @@ export function ScorecardImportForm() {
                       </div>
                     </div>
                   )}
-                  {!linkedGameId && seriesName && <p className="text-xs text-green-600">✓ Will be linked to: {seriesName}</p>}
+                  {!linkedGameId && seriesName && <p className="text-xs text-green-600">✓ Will be linked to series: {seriesName}</p>}
+
+                  {/* Game picker — shown when series is selected and not coming from a game page */}
+                  {!linkedGameId && seriesId && (
+                    <div className="pt-2 border-t space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Game <span className="text-muted-foreground font-normal">(optional)</span></p>
+                      {isAutoMatchingGame ? (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Looking for matching game...
+                        </div>
+                      ) : matchedGameId && matchedGameName ? (
+                        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-md px-2.5 py-1.5">
+                          <CheckCircle className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                          <span className="text-xs text-green-800 flex-1 truncate">✓ {matchedGameName}</span>
+                          <button
+                            onClick={() => { setMatchedGameId(''); setMatchedGameName(''); }}
+                            className="text-xs text-muted-foreground hover:text-foreground shrink-0"
+                          >
+                            Change
+                          </button>
+                        </div>
+                      ) : (
+                        <Select
+                          value={matchedGameId || 'none'}
+                          onValueChange={v => {
+                            const val = v === 'none' ? '' : v;
+                            setMatchedGameId(val);
+                            const g = availableGamesForSeries.find(g => g.id === val);
+                            setMatchedGameName(g ? `${g.team1} vs ${g.team2} (${g.date})` : '');
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue placeholder={availableGamesForSeries.length === 0 ? 'No unlinked games in series' : 'Select game (optional)'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {availableGamesForSeries.map(g => (
+                              <SelectItem key={g.id} value={g.id}>
+                                {g.team1} vs {g.team2} — {g.date}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {matchedGameId && <p className="text-xs text-green-600">✓ Will be linked to game</p>}
+                    </div>
+                  )}
+
+                  {linkedGameId && seriesName && <p className="text-xs text-green-600">✓ Linked to series: <span className="font-medium">{seriesName}</span></p>}
                 </div>
+              )}
+
+              {dupWarning && (
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertTitle className="text-amber-700">Scorecard already exists</AlertTitle>
+                  <AlertDescription className="text-amber-600 text-sm">
+                    {dupWarning.message}{' '}
+                    {dupWarning.existingId && (
+                      <button
+                        onClick={() => router.push(`/scorecards/${dupWarning.existingId}`)}
+                        className="underline font-medium"
+                      >
+                        View existing scorecard →
+                      </button>
+                    )}
+                  </AlertDescription>
+                </Alert>
               )}
 
               <div className="flex gap-3">
@@ -547,11 +711,14 @@ export function ScorecardImportForm() {
                   <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
                 <Button
-                  onClick={() => setStep(importMode === 'excel' ? 'review' : 'upload')}
-                  disabled={!team1.trim() || !team2.trim() || !date || (!linkedGameId && !seriesId && importMode === 'screenshot')}
+                  onClick={handleNextFromDetails}
+                  disabled={!team1.trim() || !team2.trim() || !date || (!linkedGameId && !seriesId && importMode === 'screenshot') || isCheckingDup}
                   className="flex-1"
                 >
-                  {importMode === 'excel' ? 'Review & Save' : 'Next: Upload Screenshots'} <ArrowRight className="ml-2 h-4 w-4" />
+                  {isCheckingDup
+                    ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Checking...</>
+                    : <>{importMode === 'excel' ? 'Review & Save' : 'Next: Upload Screenshots'} <ArrowRight className="ml-2 h-4 w-4" /></>
+                  }
                 </Button>
               </div>
               {!linkedGameId && !seriesId && importMode === 'screenshot' && (

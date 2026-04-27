@@ -3,13 +3,317 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Users, Gamepad2, Target, BarChart3, PlusCircle, Layers, Shield, MapPinned, Loader2, LogOut, Hourglass, Edit, Link2 } from 'lucide-react';
-import Image from 'next/image';
-import { useAuth } from '@/contexts/auth-context';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Users, Gamepad2, Target, Layers, Shield, MapPinned, Loader2, LogOut,
+  Hourglass, FileText, ClipboardCheck, AlertCircle, CheckCircle,
+  PlusCircle, Upload, Building, UserCog, BarChart3, ArrowRight,
+  CalendarDays, Table, RefreshCw,
+} from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { getAllOrganizationsFromDB, getAllUsersFromDB, getUsersForOrgAdminViewFromDB as getUsersForOrgFromDB, getAllPlayersFromDB, getPlayersWithDetailsFromDB, getAllTeamsFromDB, getAllSeriesFromDB, getAllGamesFromDB, getGamesCountForSeriesIdsFromDB, getPlayersCountForSeriesIdsFromDB, getSeriesCountForAdminUidFromDB, getSeriesCountForTeamIdsFromDB, getGamesCountForTeamIdsFromDB, getPlayersCountForTeamIdsFromDB } from '@/lib/db';
+import { getScorecardsForOrgAction, getScorecardsForSelectorAction } from '@/lib/actions/scorecard-actions';
+import { getGamesForUserViewAction } from '@/lib/actions/game-actions';
+import { format } from 'date-fns';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface QuickLink {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  permission?: string;
+}
+
+interface PendingAction {
+  label: string;
+  href: string;
+  variant: 'warning' | 'info' | 'success' | 'default';
+}
+
+interface StatCard {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  href?: string;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const badgeClass: Record<string, string> = {
+  warning: 'bg-amber-50 text-amber-700 border border-amber-200',
+  info: 'bg-blue-50 text-blue-700 border border-blue-200',
+  success: 'bg-green-50 text-green-700 border border-green-200',
+  default: 'bg-muted text-muted-foreground border border-border',
+};
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function StatGrid({ stats }: { stats: StatCard[] }) {
+  if (!stats.length) return null;
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {stats.map(s => (
+        <div key={s.label} className={`bg-muted/50 rounded-lg p-3 ${s.href ? 'cursor-pointer hover:bg-muted transition-colors' : ''}`}
+          onClick={() => s.href && window.location.assign(s.href)}>
+          <div className="flex items-center gap-1.5 mb-1 text-muted-foreground">{s.icon}<span className="text-xs">{s.label}</span></div>
+          <div className="text-2xl font-semibold text-primary">{s.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PendingActions({ actions }: { actions: PendingAction[] }) {
+  if (!actions.length) return (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+      <CheckCircle className="h-4 w-4 text-green-500" /> All caught up — no pending actions.
+    </div>
+  );
+  return (
+    <div className="space-y-2">
+      {actions.map(a => (
+        <Link key={a.label} href={a.href} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/40 transition-colors group">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+            <span className="text-sm">{a.label}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs px-2 py-0.5 rounded-full ${badgeClass[a.variant]}`}>
+              {a.variant === 'warning' ? 'Needs action' : a.variant === 'info' ? 'Review' : a.variant === 'success' ? 'Done' : 'FYI'}
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function QuickActions({ links }: { links: QuickLink[] }) {
+  if (!links.length) return null;
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+      {links.map(l => (
+        <Link key={l.href} href={l.href}
+          className="flex items-center gap-2 px-3 py-2.5 rounded-lg border bg-card hover:bg-muted/40 transition-colors text-sm font-medium">
+          <span className="text-primary shrink-0">{l.icon}</span>
+          {l.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// ─── Role-based content builders ─────────────────────────────────────────────
+
+interface Counts {
+  orgs: number | null;
+  users: number | null;
+  players: number | null;
+  teams: number | null;
+  series: number | null;
+  games: number | null;
+  scorecards: number | null;
+}
+
+function useRoleDashboard(counts: Counts) {
+  const { userProfile, activeOrganizationDetails, effectivePermissions, currentUser } = useAuth();
+  const roles = userProfile?.roles || [];
+  const orgName = activeOrganizationDetails?.name || 'your organization';
+  const selectionModel = activeOrganizationDetails?.selectionModel;
+
+  const isSuperAdmin = roles.includes('admin');
+  const isOrgAdmin = roles.includes('Organization Admin');
+  const isSeriesAdmin = roles.includes('Series Admin');
+  const isTeamManager = roles.includes('Team Manager');
+  const isSelector = roles.includes('selector');
+  const isPlayer = roles.includes('Player');
+
+  // ── System Admin ────────────────────────────────────────────────────────────
+  if (isSuperAdmin) {
+    return {
+      greeting: `System Admin`,
+      subtitle: 'Full access across all organizations',
+      stats: [
+        { label: 'Organizations', value: counts.orgs === null ? '…' : counts.orgs.toString(), icon: <Building className="h-3.5 w-3.5" />, href: '/admin/organizations' },
+        { label: 'Users', value: counts.users === null ? '…' : counts.users.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/admin/users' },
+        { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
+        { label: 'Series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series?year=all' },
+        { label: 'Teams', value: counts.teams === null ? '…' : counts.teams.toString(), icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
+        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
+        { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
+      ] as StatCard[],
+      pendingActions: [
+        { label: 'Review users without assigned roles', href: '/admin/users?role=unassigned', variant: 'warning' as const },
+        { label: 'Check organizations for inactive status', href: '/admin/organizations?status=inactive', variant: 'info' as const },
+      ],
+      quickLinks: [
+        { href: '/admin/organizations/add', label: 'Add org', icon: <PlusCircle className="h-4 w-4" /> },
+        { href: '/admin/users', label: 'Manage users', icon: <UserCog className="h-4 w-4" /> },
+        { href: '/series/add', label: 'Add series', icon: <PlusCircle className="h-4 w-4" /> },
+        { href: '/players/import', label: 'Import players', icon: <Upload className="h-4 w-4" /> },
+        { href: '/scorecards/import', label: 'Import scorecard', icon: <Upload className="h-4 w-4" /> },
+        { href: '/games', label: 'Manage games', icon: <Gamepad2 className="h-4 w-4" /> },
+        { href: '/team-composition', label: 'AI team select', icon: <Target className="h-4 w-4" /> },
+        { href: '/admin/organizations', label: 'Organizations', icon: <Building className="h-4 w-4" /> },
+      ] as QuickLink[],
+      navSections: [
+        { title: 'Player & team management', links: ['/players', '/teams', '/venues'] },
+        { title: 'Competition', links: ['/series', '/games', '/scorecards'] },
+        { title: 'Administration', links: ['/admin/organizations', '/admin/users'] },
+      ],
+    };
+  }
+
+  // ── Organization Admin ───────────────────────────────────────────────────────
+  if (isOrgAdmin) {
+    return {
+      greeting: `Organization Admin`,
+      subtitle: orgName,
+      stats: [
+        { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
+        { label: 'Series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series?year=all' },
+        { label: 'Teams', value: counts.teams === null ? '…' : counts.teams.toString(), icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
+        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
+        { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
+        { label: 'Users', value: counts.users === null ? '…' : counts.users.toString(), icon: <UserCog className="h-3.5 w-3.5" />, href: '/admin/users' },
+      ] as StatCard[],
+      pendingActions: [
+        { label: 'Games with unfinalized ratings', href: '/games?ratingStatus=unfinalized', variant: 'warning' as const },
+        { label: 'Scorecards missing for played games', href: '/scorecards?tab=missing', variant: 'warning' as const },
+        { label: 'Players not assigned to a team', href: '/players?team=__NO_PRIMARY_TEAM__', variant: 'info' as const },
+        { label: 'Games without selectors assigned', href: '/games?selectors=none', variant: 'info' as const },
+      ],
+      quickLinks: [
+        { href: '/players/import', label: 'Import players', icon: <Upload className="h-4 w-4" /> },
+        { href: '/scorecards/import', label: 'Import scorecard', icon: <Upload className="h-4 w-4" /> },
+        { href: '/admin/users', label: 'Manage users', icon: <UserCog className="h-4 w-4" /> },
+        { href: '/games', label: 'Manage games', icon: <Gamepad2 className="h-4 w-4" /> },
+        { href: '/series', label: 'View series', icon: <Layers className="h-4 w-4" /> },
+        { href: '/team-composition', label: 'AI team select', icon: <Target className="h-4 w-4" /> },
+        { href: '/players/add', label: 'Add player', icon: <PlusCircle className="h-4 w-4" /> },
+        { href: '/venues', label: 'Manage venues', icon: <MapPinned className="h-4 w-4" /> },
+      ] as QuickLink[],
+      navSections: [],
+    };
+  }
+
+  // ── Series Admin ─────────────────────────────────────────────────────────────
+  if (isSeriesAdmin) {
+    return {
+      greeting: `Series Admin`,
+      subtitle: orgName,
+      stats: [
+        { label: 'Assigned series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series?year=all' },
+        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
+        { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
+        { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
+      ] as StatCard[],
+      pendingActions: [
+        { label: 'Games pending selector certification', href: '/games', variant: 'warning' as const },
+        { label: 'Missing scorecards for your series', href: '/scorecards?tab=missing', variant: 'warning' as const },
+        { label: 'Games ready to finalize', href: '/games', variant: 'info' as const },
+      ],
+      quickLinks: [
+        { href: '/scorecards/import', label: 'Import scorecard', icon: <Upload className="h-4 w-4" /> },
+        { href: '/games', label: 'Manage games', icon: <Gamepad2 className="h-4 w-4" /> },
+        { href: '/series', label: 'Your series', icon: <Layers className="h-4 w-4" /> },
+        { href: '/scorecards', label: 'Scorecards', icon: <Table className="h-4 w-4" /> },
+        { href: '/players', label: 'Players', icon: <Users className="h-4 w-4" /> },
+        { href: '/team-composition', label: 'AI team select', icon: <Target className="h-4 w-4" /> },
+      ] as QuickLink[],
+      navSections: [],
+    };
+  }
+
+  // ── Team Manager ─────────────────────────────────────────────────────────────
+  if (isTeamManager) {
+    const teamCount = userProfile?.assignedTeamIds?.length || 0;
+    return {
+      greeting: `Team Manager`,
+      subtitle: orgName,
+      stats: [
+        { label: 'My teams', value: teamCount.toString(), icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
+        { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
+        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
+        { label: 'Series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series?year=all' },
+      ] as StatCard[],
+      pendingActions: [
+        { label: 'Review team rosters for upcoming games', href: '/teams', variant: 'info' as const },
+        { label: 'Check player eligibility for active series', href: '/players', variant: 'info' as const },
+      ],
+      quickLinks: [
+        { href: '/teams', label: 'My teams', icon: <Shield className="h-4 w-4" /> },
+        { href: '/players', label: 'Players', icon: <Users className="h-4 w-4" /> },
+        { href: '/games', label: 'Games', icon: <Gamepad2 className="h-4 w-4" /> },
+        { href: '/series', label: 'Series', icon: <Layers className="h-4 w-4" /> },
+        { href: '/team-composition', label: 'AI team select', icon: <Target className="h-4 w-4" /> },
+        { href: '/players/add', label: 'Add player', icon: <PlusCircle className="h-4 w-4" /> },
+      ] as QuickLink[],
+      navSections: [],
+    };
+  }
+
+  // ── Selector ──────────────────────────────────────────────────────────────────
+  if (isSelector) {
+    const isPerformanceModel = selectionModel === 'performance';
+    return {
+      greeting: `Selector`,
+      subtitle: orgName,
+      stats: [
+        { label: 'Assigned games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
+        { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
+        { label: 'Selection model', value: selectionModel || '—', icon: <BarChart3 className="h-3.5 w-3.5" /> },
+      ] as StatCard[],
+      pendingActions: [
+        ...(isPerformanceModel ? [] : [
+          { label: 'Games awaiting your rating certification', href: '/games', variant: 'warning' as const },
+        ]),
+        { label: 'Scorecards assigned to you for match reports', href: '/scorecards', variant: 'warning' as const },
+      ],
+      quickLinks: [
+        { href: '/scorecards', label: 'My scorecards', icon: <Table className="h-4 w-4" /> },
+        { href: '/games', label: 'My games', icon: <Gamepad2 className="h-4 w-4" /> },
+        { href: '/team-composition', label: 'XI Selector', icon: <Target className="h-4 w-4" /> },
+        { href: '/players', label: 'Players', icon: <Users className="h-4 w-4" /> },
+      ] as QuickLink[],
+      navSections: [],
+    };
+  }
+
+  // ── Player ────────────────────────────────────────────────────────────────────
+  if (isPlayer) {
+    return {
+      greeting: `Player`,
+      subtitle: orgName,
+      stats: [] as StatCard[],
+      pendingActions: [] as PendingAction[],
+      quickLinks: [
+        { href: '/players', label: 'Player profiles', icon: <Users className="h-4 w-4" /> },
+        { href: '/series', label: 'Series', icon: <Layers className="h-4 w-4" /> },
+        { href: '/games', label: 'Games', icon: <Gamepad2 className="h-4 w-4" /> },
+      ] as QuickLink[],
+      navSections: [],
+    };
+  }
+
+  // ── Fallback ──────────────────────────────────────────────────────────────────
+  return {
+    greeting: 'Welcome',
+    subtitle: orgName,
+    stats: [] as StatCard[],
+    pendingActions: [] as PendingAction[],
+    quickLinks: [] as QuickLink[],
+    navSections: [],
+  };
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -19,60 +323,160 @@ export default function DashboardPage() {
     userProfile,
     currentUser,
     logout,
-    effectivePermissions,
     isLoggingOut,
   } = useAuth();
 
   const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    if (!currentUser && !isAuthLoading) {
-      router.push('/login');
-    }
+    if (!currentUser && !isAuthLoading) router.push('/login');
   }, [currentUser, isAuthLoading, router]);
 
-  const isAdmin = userProfile?.roles.includes('admin');
+  const [counts, setCounts] = useState<Counts>({
+    orgs: null, users: null, players: null,
+    teams: null, series: null, games: null, scorecards: null,
+  });
+  const [countsLoading, setCountsLoading] = useState(false);
 
-  const allQuickLinks = [
-    { href: '/players/add', label: 'Add New Player', icon: <PlusCircle className="h-5 w-5" />, description: "Register a new player's profile.", permission: PERMISSIONS.PAGE_VIEW_PLAYER_ADD },
-    { href: '/teams/add', label: 'Add New Team', icon: <PlusCircle className="h-5 w-5" />, description: "Define a new cricket team.", permission: PERMISSIONS.PAGE_VIEW_TEAM_ADD },
-    { href: '/series/add', label: 'Add New Series', icon: <PlusCircle className="h-5 w-5" /> , description: 'Create a new cricket series.', permission: PERMISSIONS.PAGE_VIEW_SERIES_ADD },
-    { href: '/venues/add', label: 'Add New Venue', icon: <PlusCircle className="h-5 w-5" /> , description: 'Register a new game venue.', permission: PERMISSIONS.PAGE_VIEW_VENUE_ADD },
-    { href: '/games', label: 'Manage Games', icon: <Gamepad2 className="h-5 w-5" />, description: 'View game details and manage ratings.', permission: PERMISSIONS.PAGE_VIEW_GAMES_LIST },
-    { href: '/team-composition', label: 'AI Team Suggestion', icon: <Target className="h-5 w-5" />, description: 'Get AI-powered team composition.', permission: PERMISSIONS.PAGE_VIEW_TEAM_COMPOSITION },
-  ];
+  const fetchCounts = useCallback(async () => {
+    if (!activeOrganizationDetails) return;
+    setCountsLoading(true);
+    try {
+      const orgId = activeOrganizationDetails.id;
+      const uid = userProfile?.uid || currentUser?.uid || '';
+      const roles = userProfile?.roles || [];
 
-  const allInfoCards = [
-    { title: 'Manage Players', description: 'View, add, and edit player profiles and track their progress.', icon: <Users className="h-8 w-8 text-primary" />, href: '/players', permission: PERMISSIONS.PAGE_VIEW_PLAYERS_LIST },
-    { title: 'Manage Teams', description: 'Define teams and assign them to series or tournaments.', icon: <Shield className="h-8 w-8 text-primary" />, href: '/teams', permission: PERMISSIONS.PAGE_VIEW_TEAMS_LIST },
-    { title: 'Organize Series', description: 'Define and manage cricket series, and add participating teams and venues.', icon: <Layers className="h-8 w-8 text-primary" />, href: '/series', permission: PERMISSIONS.PAGE_VIEW_SERIES_LIST },
-    { title: 'Manage Venues', description: 'Add and maintain a list of cricket venues.', icon: <MapPinned className="h-8 w-8 text-primary" />, href: '/venues', permission: PERMISSIONS.PAGE_VIEW_VENUES_LIST },
-    { title: 'Track Games', description: 'Record game details and manage player ratings for each match.', icon: <Gamepad2 className="h-8 w-8 text-primary" />, href: '/games', permission: PERMISSIONS.PAGE_VIEW_GAMES_LIST },
-    { title: 'Sharing & Invites', description: 'Get links for user signup and public player registration for your organizations.', icon: <Link2 className="h-8 w-8 text-primary" />, href: '/admin/organizations', permission: PERMISSIONS.PAGE_VIEW_ADMIN_ORGANIZATIONS_LIST },
-  ];
+      // Priority order matches useRoleDashboard: SysAdmin → OrgAdmin → SeriesAdmin → TeamManager → Selector → else
+      const isSuperAdminUser = roles.includes('admin');
+      const isOrgAdminUser = roles.includes('Organization Admin');
+      const isSeriesAdminUser = roles.includes('Series Admin');
+      const isTeamManagerUser = roles.includes('Team Manager');
+      const isSelectorUser = roles.includes('selector');
 
-  const visibleQuickLinks = React.useMemo(() => {
-    if (!currentUser || isAuthLoading) return [];
-    return allQuickLinks.filter(link =>
-      isAdmin || (link.permission && effectivePermissions && effectivePermissions[link.permission])
-    );
-  }, [currentUser, isAdmin, isAuthLoading, effectivePermissions]);
+      const assignedSeriesIds = userProfile?.assignedSeriesIds || [];
+      const assignedTeamIds = userProfile?.assignedTeamIds || [];
 
-  const visibleInfoCards = React.useMemo(() => {
-    if (!currentUser || isAuthLoading) return [];
-    return allInfoCards.filter(card =>
-      isAdmin || (card.permission && effectivePermissions && effectivePermissions[card.permission])
-    );
-  }, [currentUser, isAdmin, isAuthLoading, effectivePermissions]);
+      if (isSuperAdminUser || isOrgAdminUser) {
+        // Sys Admin + Org Admin: org-wide counts, no scoping
+        const [orgsData, usersData, playersData, teamsData, seriesData, gamesData, scorecardsData] = await Promise.all([
+          isSuperAdminUser ? getAllOrganizationsFromDB() : Promise.resolve([]),
+          isSuperAdminUser ? getAllUsersFromDB() : getUsersForOrgFromDB(orgId),
+          getPlayersWithDetailsFromDB(orgId),
+          getAllTeamsFromDB(orgId),
+          getAllSeriesFromDB('active', orgId),
+          getAllGamesFromDB('all', orgId),
+          getScorecardsForOrgAction(orgId),
+        ]);
+        setCounts({
+          orgs: isSuperAdminUser ? orgsData.length : null,
+          users: usersData.filter((u: any) => !u.roles?.includes('admin')).length,
+          players: playersData.length,
+          teams: teamsData.length,
+          series: seriesData.length,
+          games: gamesData.length,
+          scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
+        });
+
+      } else if (isSeriesAdminUser) {
+        // Series Admin: scoped to assigned series
+        // Players: all players in teams participating in assigned series
+        const [seriesCount, gamesCount, allPlayers, assignedSeriesDocs, scorecardsData] = await Promise.all([
+          getSeriesCountForAdminUidFromDB(uid, orgId),
+          getGamesCountForSeriesIdsFromDB(assignedSeriesIds),
+          getPlayersWithDetailsFromDB(orgId),
+          getAllSeriesFromDB('all', orgId),
+          getScorecardsForOrgAction(orgId),
+        ]);
+        // Collect all team IDs from assigned series
+        const seriesTeamIds = new Set<string>();
+        assignedSeriesDocs
+          .filter(s => s.seriesAdminUids?.includes(uid))
+          .forEach(s => (s.participatingTeams || []).forEach((t: string) => seriesTeamIds.add(t)));
+        const playersCount = allPlayers.filter((p: any) =>
+          p.primaryTeamId && seriesTeamIds.has(p.primaryTeamId)
+        ).length;
+        setCounts({
+          orgs: null,
+          users: null,
+          players: playersCount,
+          teams: null,
+          series: seriesCount,
+          games: gamesCount,
+          scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
+        });
+
+      } else if (isTeamManagerUser) {
+        // Team Manager: scoped to assigned teams
+        const [gamesData, seriesCount, allPlayers, scorecardsData] = await Promise.all([
+          getGamesForUserViewAction(userProfile, orgId),
+          getSeriesCountForTeamIdsFromDB(assignedTeamIds, orgId),
+          getPlayersWithDetailsFromDB(orgId),
+          getScorecardsForOrgAction(orgId),
+        ]);
+        const playersCount = allPlayers.filter((p: any) =>
+          assignedTeamIds.includes(p.primaryTeamId)
+        ).length;
+        setCounts({
+          orgs: null,
+          users: null,
+          players: playersCount,
+          teams: assignedTeamIds.length,
+          series: seriesCount,
+          games: gamesData.length,
+          scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
+        });
+
+      } else if (isSelectorUser) {
+        // Selector: scoped to assigned games + assigned scorecards
+        const [gamesData, scorecardsData] = await Promise.all([
+          getGamesForUserViewAction(userProfile, orgId),
+          getScorecardsForSelectorAction(uid, orgId),
+        ]);
+        setCounts({
+          orgs: null,
+          users: null,
+          players: null,
+          teams: null,
+          series: null,
+          games: gamesData.length,
+          scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
+        });
+
+      } else {
+        // Fallback: org-wide
+        const [playersData, seriesData, gamesData, scorecardsData] = await Promise.all([
+          getPlayersWithDetailsFromDB(orgId),
+          getAllSeriesFromDB('active', orgId),
+          getAllGamesFromDB('all', orgId),
+          getScorecardsForOrgAction(orgId),
+        ]);
+        setCounts({
+          orgs: null,
+          users: null,
+          players: playersData.length,
+          teams: null,
+          series: seriesData.length,
+          games: gamesData.length,
+          scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
+        });
+      }
+    } catch (e) {
+      console.error('[Dashboard] counts fetch failed:', e);
+    }
+    setCountsLoading(false);
+  }, [activeOrganizationDetails, userProfile, currentUser]);
+
+  useEffect(() => { if (mounted && activeOrganizationDetails) fetchCounts(); }, [mounted, activeOrganizationDetails]);
+
+  const dashboard = useRoleDashboard(counts);
+  const today = mounted ? format(new Date(), 'EEEE, MMM d') : '';
 
   if (isLoggingOut) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Logging out & redirecting...</p>
+        <p className="text-lg text-muted-foreground">Logging out...</p>
       </div>
     );
   }
@@ -81,27 +485,26 @@ export default function DashboardPage() {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Loading dashboard...</p>
       </div>
     );
   }
 
-  if (!currentUser && !isAuthLoading) {
+  if (!currentUser) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Redirecting to login...</p>
       </div>
     );
   }
 
-  if (currentUser && userProfile && userProfile.roles.length === 1 && userProfile.roles[0] === 'unassigned') {
+  // Unassigned role
+  if (userProfile && userProfile.roles.length === 1 && userProfile.roles[0] === 'unassigned') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] text-center">
         <Hourglass className="h-16 w-16 text-primary mb-4" />
         <h1 className="text-2xl font-semibold text-primary mb-2">Account Pending Role Assignment</h1>
         <p className="text-muted-foreground mb-6 max-w-md">
-          Welcome, {userProfile.displayName || userProfile.email}! Your account has been created, but an administrator needs to assign you a role before you can access the application features. Please contact your organization administrator.
+          Welcome, {userProfile.displayName || userProfile.email}! An administrator needs to assign you a role before you can access features.
         </p>
         <Button variant="outline" onClick={logout}>
           <LogOut className="mr-2 h-4 w-4" /> Logout
@@ -110,97 +513,102 @@ export default function DashboardPage() {
     );
   }
 
-  const bannerUrl = activeOrganizationDetails?.branding?.bannerUrl || "https://placehold.co/1200x400.png";
-  const bannerAlt = activeOrganizationDetails?.name ? `${activeOrganizationDetails.name} Banner` : "Welcome Banner";
-  const bannerHint = activeOrganizationDetails?.branding?.bannerUrl ? "organization banner" : "cricket celebration";
-
-  const displayOrganizationName = isAuthLoading && !activeOrganizationDetails
-    ? "Your Organization"
-    : activeOrganizationDetails?.name || 'Cricket IQ';
-
-  const displayBannerUrl = isAuthLoading && !activeOrganizationDetails?.branding?.bannerUrl
-    ? "https://placehold.co/1200x400.png"
-    : bannerUrl;
-
-  const displayBannerAlt = isAuthLoading && !activeOrganizationDetails?.name
-    ? "Loading Banner..."
-    : bannerAlt;
+  const displayName = userProfile?.displayName || userProfile?.email?.split('@')[0] || 'there';
 
   return (
-    <div className="space-y-8">
-      <Card className="overflow-hidden shadow-lg">
-        <div className="relative h-56 md:h-72 w-full">
-          <Image
-            src={displayBannerUrl}
-            alt={displayBannerAlt}
-            fill
-            style={{objectFit: 'cover'}}
-            data-ai-hint={bannerHint}
-            priority
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end p-6 md:p-8">
-            <h1 className="text-4xl md:text-5xl font-headline font-bold text-white">
-              Welcome to {displayOrganizationName}
-            </h1>
-            <p className="text-lg text-gray-200 mt-2">Your ultimate platform for player performance analysis and team selection.</p>
+    <div className="space-y-6 max-w-6xl">
+
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-4 p-5 rounded-xl bg-muted/40 border">
+        <div>
+          <h1 className="text-2xl font-headline font-semibold text-primary">
+            Welcome back, {displayName}
+          </h1>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-sm text-muted-foreground">{dashboard.subtitle}</span>
+            {dashboard.greeting !== 'Welcome' && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <Badge variant="secondary" className="text-xs">{dashboard.greeting}</Badge>
+              </>
+            )}
+            {today && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <CalendarDays className="h-3 w-3" /> {today}
+                </span>
+              </>
+            )}
           </div>
+          {activeOrganizationDetails?.selectionModel && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className="text-xs text-muted-foreground">Selection model:</span>
+              <span className="text-xs font-medium capitalize text-foreground">{activeOrganizationDetails.selectionModel}</span>
+              {activeOrganizationDetails.ratingScope && (
+                <>
+                  <span className="text-muted-foreground text-xs">·</span>
+                  <span className="text-xs text-muted-foreground capitalize">{activeOrganizationDetails.ratingScope.replace(/_/g, ' ')}</span>
+                </>
+              )}
+            </div>
+          )}
         </div>
-      </Card>
+        <button
+          onClick={fetchCounts}
+          disabled={countsLoading}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-1"
+          title="Refresh counts"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${countsLoading ? 'animate-spin' : ''}`} />
+          {countsLoading ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
 
-      {visibleQuickLinks.length > 0 && (
+      {/* ── Stats ── */}
+      {dashboard.stats.length > 0 && (
         <section>
-          <h2 className="text-2xl font-headline font-semibold mb-4 text-foreground">Quick Actions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-            {visibleQuickLinks.map((link) => (
-              <Card key={link.href} className="hover:shadow-xl transition-shadow duration-300 flex flex-col">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-primary text-lg">
-                    {link.icon}
-                    {link.label}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p className="text-muted-foreground mb-4 text-sm">{link.description}</p>
-                </CardContent>
-                <CardFooter>
-                  <Button asChild className="w-full bg-primary hover:bg-primary/90 text-sm"><Link href={link.href}>Go to {link.label.split(' ')[0]}</Link></Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">At a glance</h2>
+          <StatGrid stats={dashboard.stats} />
         </section>
       )}
 
-      {visibleInfoCards.length > 0 && (
-        <section>
-          <h2 className="text-2xl font-headline font-semibold mb-4 text-foreground">Core Features</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {visibleInfoCards.map((card) => (
-              <Card key={card.title} className="hover:shadow-xl transition-shadow duration-300 flex flex-col">
-                <CardHeader className="flex flex-row items-start gap-4">
-                  {card.icon}
-                  <div>
-                    <CardTitle className="text-lg">{card.title}</CardTitle>
-                    <CardDescription className="text-sm">{card.description}</CardDescription>
-                  </div>
-                </CardHeader>
-                <CardContent className="mt-auto">
-                   <Button variant="outline" asChild className="w-full border-primary text-primary hover:bg-primary/10 text-sm"><Link href={card.href}>Explore {card.title.split(' ').slice(-1)[0]}</Link></Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-      )}
-      {(visibleQuickLinks.length === 0 && visibleInfoCards.length === 0 && currentUser && !isAuthLoading) && (
+      {/* ── Pending actions + Quick actions ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-500" /> Pending actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PendingActions actions={dashboard.pendingActions} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ArrowRight className="h-4 w-4 text-primary" /> Quick actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <QuickActions links={dashboard.quickLinks} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── No org selected ── */}
+      {!activeOrganizationDetails && (
         <Alert variant="default" className="border-primary/50">
           <Hourglass className="h-5 w-5 text-primary" />
-          <AlertTitle>Dashboard Content Limited</AlertTitle>
+          <AlertTitle>No organization selected</AlertTitle>
           <AlertDescription>
-            You do not have permissions to view most dashboard items. Please contact an administrator if you believe this is an error.
+            Select an organization from the navbar to see org-specific data and actions.
           </AlertDescription>
         </Alert>
       )}
+
     </div>
   );
 }
