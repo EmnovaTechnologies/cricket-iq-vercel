@@ -46,6 +46,15 @@ export default function ScorecardsPage() {
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [isMobile, setIsMobile] = useState(false);
+  const [orgCheckReady, setOrgCheckReady] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && !isPermissionsLoading) {
+      const t = setTimeout(() => setOrgCheckReady(true), 300);
+      return () => clearTimeout(t);
+    }
+    setOrgCheckReady(false);
+  }, [authLoading, isPermissionsLoading]);
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
   useEffect(() => {
@@ -236,7 +245,7 @@ export default function ScorecardsPage() {
           )}
         </div>
 
-        {!activeOrganizationId && !isPermissionsLoading && (
+        {!activeOrganizationId && orgCheckReady && (
           <Alert variant="default" className="border-primary/50">
             <Info className="h-5 w-5 text-primary" />
             <AlertTitle>No Organization Selected</AlertTitle>

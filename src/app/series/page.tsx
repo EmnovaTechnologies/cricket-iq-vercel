@@ -28,6 +28,15 @@ export default function SeriesPage() {
   const [selectedYear, setSelectedYear] = useState<string>(currentYearString);
   const [selectedStatus, setSelectedStatus] = useState<Series['status'] | 'all'>('active');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const [orgCheckReady, setOrgCheckReady] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && !isPermissionsLoading) {
+      const t = setTimeout(() => setOrgCheckReady(true), 300);
+      return () => clearTimeout(t);
+    }
+    setOrgCheckReady(false);
+  }, [authLoading, isPermissionsLoading]);
 
 
   const fetchSeries = useCallback(async () => {
@@ -185,7 +194,7 @@ export default function SeriesPage() {
         </div>
       </div>
 
-      {!activeOrganizationId && !authLoading && !isPermissionsLoading && (
+      {!activeOrganizationId && orgCheckReady && (
         <Alert variant="default" className="border-primary/50">
           <Info className="h-5 w-5 text-primary" />
           <AlertTitle>No Organization Selected</AlertTitle>
