@@ -9,7 +9,8 @@ import { getAllSeriesFromDB, getAllTeamsFromDB } from '@/lib/db';
 import { getGamesForUserViewAction } from '@/lib/actions/game-actions';
 import type { Game, Series, Team } from '@/types';
 import { PlusCircle, Filter, Upload, Info, Loader2, Gamepad2, CheckSquare, Square, UserCheck , LayoutGrid, List } from 'lucide-react'; // Added UserCheck
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -28,7 +29,7 @@ interface SeriesFilterItem {
 type FinalizedStatusFilter = 'all' | 'finalized' | 'notFinalized';
 type SelectorSpecificFilterOption = 'all' | 'myPending';
 
-export default function GamesPage() {
+function GamesPageInner() {
   const {
     userProfile,
     activeOrganizationId,
@@ -50,8 +51,12 @@ export default function GamesPage() {
   const [selectedYear, setSelectedYear] = useState<string>(currentYearString);
   const [selectedSeriesId, setSelectedSeriesId] = useState<string>('all');
   const [selectedTeamName, setSelectedTeamName] = useState<string>('all');
-  const [selectedFinalizedStatus, setSelectedFinalizedStatus] = useState<FinalizedStatusFilter>('all');
+  const searchParams = useSearchParams();
+  const [selectedFinalizedStatus, setSelectedFinalizedStatus] = useState<FinalizedStatusFilter>(
+    searchParams.get('ratingStatus') === 'unfinalized' ? 'notFinalized' : 'all'
+  );
   const [selectorSpecificFilter, setSelectorSpecificFilter] = useState<SelectorSpecificFilterOption>('all');
+  const [noSelectorsFilter, setNoSelectorsFilter] = useState<boolean>(searchParams.get('selectors') === 'none');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
   useEffect(() => {
@@ -73,6 +78,7 @@ export default function GamesPage() {
       setSelectedSeriesId('all');
       setSelectedTeamName('all');
       setSelectedFinalizedStatus('all');
+      setNoSelectorsFilter(false);
       try {
         const gamesFromDB = await getGamesForUserViewAction(userProfile, activeOrganizationId);
         setAllGames(gamesFromDB);
@@ -225,10 +231,11 @@ export default function GamesPage() {
 
       const myPendingMatch = selectorSpecificFilter === 'all' ||
                              (selectorSpecificFilter === 'myPending' && isGamePendingMyCertification(game, userProfile?.uid));
+      const noSelectorsMatch = !noSelectorsFilter || !game.selectorUserIds?.length;
 
-      return yearMatch && seriesMatch && teamMatch && finalizedMatch && myPendingMatch;
+      return yearMatch && seriesMatch && teamMatch && finalizedMatch && myPendingMatch && noSelectorsMatch;
     });
-  }, [allGames, selectedYear, selectedSeriesId, selectedTeamName, selectedFinalizedStatus, selectorSpecificFilter, userProfile?.uid]);
+  }, [allGames, selectedYear, selectedSeriesId, selectedTeamName, selectedFinalizedStatus, selectorSpecificFilter, noSelectorsFilter, userProfile?.uid]);
 
   const canImportGames = effectivePermissions[PERMISSIONS.PAGE_VIEW_GAME_IMPORT];
   const canAddGames = effectivePermissions[PERMISSIONS.PAGE_VIEW_GAME_ADD];
@@ -430,5 +437,13 @@ export default function GamesPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function GamesPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+      <GamesPageInner />
+    </Suspense>
   );
 }

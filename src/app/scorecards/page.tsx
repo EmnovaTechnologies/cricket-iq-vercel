@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { getScorecardsForOrgAction, getScorecardsForSelectorAction, deleteScorecardAction } from '@/lib/actions/scorecard-actions';
@@ -30,7 +31,7 @@ import { format, parseISO } from 'date-fns';
 import { ScorecardCard } from '@/components/scorecard-card';
 import { ScorecardListRow } from '@/components/scorecard-list-row';
 
-export default function ScorecardsPage() {
+function ScorecardsPageInner() {
   const { activeOrganizationId, activeOrganizationDetails, loading: authLoading, isOrgLoading, effectivePermissions, isPermissionsLoading, userProfile, currentUser } = useAuth();
   const { toast } = useToast();
   const [scorecards, setScorecards] = useState<MatchScorecard[]>([]);
@@ -46,7 +47,9 @@ export default function ScorecardsPage() {
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [isMobile, setIsMobile] = useState(false);
+  const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const defaultTab = searchParams.get('tab') === 'missing' ? 'missing' : 'imported';
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
@@ -325,7 +328,7 @@ export default function ScorecardsPage() {
             </Card>
 
             {/* Tabs: Imported + Missing */}
-            <Tabs defaultValue="imported">
+            <Tabs defaultValue={defaultTab}>
               <TabsList>
                 <TabsTrigger value="imported">
                   Imported
@@ -470,5 +473,13 @@ export default function ScorecardsPage() {
         )}
       </div>
     </AuthProviderClientComponent>
+  );
+}
+
+export default function ScorecardsPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+      <ScorecardsPageInner />
+    </Suspense>
   );
 }

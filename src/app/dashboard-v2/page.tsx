@@ -183,10 +183,10 @@ function useRoleDashboard(counts: Counts) {
         { label: 'Users', value: counts.users === null ? '…' : counts.users.toString(), icon: <UserCog className="h-3.5 w-3.5" />, href: '/admin/users' },
       ] as StatCard[],
       pendingActions: [
-        { label: 'Games with unfinalized ratings', href: '/games', variant: 'warning' as const },
-        { label: 'Scorecards missing for played games', href: '/scorecards', variant: 'warning' as const },
-        { label: 'Players not assigned to a team', href: '/players', variant: 'info' as const },
-        { label: 'Selectors not assigned to games', href: '/games', variant: 'info' as const },
+        { label: 'Games with unfinalized ratings', href: '/games?ratingStatus=unfinalized', variant: 'warning' as const },
+        { label: 'Scorecards missing for played games', href: '/scorecards?tab=missing', variant: 'warning' as const },
+        { label: 'Players not assigned to a team', href: '/players?team=__NO_PRIMARY_TEAM__', variant: 'info' as const },
+        { label: 'Games without selectors assigned', href: '/games?selectors=none', variant: 'info' as const },
       ],
       quickLinks: [
         { href: '/players/import', label: 'Import players', icon: <Upload className="h-4 w-4" /> },

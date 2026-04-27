@@ -8,7 +8,8 @@ import PlayerListRow from '@/components/player-list-row';
 import { getPlayersWithDetailsFromDB, getAllTeamsFromDB } from '@/lib/db'; // Added getAllTeamsFromDB
 import type { PlayerWithRatings, Team } from '@/types'; // Added Team
 import { PlusCircle, Search as SearchIcon, Upload, Info, Loader2, ShieldAlert, AlertCircle, Filter as FilterIcon, UserSquare2, LayoutGrid, List } from 'lucide-react'; // Added FilterIcon
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -20,12 +21,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const NO_PRIMARY_TEAM_VALUE = "__NO_PRIMARY_TEAM__"; // Constant for "No Primary Team" filter
 
-export default function PlayersPage() {
+function PlayersPageInner() {
   const { activeOrganizationId, loading: authLoading, isOrgLoading, effectivePermissions, isPermissionsLoading } = useAuth();
   const [allPlayers, setAllPlayers] = useState<PlayerWithRatings[]>([]);
   const [allTeamsForOrg, setAllTeamsForOrg] = useState<Team[]>([]); // State for teams in org
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPrimaryTeamFilter, setSelectedPrimaryTeamFilter] = useState<string>('all'); // 'all', 'none', or teamId
+  const searchParams = useSearchParams();
+  const [selectedPrimaryTeamFilter, setSelectedPrimaryTeamFilter] = useState<string>(
+    searchParams.get('team') || 'all'
+  ); // 'all', '__NO_PRIMARY_TEAM__', or teamId
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
@@ -272,5 +276,13 @@ export default function PlayersPage() {
 
       </div>
     </AuthProviderClientComponent>
+  );
+}
+
+export default function PlayersPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+      <PlayersPageInner />
+    </Suspense>
   );
 }
