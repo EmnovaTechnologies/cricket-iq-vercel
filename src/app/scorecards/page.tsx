@@ -23,10 +23,12 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import {
   Table, PlusCircle, Loader2, ShieldAlert, Info,
-  CalendarFold, ArrowRight, Trash2, Filter, AlertCircle, Link2, FileText
+  CalendarFold, ArrowRight, Filter, AlertCircle, Link2, LayoutGrid, List,
 } from 'lucide-react';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
+import { ScorecardCard } from '@/components/scorecard-card';
+import { ScorecardListRow } from '@/components/scorecard-list-row';
 
 export default function ScorecardsPage() {
   const { activeOrganizationId, loading: authLoading, effectivePermissions, isPermissionsLoading, userProfile, currentUser } = useAuth();
@@ -44,6 +46,7 @@ export default function ScorecardsPage() {
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [isMobile, setIsMobile] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
@@ -76,15 +79,14 @@ export default function ScorecardsPage() {
     if (!activeOrganizationId || !currentUser) { setScorecards([]); setAllSeries([]); setIsLoading(false); return; }
     setIsLoading(true);
 
-    // Pure selectors (no admin/org-admin/series-admin role) only see scorecards they are assigned to
-    const isSelectorOnly =
+    const isSelectorOnlyLocal =
       !!userProfile?.roles?.includes('selector') &&
       !userProfile?.roles?.includes('admin') &&
       !userProfile?.roles?.includes('Organization Admin') &&
       !userProfile?.roles?.includes('Series Admin');
 
     const [result, series] = await Promise.all([
-      isSelectorOnly
+      isSelectorOnlyLocal
         ? getScorecardsForSelectorAction(currentUser.uid, activeOrganizationId)
         : getScorecardsForOrgAction(activeOrganizationId),
       getAllSeriesFromDB('all', activeOrganizationId),
@@ -93,7 +95,6 @@ export default function ScorecardsPage() {
     const loadedScorecards = result.success ? result.scorecards || [] : [];
     if (result.success) setScorecards(loadedScorecards);
     setAllSeries(series || []);
-    // Check which scorecards have match reports (for disabling delete)
     if (loadedScorecards.length > 0) {
       const reportChecks = await Promise.all(
         loadedScorecards.map(async sc => {
@@ -108,7 +109,6 @@ export default function ScorecardsPage() {
 
   useEffect(() => { fetchScorecards(); }, [fetchScorecards]);
 
-  // Fetch games when a specific series is selected
   useEffect(() => {
     if (!selectedSeries || selectedSeries === 'all' || selectedSeries === 'none') {
       setSeriesGames([]);
@@ -121,41 +121,30 @@ export default function ScorecardsPage() {
     });
   }, [selectedSeries]);
 
-  // Years from all series in org (not just scorecards)
   const uniqueYears = useMemo(() => {
     const years = new Set<string>();
     allSeries.forEach(s => { if (s.year) years.add(s.year.toString()); });
-    // Also include years from scorecards that may not have a series
     scorecards.forEach(sc => {
       if (sc.date) { try { years.add(parseISO(sc.date).getFullYear().toString()); } catch {} }
     });
     return Array.from(years).sort((a, b) => +b - +a);
   }, [allSeries, scorecards]);
 
-  // Series filtered by selected year
   const filteredSeriesOptions = useMemo(() => {
     if (selectedYear === 'all') return allSeries;
-    // Show series whose defined year matches, OR series that have scorecards
-    // with dates in the selected year (cross-year series)
     const scorecardsInYear = scorecards.filter(sc => {
       try { return sc.date && parseISO(sc.date).getFullYear().toString() === selectedYear; } catch { return false; }
     });
     const seriesIdsWithScorecards = new Set(scorecardsInYear.map(sc => sc.seriesId).filter(Boolean));
-    return allSeries.filter(s =>
-      s.year.toString() === selectedYear || seriesIdsWithScorecards.has(s.id)
-    );
+    return allSeries.filter(s => s.year.toString() === selectedYear || seriesIdsWithScorecards.has(s.id));
   }, [allSeries, selectedYear]);
 
   useEffect(() => {
-    // Reset series only if it doesn't belong to the newly selected year
     if (selectedYear === 'all') return;
     const currentSeries = allSeries.find(s => s.id === selectedSeries);
-    if (currentSeries && currentSeries.year.toString() !== selectedYear) {
-      setSelectedSeries('all');
-    }
+    if (currentSeries && currentSeries.year.toString() !== selectedYear) setSelectedSeries('all');
   }, [selectedYear, activeOrganizationId]);
 
-  // Reset team/date when series or year changes
   useEffect(() => {
     setSelectedTeam('all');
     setSelectedDate('');
@@ -180,32 +169,25 @@ export default function ScorecardsPage() {
       const yearOk = selectedYear === 'all' || (sc.date && (() => { try { return parseISO(sc.date).getFullYear().toString() === selectedYear; } catch { return false; } })());
       const seriesOk = selectedSeries === 'all' || (selectedSeries === 'none' && !sc.seriesId) || sc.seriesId === selectedSeries;
       const teamOk = selectedTeam === 'all' || sc.team1 === selectedTeam || sc.team2 === selectedTeam;
-      if (yearOk && seriesOk && teamOk && sc.date) {
-        dates.add(sc.date.slice(0, 10));
-      }
+      if (yearOk && seriesOk && teamOk && sc.date) dates.add(sc.date.slice(0, 10));
     });
     return Array.from(dates).sort((a, b) => b.localeCompare(a));
   }, [scorecards, selectedYear, selectedSeries, selectedTeam]);
 
   const filteredScorecards = useMemo(() => {
     return scorecards.filter(sc => {
-      // When a specific series is selected, skip year filter —
-      // a series may have games crossing year boundaries
       const yearMatch = (selectedSeries !== 'all' && selectedSeries !== 'none')
         ? true
         : selectedYear === 'all' || (sc.date && (() => {
             try { return parseISO(sc.date).getFullYear().toString() === selectedYear; } catch { return false; }
           })());
-      const seriesMatch = selectedSeries === 'all'
-        || (selectedSeries === 'none' && !sc.seriesId)
-        || sc.seriesId === selectedSeries;
+      const seriesMatch = selectedSeries === 'all' || (selectedSeries === 'none' && !sc.seriesId) || sc.seriesId === selectedSeries;
       const teamMatch = selectedTeam === 'all' || sc.team1 === selectedTeam || sc.team2 === selectedTeam;
       const dateMatch = !selectedDate || sc.date?.slice(0, 10) === selectedDate;
       return yearMatch && seriesMatch && teamMatch && dateMatch;
     });
   }, [scorecards, selectedYear, selectedSeries, selectedTeam, selectedDate]);
 
-  // Games with no imported scorecard in the selected series
   const missingGames = useMemo(() => {
     if (!seriesGames.length) return [];
     const linkedGameIds = new Set(scorecards.map(sc => sc.linkedGameId).filter(Boolean));
@@ -272,8 +254,8 @@ export default function ScorecardsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="flex-1 min-w-[140px]">
                     <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Year</label>
                     <Select value={selectedYear} onValueChange={setSelectedYear}>
                       <SelectTrigger><SelectValue placeholder="Select Year" /></SelectTrigger>
@@ -283,7 +265,7 @@ export default function ScorecardsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-[140px]">
                     <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Series</label>
                     <Select value={selectedSeries} onValueChange={setSelectedSeries}>
                       <SelectTrigger><SelectValue placeholder={filteredSeriesOptions.length === 0 ? 'No series for this year' : 'Select Series'} /></SelectTrigger>
@@ -296,7 +278,7 @@ export default function ScorecardsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-[140px]">
                     <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Team</label>
                     <Select value={selectedTeam} onValueChange={setSelectedTeam} disabled={availableTeams.length === 0}>
                       <SelectTrigger><SelectValue placeholder={availableTeams.length === 0 ? 'No teams' : 'Select Team'} /></SelectTrigger>
@@ -306,7 +288,7 @@ export default function ScorecardsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-[140px]">
                     <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Date</label>
                     <Select value={selectedDate || 'all'} onValueChange={v => setSelectedDate(v === 'all' ? '' : v)} disabled={availableDates.length === 0}>
                       <SelectTrigger><SelectValue placeholder={availableDates.length === 0 ? 'No dates' : 'Select Date'} /></SelectTrigger>
@@ -318,6 +300,25 @@ export default function ScorecardsPage() {
                         })}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="flex flex-col items-end justify-end gap-1">
+                    <span className="text-xs text-muted-foreground">{filteredScorecards.length} {filteredScorecards.length === 1 ? 'scorecard' : 'scorecards'}</span>
+                    <div className="flex rounded-md border border-input overflow-hidden">
+                      <button
+                        onClick={() => setViewMode('cards')}
+                        className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${viewMode === 'cards' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                        title="Card view"
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode('list')}
+                        className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors border-l border-input ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                        title="List view"
+                      >
+                        <List className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -352,93 +353,39 @@ export default function ScorecardsPage() {
                   ) : (
                     <p className="text-muted-foreground text-center py-6">No scorecards found matching your filters.</p>
                   )
+                ) : viewMode === 'cards' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredScorecards.map(sc => (
+                      <ScorecardCard
+                        key={sc.id}
+                        sc={sc}
+                        isMobile={isMobile}
+                        isSelector={!!isSelector}
+                        currentUser={currentUser}
+                        canImport={!!canImport}
+                        hasReports={scorecardsWithReports.has(sc.id)}
+                        deletingId={deletingId}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </div>
                 ) : (
-                  <>
-                    <p className="text-sm text-muted-foreground mb-3">{filteredScorecards.length} of {scorecards.length} scorecards</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredScorecards.map(sc => (
-                        <Card key={sc.id} className="flex flex-col h-full hover:shadow-lg transition-shadow duration-300">
-                          <CardHeader className="p-3 space-y-1">
-                            <div className="flex justify-between items-start gap-2">
-                              <div className="flex-1 min-w-0">
-                                <CardTitle className="text-xl font-headline text-primary truncate">{sc.team1} vs {sc.team2}</CardTitle>
-                                {sc.seriesName && <p className="text-xs text-muted-foreground truncate">Series: {sc.seriesName}</p>}
-                              </div>
-                              <Badge variant="outline" className="text-xs shrink-0">{sc.innings.length} inn</Badge>
-                            </div>
-                            <CardDescription className="flex items-center gap-1 text-sm pt-1">
-                              <CalendarFold className="h-4 w-4" />
-                              {sc.date ? (() => { try { return format(parseISO(sc.date), 'PP'); } catch { return sc.date; } })() : 'No date'}
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent className="flex-grow p-3 pt-1 space-y-1">
-                            {sc.result && <p className="text-xs text-green-600 font-medium">{sc.result}</p>}
-                            <div className="flex flex-wrap gap-1">
-                              {sc.innings.map((inn, i) => (
-                                <Badge key={i} variant="secondary" className="text-xs">
-                                  {inn.battingTeam}: {inn.totalRuns}/{inn.wickets}
-                                </Badge>
-                              ))}
-                            </div>
-                          </CardContent>
-                          <CardFooter className="grid grid-cols-2 gap-1.5 p-2 pt-1">
-                            {isMobile && isSelector && currentUser ? (
-                              <Button asChild variant="default" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm">
-                                <Link href={`/match-report/${sc.id}?uid=${currentUser.uid}`}>
-                                  <span className="flex items-center justify-center gap-1"><FileText className="h-3.5 w-3.5" /> Match Report</span>
-                                </Link>
-                              </Button>
-                            ) : (
-                              <Button asChild variant="outline" size="sm" className="w-full border-primary text-primary hover:bg-primary/10 text-sm">
-                                <Link href={`/scorecards/${sc.id}`}>
-                                  <span className="flex items-center justify-center gap-1">View Details <ArrowRight className="h-3.5 w-3.5" /></span>
-                                </Link>
-                              </Button>
-                            )}
-                            {canImport && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  {scorecardsWithReports.has(sc.id) ? (
-                                    <span className="w-full relative group cursor-not-allowed">
-                                      <Button
-                                        variant="destructive" size="sm" className="w-full text-sm pointer-events-none opacity-50"
-                                        disabled
-                                      >
-                                        <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
-                                      </Button>
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block whitespace-nowrap bg-gray-900 text-white text-xs rounded px-2 py-1 z-50">
-                                        Match reports exist
-                                      </span>
-                                    </span>
-                                  ) : (
-                                    <Button
-                                      variant="destructive" size="sm" className="w-full text-sm"
-                                      disabled={deletingId === sc.id}
-                                    >
-                                      {deletingId === sc.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />}
-                                      {deletingId === sc.id ? 'Deleting...' : 'Delete'}
-                                    </Button>
-                                  )}
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Scorecard</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Delete scorecard for <strong>{sc.team1} vs {sc.team2}</strong>? Players only on this scorecard will also be removed. This cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(sc)} className="bg-destructive hover:bg-destructive/90">Confirm Delete</AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
-                          </CardFooter>
-                        </Card>
-                      ))}
-                    </div>
-                  </>
+                  <div className="border rounded-lg overflow-hidden bg-card">
+                    {filteredScorecards.map((sc, idx) => (
+                      <ScorecardListRow
+                        key={sc.id}
+                        sc={sc}
+                        isMobile={isMobile}
+                        isSelector={!!isSelector}
+                        currentUser={currentUser}
+                        canImport={!!canImport}
+                        hasReports={scorecardsWithReports.has(sc.id)}
+                        deletingId={deletingId}
+                        onDelete={handleDelete}
+                        isLast={idx === filteredScorecards.length - 1}
+                      />
+                    ))}
+                  </div>
                 )}
               </TabsContent>
 
