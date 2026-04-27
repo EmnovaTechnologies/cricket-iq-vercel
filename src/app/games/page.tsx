@@ -357,6 +357,16 @@ function GamesPageInner() {
                   </Select>
                 </div>
                 <div className="flex-1 min-w-[140px]">
+                  <label htmlFor="selectors-filter" className="block text-sm font-medium text-muted-foreground mb-1">Selectors</label>
+                  <Select value={noSelectorsFilter ? 'none' : 'all'} onValueChange={(v) => setNoSelectorsFilter(v === 'none')}>
+                    <SelectTrigger id="selectors-filter"><SelectValue placeholder="All Games" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Games</SelectItem>
+                      <SelectItem value="none">No Selectors</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1 min-w-[140px]">
                   <label htmlFor="finalized-status-filter" className="block text-sm font-medium text-muted-foreground mb-1">Rating Status</label>
                   <Select value={selectedFinalizedStatus} onValueChange={(value) => setSelectedFinalizedStatus(value as FinalizedStatusFilter)}>
                     <SelectTrigger id="finalized-status-filter">
