@@ -20,22 +20,13 @@ import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { checkTeamDeletableAction } from '@/lib/actions/team-admin-actions';
 
 export default function TeamsPage() {
-  const { activeOrganizationId, loading: authLoading, effectivePermissions, isPermissionsLoading, userProfile } = useAuth();
+  const { activeOrganizationId, activeOrganizationDetails, loading: authLoading, effectivePermissions, isPermissionsLoading, userProfile } = useAuth();
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [teamDeletable, setTeamDeletable] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAgeCategory, setSelectedAgeCategory] = useState<AgeCategory | 'all'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
-  const [orgCheckReady, setOrgCheckReady] = useState(false);
-
-  useEffect(() => {
-    if (!authLoading && !isPermissionsLoading) {
-      const t = setTimeout(() => setOrgCheckReady(true), 800);
-      return () => clearTimeout(t);
-    }
-    setOrgCheckReady(false);
-  }, [authLoading, isPermissionsLoading]);
   const { toast } = useToast();
 
   const fetchTeams = useCallback(async () => {
@@ -118,7 +109,7 @@ export default function TeamsPage() {
         )}
       </div>
 
-      {!activeOrganizationId && orgCheckReady && (
+      {!activeOrganizationId && !authLoading && activeOrganizationDetails === null && (
         <Alert variant="default" className="border-primary/50">
           <Info className="h-5 w-5 text-primary" />
           <AlertTitle>No Organization Selected</AlertTitle>

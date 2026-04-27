@@ -18,7 +18,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 
 export default function SeriesPage() {
-  const { userProfile, activeOrganizationId, loading: authLoading, effectivePermissions, isPermissionsLoading } = useAuth();
+  const { userProfile, activeOrganizationId, activeOrganizationDetails, loading: authLoading, effectivePermissions, isPermissionsLoading } = useAuth();
   const [allSeries, setAllSeries] = useState<Series[]>([]);
   const [seriesDeletable, setSeriesDeletable] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -28,15 +28,6 @@ export default function SeriesPage() {
   const [selectedYear, setSelectedYear] = useState<string>(currentYearString);
   const [selectedStatus, setSelectedStatus] = useState<Series['status'] | 'all'>('active');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
-  const [orgCheckReady, setOrgCheckReady] = useState(false);
-
-  useEffect(() => {
-    if (!authLoading && !isPermissionsLoading) {
-      const t = setTimeout(() => setOrgCheckReady(true), 800);
-      return () => clearTimeout(t);
-    }
-    setOrgCheckReady(false);
-  }, [authLoading, isPermissionsLoading]);
 
 
   const fetchSeries = useCallback(async () => {
@@ -194,7 +185,7 @@ export default function SeriesPage() {
         </div>
       </div>
 
-      {!activeOrganizationId && orgCheckReady && (
+      {!activeOrganizationId && !authLoading && activeOrganizationDetails === null && (
         <Alert variant="default" className="border-primary/50">
           <Info className="h-5 w-5 text-primary" />
           <AlertTitle>No Organization Selected</AlertTitle>

@@ -31,7 +31,7 @@ import { ScorecardCard } from '@/components/scorecard-card';
 import { ScorecardListRow } from '@/components/scorecard-list-row';
 
 export default function ScorecardsPage() {
-  const { activeOrganizationId, loading: authLoading, effectivePermissions, isPermissionsLoading, userProfile, currentUser } = useAuth();
+  const { activeOrganizationId, activeOrganizationDetails, loading: authLoading, effectivePermissions, isPermissionsLoading, userProfile, currentUser } = useAuth();
   const { toast } = useToast();
   const [scorecards, setScorecards] = useState<MatchScorecard[]>([]);
   const [allSeries, setAllSeries] = useState<Series[]>([]);
@@ -46,15 +46,6 @@ export default function ScorecardsPage() {
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [isMobile, setIsMobile] = useState(false);
-  const [orgCheckReady, setOrgCheckReady] = useState(false);
-
-  useEffect(() => {
-    if (!authLoading && !isPermissionsLoading) {
-      const t = setTimeout(() => setOrgCheckReady(true), 800);
-      return () => clearTimeout(t);
-    }
-    setOrgCheckReady(false);
-  }, [authLoading, isPermissionsLoading]);
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
   useEffect(() => {
@@ -245,7 +236,7 @@ export default function ScorecardsPage() {
           )}
         </div>
 
-        {!activeOrganizationId && orgCheckReady && (
+        {!activeOrganizationId && !authLoading && activeOrganizationDetails === null && (
           <Alert variant="default" className="border-primary/50">
             <Info className="h-5 w-5 text-primary" />
             <AlertTitle>No Organization Selected</AlertTitle>

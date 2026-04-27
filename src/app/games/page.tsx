@@ -32,6 +32,7 @@ export default function GamesPage() {
   const {
     userProfile,
     activeOrganizationId,
+    activeOrganizationDetails,
     loading: authLoading,
     effectivePermissions,
     isPermissionsLoading
@@ -51,15 +52,6 @@ export default function GamesPage() {
   const [selectedFinalizedStatus, setSelectedFinalizedStatus] = useState<FinalizedStatusFilter>('all');
   const [selectorSpecificFilter, setSelectorSpecificFilter] = useState<SelectorSpecificFilterOption>('all');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
-  const [orgCheckReady, setOrgCheckReady] = useState(false);
-
-  useEffect(() => {
-    if (!authLoading && !isPermissionsLoading) {
-      const t = setTimeout(() => setOrgCheckReady(true), 800);
-      return () => clearTimeout(t);
-    }
-    setOrgCheckReady(false);
-  }, [authLoading, isPermissionsLoading]);
 
   useEffect(() => {
     setMounted(true);
@@ -290,7 +282,7 @@ export default function GamesPage() {
         </div>
       </div>
 
-      {!activeOrganizationId && orgCheckReady && (
+      {!activeOrganizationId && !authLoading && activeOrganizationDetails === null && (
         <Alert variant="default" className="border-primary/50">
           <Info className="h-5 w-5 text-primary" />
           <AlertTitle>No Organization Selected</AlertTitle>

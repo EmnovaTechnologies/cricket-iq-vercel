@@ -29,17 +29,8 @@ export default function VenuesPage() {
   const [selectedStatus, setSelectedStatus] = useState<VenueStatus | 'all'>('active');
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
-  const [orgCheckReady, setOrgCheckReady] = useState(false);
   const { toast } = useToast();
-  const { effectivePermissions, isPermissionsLoading, loading: authLoading, activeOrganizationId, userProfile } = useAuth();
-
-  useEffect(() => {
-    if (!authLoading && !isPermissionsLoading) {
-      const t = setTimeout(() => setOrgCheckReady(true), 800);
-      return () => clearTimeout(t);
-    }
-    setOrgCheckReady(false);
-  }, [authLoading, isPermissionsLoading]);
+  const { effectivePermissions, isPermissionsLoading, loading: authLoading, activeOrganizationId, activeOrganizationDetails, userProfile } = useAuth();
 
   const fetchVenues = useCallback(async () => {
     if (authLoading) {
@@ -138,7 +129,7 @@ export default function VenuesPage() {
             </Button>
           )}
         </div>
-         {!activeOrganizationId && orgCheckReady && (
+         {!activeOrganizationId && !authLoading && activeOrganizationDetails === null && (
           <Alert variant="default" className="border-primary/50">
              <MapPinned className="h-5 w-5 text-primary" />
             <AlertTitle>No Organization Selected</AlertTitle>
