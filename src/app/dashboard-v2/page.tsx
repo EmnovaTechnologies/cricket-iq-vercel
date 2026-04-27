@@ -15,7 +15,7 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAllOrganizationsFromDB, getAllUsersFromDB, getUsersForOrgAdminViewFromDB as getUsersForOrgFromDB, getAllPlayersFromDB, getPlayersWithDetailsFromDB, getAllTeamsFromDB, getAllSeriesFromDB, getAllGamesFromDB, getGamesCountForSeriesIdsFromDB, getPlayersCountForSeriesIdsFromDB, getSeriesCountForAdminUidFromDB } from '@/lib/db';
+import { getAllOrganizationsFromDB, getAllUsersFromDB, getUsersForOrgAdminViewFromDB as getUsersForOrgFromDB, getAllPlayersFromDB, getPlayersWithDetailsFromDB, getAllTeamsFromDB, getAllSeriesFromDB, getAllGamesFromDB, getGamesCountForSeriesIdsFromDB, getPlayersCountForSeriesIdsFromDB, getSeriesCountForAdminUidFromDB, getSeriesCountForTeamIdsFromDB, getGamesCountForTeamIdsFromDB, getPlayersCountForTeamIdsFromDB } from '@/lib/db';
 import { getScorecardsForOrgAction } from '@/lib/actions/scorecard-actions';
 import { format } from 'date-fns';
 
@@ -349,7 +349,27 @@ export default function DashboardPage() {
       const uid = userProfile?.uid || currentUser?.uid || '';
       const assignedSeriesIds = userProfile?.assignedSeriesIds || [];
 
-      if (isSeriesAdminUser && !isSuperAdminUser) {
+      const isTeamManagerUser = userProfile?.roles.includes('Team Manager');
+      const assignedTeamIds = userProfile?.assignedTeamIds || [];
+
+      if (isTeamManagerUser && !isSuperAdminUser && !isSeriesAdminUser) {
+        // Scoped counts for Team Manager — scoped to assigned teams only
+        const [seriesCount, gamesCount, playersCount, scorecardsData] = await Promise.all([
+          getSeriesCountForTeamIdsFromDB(assignedTeamIds, orgId),
+          getGamesCountForTeamIdsFromDB(assignedTeamIds, orgId),
+          getPlayersCountForTeamIdsFromDB(assignedTeamIds, orgId),
+          getScorecardsForOrgAction(orgId),
+        ]);
+        setCounts({
+          orgs: null,
+          users: null,
+          players: playersCount,
+          teams: assignedTeamIds.length,
+          series: seriesCount,
+          games: gamesCount,
+          scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
+        });
+      } else if (isSeriesAdminUser && !isSuperAdminUser) {
         // Scoped counts for Series Admin — match exactly what the pages show
         const [seriesCount, gamesCount, playersData, scorecardsData] = await Promise.all([
           getSeriesCountForAdminUidFromDB(uid, orgId),

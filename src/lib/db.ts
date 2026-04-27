@@ -1013,6 +1013,72 @@ export async function getSeriesCountForAdminUidFromDB(uid: string, orgId: string
   return snapshot.docs.filter(d => d.data().status !== 'archived').length;
 }
 
+/**
+ * Returns series count scoped to teams managed by a Team Manager.
+ * Counts active series that contain at least one of the manager's assigned teams.
+ */
+export async function getSeriesCountForTeamIdsFromDB(teamIds: string[], orgId: string): Promise<number> {
+  if (!teamIds || teamIds.length === 0) return 0;
+  const seriesIdSet = new Set<string>();
+  for (let i = 0; i < teamIds.length; i += 30) {
+    const chunk = teamIds.slice(i, i + 30);
+    if (chunk.length === 0) continue;
+    const seriesQuery = query(
+      collection(db, 'series'),
+      where('organizationId', '==', orgId),
+      where('participatingTeams', 'array-contains-any', chunk)
+    );
+    const snap = await getDocs(seriesQuery);
+    snap.docs
+      .filter(d => d.data().status !== 'archived')
+      .forEach(d => seriesIdSet.add(d.id));
+  }
+  return seriesIdSet.size;
+}
+
+/**
+ * Returns games count scoped to teams managed by a Team Manager.
+ * Counts games where team1Id or team2Id is in the manager's assigned teams.
+ */
+export async function getGamesCountForTeamIdsFromDB(teamIds: string[], orgId: string): Promise<number> {
+  if (!teamIds || teamIds.length === 0) return 0;
+  const gameIdSet = new Set<string>();
+  for (let i = 0; i < teamIds.length; i += 30) {
+    const chunk = teamIds.slice(i, i + 30);
+    if (chunk.length === 0) continue;
+    // Query by team1Id
+    const q1 = query(collection(db, 'games'), where('organizationId', '==', orgId), where('team1Id', 'in', chunk));
+    const snap1 = await getDocs(q1);
+    snap1.docs.filter(d => d.data().status !== 'archived').forEach(d => gameIdSet.add(d.id));
+    // Query by team2Id
+    const q2 = query(collection(db, 'games'), where('organizationId', '==', orgId), where('team2Id', 'in', chunk));
+    const snap2 = await getDocs(q2);
+    snap2.docs.filter(d => d.data().status !== 'archived').forEach(d => gameIdSet.add(d.id));
+  }
+  return gameIdSet.size;
+}
+
+/**
+ * Returns player count scoped to teams managed by a Team Manager.
+ * Counts players whose primaryTeamId is in the manager's assigned teams.
+ */
+export async function getPlayersCountForTeamIdsFromDB(teamIds: string[], orgId: string): Promise<number> {
+  if (!teamIds || teamIds.length === 0) return 0;
+  const playerIdSet = new Set<string>();
+  for (let i = 0; i < teamIds.length; i += 30) {
+    const chunk = teamIds.slice(i, i + 30);
+    if (chunk.length === 0) continue;
+    const playersQuery = query(
+      collection(db, 'players'),
+      where('primaryTeamId', 'in', chunk),
+      where('organizationId', '==', orgId)
+    );
+    const snap = await getDocs(playersQuery);
+    snap.docs.forEach(d => playerIdSet.add(d.id));
+  }
+  return playerIdSet.size;
+}
+
 export async function getGameByIdFromDB(id: string): Promise<Game | undefined> {
   if (!id) return undefined;
   const gameDocRef = doc(db, 'games', id);
