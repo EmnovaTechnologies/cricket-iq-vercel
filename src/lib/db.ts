@@ -930,6 +930,89 @@ export async function getAllGamesFromDB(statusFilter?: Game['status'] | 'all', o
   return gamesWithSeriesNamesAndStatus.filter(game => game !== null) as Game[];
 }
 
+// --- Dashboard Count Helpers (scoped per role, do not modify existing functions) ---
+
+/**
+ * Returns games scoped to a list of seriesIds.
+ * Used by dashboard to count games for Series Admin.
+ * Excludes archived games/series.
+ */
+export async function getGamesCountForSeriesIdsFromDB(seriesIds: string[]): Promise<number> {
+  if (!seriesIds || seriesIds.length === 0) return 0;
+  let count = 0;
+  for (let i = 0; i < seriesIds.length; i += 30) {
+    const chunk = seriesIds.slice(i, i + 30);
+    if (chunk.length === 0) continue;
+    const gamesQuery = query(
+      collection(db, 'games'),
+      where('seriesId', 'in', chunk),
+      where('status', '!=', 'archived')
+    );
+    const snapshot = await getDocs(gamesQuery);
+    count += snapshot.size;
+  }
+  return count;
+}
+
+/**
+ * Returns player count scoped to teams participating in given seriesIds.
+ * Used by dashboard to count players for Series Admin.
+ */
+export async function getPlayersCountForSeriesIdsFromDB(seriesIds: string[], orgId: string): Promise<number> {
+  if (!seriesIds || seriesIds.length === 0) return 0;
+
+  // 1. Collect all participatingTeam IDs across the assigned series
+  const teamIdSet = new Set<string>();
+  for (let i = 0; i < seriesIds.length; i += 30) {
+    const chunk = seriesIds.slice(i, i + 30);
+    if (chunk.length === 0) continue;
+    const seriesQuery = query(
+      collection(db, 'series'),
+      where('__name__', 'in', chunk),
+      where('organizationId', '==', orgId)
+    );
+    const seriesSnap = await getDocs(seriesQuery);
+    seriesSnap.docs.forEach(d => {
+      const teams: string[] = d.data().participatingTeams || [];
+      teams.forEach(t => teamIdSet.add(t));
+    });
+  }
+
+  if (teamIdSet.size === 0) return 0;
+
+  // 2. Count players whose primaryTeamId is in those teams
+  const teamIds = Array.from(teamIdSet);
+  let playerIdSet = new Set<string>();
+  for (let i = 0; i < teamIds.length; i += 30) {
+    const chunk = teamIds.slice(i, i + 30);
+    if (chunk.length === 0) continue;
+    const playersQuery = query(
+      collection(db, 'players'),
+      where('primaryTeamId', 'in', chunk),
+      where('organizationId', '==', orgId)
+    );
+    const playersSnap = await getDocs(playersQuery);
+    playersSnap.docs.forEach(d => playerIdSet.add(d.id));
+  }
+  return playerIdSet.size;
+}
+
+/**
+ * Returns series count scoped to seriesIds where the user appears in seriesAdminUids.
+ * This matches the series page filter — use this instead of assignedSeriesIds.length.
+ */
+export async function getSeriesCountForAdminUidFromDB(uid: string, orgId: string): Promise<number> {
+  if (!uid || !orgId) return 0;
+  const seriesQuery = query(
+    collection(db, 'series'),
+    where('organizationId', '==', orgId),
+    where('seriesAdminUids', 'array-contains', uid),
+    where('status', '!=', 'archived')
+  );
+  const snapshot = await getDocs(seriesQuery);
+  return snapshot.size;
+}
+
 export async function getGameByIdFromDB(id: string): Promise<Game | undefined> {
   if (!id) return undefined;
   const gameDocRef = doc(db, 'games', id);
