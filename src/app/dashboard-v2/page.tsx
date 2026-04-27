@@ -351,16 +351,16 @@ export default function DashboardPage() {
 
       if (isSeriesAdminUser && !isSuperAdminUser) {
         // Scoped counts for Series Admin — match exactly what the pages show
-        const [seriesCount, gamesCount, playersCount, scorecardsData] = await Promise.all([
+        const [seriesCount, gamesCount, playersData, scorecardsData] = await Promise.all([
           getSeriesCountForAdminUidFromDB(uid, orgId),
           getGamesCountForSeriesIdsFromDB(assignedSeriesIds),
-          getPlayersCountForSeriesIdsFromDB(assignedSeriesIds, orgId),
+          getAllPlayersFromDB(orgId),
           getScorecardsForOrgAction(orgId),
         ]);
         setCounts({
           orgs: null,
           users: null,
-          players: playersCount,
+          players: playersData.length,
           teams: null,
           series: seriesCount,
           games: gamesCount,
