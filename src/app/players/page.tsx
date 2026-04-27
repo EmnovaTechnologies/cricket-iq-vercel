@@ -4,9 +4,10 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import PlayerCard from '@/components/player-card';
+import PlayerListRow from '@/components/player-list-row';
 import { getPlayersWithDetailsFromDB, getAllTeamsFromDB } from '@/lib/db'; // Added getAllTeamsFromDB
 import type { PlayerWithRatings, Team } from '@/types'; // Added Team
-import { PlusCircle, Search as SearchIcon, Upload, Info, Loader2, ShieldAlert, AlertCircle, Filter as FilterIcon, UserSquare2 } from 'lucide-react'; // Added FilterIcon
+import { PlusCircle, Search as SearchIcon, Upload, Info, Loader2, ShieldAlert, AlertCircle, Filter as FilterIcon, UserSquare2, LayoutGrid, List } from 'lucide-react'; // Added FilterIcon
 import { useState, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +28,7 @@ export default function PlayersPage() {
   const [selectedPrimaryTeamFilter, setSelectedPrimaryTeamFilter] = useState<string>('all'); // 'all', 'none', or teamId
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -135,10 +137,20 @@ export default function PlayersPage() {
     }
 
     if (filteredPlayers.length > 0) {
-      return (
+      return viewMode === 'cards' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredPlayers.map((player) => (
             <PlayerCard key={player.id} player={player} />
+          ))}
+        </div>
+      ) : (
+        <div className="border rounded-lg overflow-hidden bg-card">
+          {filteredPlayers.map((player, idx) => (
+            <PlayerListRow
+              key={player.id}
+              player={player}
+              isLast={idx === filteredPlayers.length - 1}
+            />
           ))}
         </div>
       );
@@ -231,6 +243,25 @@ export default function PlayersPage() {
                    {allTeamsForOrg.length === 0 && activeOrganizationId && !isLoading && (
                       <p className="text-xs text-muted-foreground mt-1">No teams found in this organization to filter by.</p>
                    )}
+                </div>
+                <div className="flex flex-col items-end justify-end gap-1">
+                  <span className="text-xs text-muted-foreground">{filteredPlayers.length} {filteredPlayers.length === 1 ? 'player' : 'players'}</span>
+                  <div className="flex rounded-md border border-input overflow-hidden">
+                    <button
+                      onClick={() => setViewMode('cards')}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${viewMode === 'cards' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                      title="Card view"
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors border-l border-input ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                      title="List view"
+                    >
+                      <List className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </CardContent>
