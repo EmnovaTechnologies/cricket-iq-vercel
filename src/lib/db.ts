@@ -945,11 +945,11 @@ export async function getGamesCountForSeriesIdsFromDB(seriesIds: string[]): Prom
     if (chunk.length === 0) continue;
     const gamesQuery = query(
       collection(db, 'games'),
-      where('seriesId', 'in', chunk),
-      where('status', '!=', 'archived')
+      where('seriesId', 'in', chunk)
     );
     const snapshot = await getDocs(gamesQuery);
-    count += snapshot.size;
+    // Filter archived in JS to avoid Firestore composite index requirement
+    count += snapshot.docs.filter(d => d.data().status !== 'archived').length;
   }
   return count;
 }
@@ -1006,11 +1006,11 @@ export async function getSeriesCountForAdminUidFromDB(uid: string, orgId: string
   const seriesQuery = query(
     collection(db, 'series'),
     where('organizationId', '==', orgId),
-    where('seriesAdminUids', 'array-contains', uid),
-    where('status', '!=', 'archived')
+    where('seriesAdminUids', 'array-contains', uid)
   );
   const snapshot = await getDocs(seriesQuery);
-  return snapshot.size;
+  // Filter archived in JS to avoid Firestore composite index requirement
+  return snapshot.docs.filter(d => d.data().status !== 'archived').length;
 }
 
 export async function getGameByIdFromDB(id: string): Promise<Game | undefined> {
