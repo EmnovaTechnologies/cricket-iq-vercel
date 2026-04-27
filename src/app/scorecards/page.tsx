@@ -207,7 +207,7 @@ function ScorecardsPageInner() {
     });
   }, [seriesGames, scorecards, selectedSeries]);
 
-  const showMissingTab = !isSelectorOnly && selectedSeries && selectedSeries !== 'all' && selectedSeries !== 'none';
+  const showMissingTab = !isSelectorOnly && (defaultTab === 'missing' || (selectedSeries && selectedSeries !== 'all' && selectedSeries !== 'none'));
 
   if (!mounted) return <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   if (authLoading || isPermissionsLoading || (isLoading && !!activeOrganizationId)) return <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -395,7 +395,12 @@ function ScorecardsPageInner() {
               {/* ── Missing ── */}
               {showMissingTab && (
                 <TabsContent value="missing" className="mt-4">
-                  {isLoadingGames ? (
+                  {(!selectedSeries || selectedSeries === 'all' || selectedSeries === 'none') ? (
+                    <div className="text-center py-12 space-y-2">
+                      <Table className="h-12 w-12 mx-auto text-muted-foreground/30" />
+                      <p className="text-muted-foreground">Select a series above to see missing scorecards.</p>
+                    </div>
+                  ) : isLoadingGames ? (
                     <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
                   ) : missingGames.length === 0 ? (
                     <div className="text-center py-12 space-y-2">
