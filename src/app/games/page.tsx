@@ -281,7 +281,7 @@ export default function GamesPage() {
         </div>
       </div>
 
-      {!activeOrganizationId && !authLoading && (
+      {!activeOrganizationId && !authLoading && !isPermissionsLoading && (
         <Alert variant="default" className="border-primary/50">
           <Info className="h-5 w-5 text-primary" />
           <AlertTitle>No Organization Selected</AlertTitle>
