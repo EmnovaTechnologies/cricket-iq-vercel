@@ -30,6 +30,8 @@ export default function VenuesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [orgCheckReady, setOrgCheckReady] = useState(false);
+  const { toast } = useToast();
+  const { effectivePermissions, isPermissionsLoading, loading: authLoading, activeOrganizationId, userProfile } = useAuth();
 
   useEffect(() => {
     if (!authLoading && !isPermissionsLoading) {
@@ -38,8 +40,6 @@ export default function VenuesPage() {
     }
     setOrgCheckReady(false);
   }, [authLoading, isPermissionsLoading]);
-  const { toast } = useToast();
-  const { effectivePermissions, isPermissionsLoading, loading: authLoading, activeOrganizationId, userProfile } = useAuth();
 
   const fetchVenues = useCallback(async () => {
     if (authLoading) {
