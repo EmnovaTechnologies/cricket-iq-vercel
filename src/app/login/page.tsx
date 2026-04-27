@@ -78,11 +78,8 @@ function LoginForm() {
 
   useEffect(() => {
     if (!isAuthLoading && userProfile) {
-      const redirectParam = searchParams.get('redirect');
-      if (redirectParam) {
-        router.push(redirectParam);
-        return;
-      }
+      // Always redirect to root after login — never honour ?redirect= param
+      // because the redirecting user may have had different permissions
       // Step 4: on mobile, redirect selector-role users to their mobile dashboard
       const isMobile = typeof window !== 'undefined' &&
         (window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
@@ -95,7 +92,7 @@ function LoginForm() {
         router.push('/');
       }
     }
-  }, [isAuthLoading, userProfile, router, searchParams]);
+  }, [isAuthLoading, userProfile, router]);
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
