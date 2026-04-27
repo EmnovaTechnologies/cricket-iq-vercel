@@ -32,6 +32,7 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   isAuthLoading: boolean;
   isOrgLoading: boolean;
+  permissionsReady: boolean;
   isLoggingOut: boolean;
   activeOrganizationId: string | null;
   setActiveOrganizationId: (orgId: string | null) => Promise<void>;
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isOrgLoading, setIsOrgLoading] = useState(true);
+  const [permissionsReady, setPermissionsReady] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [pendingRegistrationToken, setPendingRegistrationToken] = useState<string | null>(null);
   
@@ -151,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUserProfile(profile);
             const perms = await calculateEffectivePermissions(profile);
             setEffectivePermissions(perms);
+            setPermissionsReady(true);
             let orgs: Organization[];
             if (profile.roles.includes('admin')) {
                 orgs = await getAllOrganizationsFromDB();
@@ -174,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else {
                 setActiveOrganizationDetails(null);
             }
+            setIsOrgLoading(false);
             setIsOrgLoading(false);
         }
 
@@ -210,6 +214,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUserProfile(null);
         setEffectivePermissions({});
+        setPermissionsReady(false);
+        setIsOrgLoading(false);
         _setInternalActiveOrganizationId(null);
         setActiveOrganizationDetails(null);
         setIsOrgLoading(false);
@@ -406,7 +412,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = {
     currentUser, userProfile,
-    isAuthLoading, isOrgLoading, isLoggingOut, 
+    isAuthLoading, isOrgLoading, permissionsReady, isLoggingOut, 
     activeOrganizationId: _activeOrganizationId,
     setActiveOrganizationId, organizationsForSwitching, activeOrganizationDetails,
     effectivePermissions,
