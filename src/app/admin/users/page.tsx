@@ -481,9 +481,7 @@ export default function AdminUsersV2Page() {
                 <div>
                   <CardTitle className="text-xl font-headline text-primary">User management</CardTitle>
                   <CardDescription className="mt-0.5">
-                    {isSuperAdmin
-                      ? `${filteredUsers.length} of ${users.length} users`
-                      : 'Click Edit on any row to manage roles and club.'}
+                    {`${filteredUsers.length} of ${users.length} users`}
                   </CardDescription>
                 </div>
               </div>
