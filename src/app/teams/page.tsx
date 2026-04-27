@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import TeamCard from '@/components/team-card';
+import TeamListRow from '@/components/team-list-row';
 import { getAllTeamsFromDB } from '@/lib/db';
 import type { Team, AgeCategory } from '@/types';
-import { PlusCircle, Users, Search as SearchIcon, Filter, Info, Loader2, Upload } from 'lucide-react';
+import { PlusCircle, Users, Search as SearchIcon, Filter, Info, Loader2, Upload, LayoutGrid, List } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +26,7 @@ export default function TeamsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAgeCategory, setSelectedAgeCategory] = useState<AgeCategory | 'all'>('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const { toast } = useToast();
 
   const fetchTeams = useCallback(async () => {
@@ -154,6 +156,25 @@ export default function TeamsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex flex-col items-end justify-end gap-1">
+                  <span className="text-xs text-muted-foreground">{filteredTeams.length} {filteredTeams.length === 1 ? 'team' : 'teams'}</span>
+                  <div className="flex rounded-md border border-input overflow-hidden">
+                    <button
+                      onClick={() => setViewMode('cards')}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${viewMode === 'cards' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                      title="Card view"
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors border-l border-input ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                      title="List view"
+                    >
+                      <List className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -166,10 +187,22 @@ export default function TeamsPage() {
                 ? 'No teams found matching your criteria for this organization.'
                 : 'No teams found for this organization. Add some teams to get started.'}
             </p>
-          ) : (
+          ) : viewMode === 'cards' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredTeams.map((teamItem) => (
                 <TeamCard key={teamItem.id} team={teamItem} onDeleted={fetchTeams} canDelete={teamDeletable[teamItem.id] ?? null} />
+              ))}
+            </div>
+          ) : (
+            <div className="border rounded-lg overflow-hidden bg-card">
+              {filteredTeams.map((teamItem, idx) => (
+                <TeamListRow
+                  key={teamItem.id}
+                  team={teamItem}
+                  onDeleted={fetchTeams}
+                  canDelete={teamDeletable[teamItem.id] ?? null}
+                  isLast={idx === filteredTeams.length - 1}
+                />
               ))}
             </div>
           )}
