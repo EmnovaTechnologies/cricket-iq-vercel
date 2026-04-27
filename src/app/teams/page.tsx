@@ -34,7 +34,13 @@ export default function TeamsPage() {
     if (!activeOrganizationId) { setAllTeams([]); setIsLoading(false); return; }
     setIsLoading(true);
     try {
-      const teamsFromDB = await getAllTeamsFromDB(activeOrganizationId);
+      const allOrgTeams = await getAllTeamsFromDB(activeOrganizationId);
+      const isTeamManager = userProfile?.roles?.includes('Team Manager') &&
+        !userProfile?.roles?.includes('admin') &&
+        !userProfile?.roles?.includes('Organization Admin');
+      const teamsFromDB = isTeamManager
+        ? allOrgTeams.filter(t => (userProfile?.assignedTeamIds || []).includes(t.id))
+        : allOrgTeams;
       setAllTeams(teamsFromDB);
 
       const isOrgAdmin = userProfile?.roles?.includes('Organization Admin') ?? false;
