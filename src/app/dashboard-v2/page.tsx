@@ -15,7 +15,7 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAllOrganizationsFromDB, getAllUsersFromDB, getUsersForOrgAdminViewFromDB as getUsersForOrgFromDB, getAllPlayersFromDB, getAllTeamsFromDB, getAllSeriesFromDB, getAllGamesFromDB, getGamesCountForSeriesIdsFromDB, getPlayersCountForSeriesIdsFromDB, getSeriesCountForAdminUidFromDB } from '@/lib/db';
+import { getAllOrganizationsFromDB, getAllUsersFromDB, getUsersForOrgAdminViewFromDB as getUsersForOrgFromDB, getAllPlayersFromDB, getPlayersWithDetailsFromDB, getAllTeamsFromDB, getAllSeriesFromDB, getAllGamesFromDB, getGamesCountForSeriesIdsFromDB, getPlayersCountForSeriesIdsFromDB, getSeriesCountForAdminUidFromDB } from '@/lib/db';
 import { getScorecardsForOrgAction } from '@/lib/actions/scorecard-actions';
 import { format } from 'date-fns';
 
@@ -354,7 +354,7 @@ export default function DashboardPage() {
         const [seriesCount, gamesCount, playersData, scorecardsData] = await Promise.all([
           getSeriesCountForAdminUidFromDB(uid, orgId),
           getGamesCountForSeriesIdsFromDB(assignedSeriesIds),
-          getAllPlayersFromDB(orgId),
+          getPlayersWithDetailsFromDB(orgId),
           getScorecardsForOrgAction(orgId),
         ]);
         setCounts({
@@ -371,7 +371,7 @@ export default function DashboardPage() {
         const [orgsData, usersData, playersData, teamsData, seriesData, gamesData, scorecardsData] = await Promise.all([
           isSuperAdminUser ? getAllOrganizationsFromDB() : Promise.resolve([]),
           isSuperAdminUser ? getAllUsersFromDB() : getUsersForOrgFromDB(orgId),
-          getAllPlayersFromDB(orgId),
+          getPlayersWithDetailsFromDB(orgId),
           getAllTeamsFromDB(orgId),
           getAllSeriesFromDB('active', orgId),
           getAllGamesFromDB('all', orgId),
