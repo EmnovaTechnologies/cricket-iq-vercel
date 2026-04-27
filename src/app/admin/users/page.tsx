@@ -481,7 +481,7 @@ export default function AdminUsersV2Page() {
                 <div>
                   <CardTitle className="text-xl font-headline text-primary">User management</CardTitle>
                   <CardDescription className="mt-0.5">
-                    {`${filteredUsers.length} of ${users.length} users`}
+                    {`${filteredUsers.filter(u => !u.roles?.includes('admin')).length} of ${users.filter(u => !u.roles?.includes('admin')).length} users`}
                   </CardDescription>
                 </div>
               </div>
