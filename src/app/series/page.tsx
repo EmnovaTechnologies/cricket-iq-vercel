@@ -4,9 +4,10 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import SeriesCard from '@/components/series-card';
+import SeriesListRow from '@/components/series-list-row';
 import { getAllSeriesFromDB, getGamesByIdsFromDB, getTeamByIdFromDB } from '@/lib/db';
 import type { Series } from '@/types';
-import { PlusCircle, Layers, Filter, Upload, AlertTriangle, Info, Loader2 } from 'lucide-react';
+import { PlusCircle, Layers, Filter, Upload, AlertTriangle, Info, Loader2, LayoutGrid, List } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { archiveSeriesAction, unarchiveSeriesAction } from '@/lib/actions/series-actions';
@@ -26,6 +27,7 @@ export default function SeriesPage() {
   const currentYearString = useMemo(() => new Date().getFullYear().toString(), []);
   const [selectedYear, setSelectedYear] = useState<string>(currentYearString);
   const [selectedStatus, setSelectedStatus] = useState<Series['status'] | 'all'>('active');
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
 
   const fetchSeries = useCallback(async () => {
@@ -221,6 +223,24 @@ export default function SeriesPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex items-end pb-0.5">
+              <div className="flex rounded-md border border-input overflow-hidden">
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${viewMode === 'cards' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                  title="Card view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors border-l border-input ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                  title="List view"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           </div>
 
           {isLoading ? (
@@ -231,7 +251,7 @@ export default function SeriesPage() {
               {activeOrganizationId ? "This may be due to your role's permissions for this organization." : "This may be due to your role's permissions."}
               Try adjusting the filters or contact an administrator.
             </p>
-          ) : (
+          ) : viewMode === 'cards' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredSeries.map((seriesItem) => (
                 <SeriesCard
@@ -243,6 +263,22 @@ export default function SeriesPage() {
                   isPermissionsLoading={isPermissionsLoading}
                   canDelete={seriesDeletable[seriesItem.id] ?? null}
                   onDeleted={fetchSeries}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="border rounded-lg overflow-hidden bg-card">
+              {filteredSeries.map((seriesItem, idx) => (
+                <SeriesListRow
+                  key={seriesItem.id}
+                  series={seriesItem}
+                  onArchiveToggle={handleArchiveToggle}
+                  canArchive={canArchiveAnySeries}
+                  canUnarchive={canUnarchiveAnySeries}
+                  isPermissionsLoading={isPermissionsLoading}
+                  canDelete={seriesDeletable[seriesItem.id] ?? null}
+                  onDeleted={fetchSeries}
+                  isLast={idx === filteredSeries.length - 1}
                 />
               ))}
             </div>
