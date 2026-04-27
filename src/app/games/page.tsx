@@ -64,6 +64,13 @@ export default function GamesPage() {
       }
 
       setIsLoading(true);
+      // Clear stale data + reset filters immediately so previous org's data never bleeds through
+      setAllGames([]);
+      setAllSeriesForOrg([]);
+      setAllTeamsForOrg([]);
+      setSelectedSeriesId('all');
+      setSelectedTeamName('all');
+      setSelectedFinalizedStatus('all');
       try {
         const gamesFromDB = await getGamesForUserViewAction(userProfile, activeOrganizationId);
         setAllGames(gamesFromDB);
