@@ -216,7 +216,7 @@ function useRoleDashboard(counts: Counts) {
       ] as StatCard[],
       pendingActions: [
         { label: 'Games pending selector certification', href: '/games', variant: 'warning' as const },
-        { label: 'Missing scorecards for your series', href: '/scorecards', variant: 'warning' as const },
+        { label: 'Missing scorecards for your series', href: '/scorecards?tab=missing', variant: 'warning' as const },
         { label: 'Games ready to finalize', href: '/games', variant: 'info' as const },
       ],
       quickLinks: [
