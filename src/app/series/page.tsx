@@ -18,7 +18,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 
 export default function SeriesPage() {
-  const { userProfile, activeOrganizationId, activeOrganizationDetails, loading: authLoading, effectivePermissions, isPermissionsLoading } = useAuth();
+  const { userProfile, activeOrganizationId, activeOrganizationDetails, loading: authLoading, isOrgLoading, effectivePermissions, isPermissionsLoading } = useAuth();
   const [allSeries, setAllSeries] = useState<Series[]>([]);
   const [seriesDeletable, setSeriesDeletable] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -185,7 +185,7 @@ export default function SeriesPage() {
         </div>
       </div>
 
-      {!activeOrganizationId && !authLoading && activeOrganizationDetails === null && (
+      {!activeOrganizationId && !authLoading && !isOrgLoading && (
         <Alert variant="default" className="border-primary/50">
           <Info className="h-5 w-5 text-primary" />
           <AlertTitle>No Organization Selected</AlertTitle>

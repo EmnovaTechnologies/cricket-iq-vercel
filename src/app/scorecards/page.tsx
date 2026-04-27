@@ -31,7 +31,7 @@ import { ScorecardCard } from '@/components/scorecard-card';
 import { ScorecardListRow } from '@/components/scorecard-list-row';
 
 export default function ScorecardsPage() {
-  const { activeOrganizationId, activeOrganizationDetails, loading: authLoading, effectivePermissions, isPermissionsLoading, userProfile, currentUser } = useAuth();
+  const { activeOrganizationId, activeOrganizationDetails, loading: authLoading, isOrgLoading, effectivePermissions, isPermissionsLoading, userProfile, currentUser } = useAuth();
   const { toast } = useToast();
   const [scorecards, setScorecards] = useState<MatchScorecard[]>([]);
   const [allSeries, setAllSeries] = useState<Series[]>([]);
@@ -236,7 +236,7 @@ export default function ScorecardsPage() {
           )}
         </div>
 
-        {!activeOrganizationId && !authLoading && activeOrganizationDetails === null && (
+        {!activeOrganizationId && !authLoading && !isOrgLoading && (
           <Alert variant="default" className="border-primary/50">
             <Info className="h-5 w-5 text-primary" />
             <AlertTitle>No Organization Selected</AlertTitle>

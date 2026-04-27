@@ -34,6 +34,7 @@ export default function GamesPage() {
     activeOrganizationId,
     activeOrganizationDetails,
     loading: authLoading,
+    isOrgLoading,
     effectivePermissions,
     isPermissionsLoading
   } = useAuth();
@@ -282,7 +283,7 @@ export default function GamesPage() {
         </div>
       </div>
 
-      {!activeOrganizationId && !authLoading && activeOrganizationDetails === null && (
+      {!activeOrganizationId && !authLoading && !isOrgLoading && (
         <Alert variant="default" className="border-primary/50">
           <Info className="h-5 w-5 text-primary" />
           <AlertTitle>No Organization Selected</AlertTitle>

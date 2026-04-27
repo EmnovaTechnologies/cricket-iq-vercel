@@ -30,7 +30,7 @@ export default function VenuesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const { toast } = useToast();
-  const { effectivePermissions, isPermissionsLoading, loading: authLoading, activeOrganizationId, activeOrganizationDetails, userProfile } = useAuth();
+  const { effectivePermissions, isPermissionsLoading, loading: authLoading, isOrgLoading, activeOrganizationId, activeOrganizationDetails, userProfile } = useAuth();
 
   const fetchVenues = useCallback(async () => {
     if (authLoading) {
@@ -129,7 +129,7 @@ export default function VenuesPage() {
             </Button>
           )}
         </div>
-         {!activeOrganizationId && !authLoading && activeOrganizationDetails === null && (
+         {!activeOrganizationId && !authLoading && !isOrgLoading && (
           <Alert variant="default" className="border-primary/50">
              <MapPinned className="h-5 w-5 text-primary" />
             <AlertTitle>No Organization Selected</AlertTitle>

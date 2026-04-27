@@ -20,7 +20,7 @@ import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { checkTeamDeletableAction } from '@/lib/actions/team-admin-actions';
 
 export default function TeamsPage() {
-  const { activeOrganizationId, activeOrganizationDetails, loading: authLoading, effectivePermissions, isPermissionsLoading, userProfile } = useAuth();
+  const { activeOrganizationId, activeOrganizationDetails, loading: authLoading, isOrgLoading, effectivePermissions, isPermissionsLoading, userProfile } = useAuth();
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [teamDeletable, setTeamDeletable] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -109,7 +109,7 @@ export default function TeamsPage() {
         )}
       </div>
 
-      {!activeOrganizationId && !authLoading && activeOrganizationDetails === null && (
+      {!activeOrganizationId && !authLoading && !isOrgLoading && (
         <Alert variant="default" className="border-primary/50">
           <Info className="h-5 w-5 text-primary" />
           <AlertTitle>No Organization Selected</AlertTitle>

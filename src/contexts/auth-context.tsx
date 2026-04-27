@@ -31,6 +31,7 @@ interface AuthContextType {
   currentUser: FirebaseUser | null;
   userProfile: UserProfile | null;
   isAuthLoading: boolean;
+  isOrgLoading: boolean;
   isLoggingOut: boolean;
   activeOrganizationId: string | null;
   setActiveOrganizationId: (orgId: string | null) => Promise<void>;
@@ -60,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isOrgLoading, setIsOrgLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [pendingRegistrationToken, setPendingRegistrationToken] = useState<string | null>(null);
   
@@ -172,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else {
                 setActiveOrganizationDetails(null);
             }
+            setIsOrgLoading(false);
         }
 
     } catch (error) {
@@ -209,6 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setEffectivePermissions({});
         _setInternalActiveOrganizationId(null);
         setActiveOrganizationDetails(null);
+        setIsOrgLoading(false);
         setOrganizationsForSwitching([]);
         if (typeof window !== 'undefined') {
           localStorage.removeItem(ACTIVE_ORG_ID_LS_KEY);
@@ -402,7 +406,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = {
     currentUser, userProfile,
-    isAuthLoading, isLoggingOut, 
+    isAuthLoading, isOrgLoading, isLoggingOut, 
     activeOrganizationId: _activeOrganizationId,
     setActiveOrganizationId, organizationsForSwitching, activeOrganizationDetails,
     effectivePermissions,
