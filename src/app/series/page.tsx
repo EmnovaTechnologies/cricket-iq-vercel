@@ -223,7 +223,8 @@ export default function SeriesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end pb-0.5">
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-xs text-muted-foreground">{filteredSeries.length} {filteredSeries.length === 1 ? 'series' : 'series'}</span>
               <div className="flex rounded-md border border-input overflow-hidden">
                 <button
                   onClick={() => setViewMode('cards')}
