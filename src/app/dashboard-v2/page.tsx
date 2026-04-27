@@ -16,7 +16,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAllOrganizationsFromDB, getAllUsersFromDB, getUsersForOrgAdminViewFromDB as getUsersForOrgFromDB, getAllPlayersFromDB, getPlayersWithDetailsFromDB, getAllTeamsFromDB, getAllSeriesFromDB, getAllGamesFromDB, getGamesCountForSeriesIdsFromDB, getPlayersCountForSeriesIdsFromDB, getSeriesCountForAdminUidFromDB, getSeriesCountForTeamIdsFromDB, getGamesCountForTeamIdsFromDB, getPlayersCountForTeamIdsFromDB } from '@/lib/db';
-import { getScorecardsForOrgAction } from '@/lib/actions/scorecard-actions';
+import { getScorecardsForOrgAction, getScorecardsForSelectorAction } from '@/lib/actions/scorecard-actions';
 import { getGamesForUserViewAction } from '@/lib/actions/game-actions';
 import { format } from 'date-fns';
 
@@ -261,13 +261,12 @@ function useRoleDashboard(counts: Counts) {
 
   // ── Selector ──────────────────────────────────────────────────────────────────
   if (isSelector) {
-    const assignedGames = userProfile?.assignedGameIds?.length || 0;
     const isPerformanceModel = selectionModel === 'performance';
     return {
       greeting: `Selector`,
       subtitle: orgName,
       stats: [
-        { label: 'Assigned games', value: assignedGames.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
+        { label: 'Assigned games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
         { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
         { label: 'Selection model', value: selectionModel || '—', icon: <BarChart3 className="h-3.5 w-3.5" /> },
       ] as StatCard[],
@@ -344,51 +343,22 @@ export default function DashboardPage() {
     if (!activeOrganizationDetails) return;
     setCountsLoading(true);
     try {
-      const isSuperAdminUser = userProfile?.roles.includes('admin');
-      const isSeriesAdminUser = userProfile?.roles.includes('Series Admin');
       const orgId = activeOrganizationDetails.id;
       const uid = userProfile?.uid || currentUser?.uid || '';
-      const assignedSeriesIds = userProfile?.assignedSeriesIds || [];
+      const roles = userProfile?.roles || [];
 
-      const isTeamManagerUser = userProfile?.roles.includes('Team Manager');
+      // Priority order matches useRoleDashboard: SysAdmin → OrgAdmin → SeriesAdmin → TeamManager → Selector → else
+      const isSuperAdminUser = roles.includes('admin');
+      const isOrgAdminUser = roles.includes('Organization Admin');
+      const isSeriesAdminUser = roles.includes('Series Admin');
+      const isTeamManagerUser = roles.includes('Team Manager');
+      const isSelectorUser = roles.includes('selector');
+
+      const assignedSeriesIds = userProfile?.assignedSeriesIds || [];
       const assignedTeamIds = userProfile?.assignedTeamIds || [];
 
-      if (isTeamManagerUser && !isSuperAdminUser && !isSeriesAdminUser) {
-        // Scoped counts for Team Manager — use same functions as the pages themselves
-        const [gamesData, seriesCount, playersData, scorecardsData] = await Promise.all([
-          getGamesForUserViewAction(userProfile, orgId),
-          getSeriesCountForTeamIdsFromDB(assignedTeamIds, orgId),
-          getPlayersWithDetailsFromDB(orgId),
-          getScorecardsForOrgAction(orgId),
-        ]);
-        setCounts({
-          orgs: null,
-          users: null,
-          players: playersData.filter((p: any) => assignedTeamIds.includes(p.primaryTeamId)).length,
-          teams: assignedTeamIds.length,
-          series: seriesCount,
-          games: gamesData.length,
-          scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
-        });
-      } else if (isSeriesAdminUser && !isSuperAdminUser) {
-        // Scoped counts for Series Admin — match exactly what the pages show
-        const [seriesCount, gamesCount, playersData, scorecardsData] = await Promise.all([
-          getSeriesCountForAdminUidFromDB(uid, orgId),
-          getGamesCountForSeriesIdsFromDB(assignedSeriesIds),
-          getPlayersWithDetailsFromDB(orgId),
-          getScorecardsForOrgAction(orgId),
-        ]);
-        setCounts({
-          orgs: null,
-          users: null,
-          players: playersData.length,
-          teams: null,
-          series: seriesCount,
-          games: gamesCount,
-          scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
-        });
-      } else {
-        // Org-wide counts for all other roles
+      if (isSuperAdminUser || isOrgAdminUser) {
+        // Sys Admin + Org Admin: org-wide counts, no scoping
         const [orgsData, usersData, playersData, teamsData, seriesData, gamesData, scorecardsData] = await Promise.all([
           isSuperAdminUser ? getAllOrganizationsFromDB() : Promise.resolve([]),
           isSuperAdminUser ? getAllUsersFromDB() : getUsersForOrgFromDB(orgId),
@@ -403,6 +373,89 @@ export default function DashboardPage() {
           users: usersData.filter((u: any) => !u.roles?.includes('admin')).length,
           players: playersData.length,
           teams: teamsData.length,
+          series: seriesData.length,
+          games: gamesData.length,
+          scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
+        });
+
+      } else if (isSeriesAdminUser) {
+        // Series Admin: scoped to assigned series
+        // Players: all players in teams participating in assigned series
+        const [seriesCount, gamesCount, allPlayers, assignedSeriesDocs, scorecardsData] = await Promise.all([
+          getSeriesCountForAdminUidFromDB(uid, orgId),
+          getGamesCountForSeriesIdsFromDB(assignedSeriesIds),
+          getPlayersWithDetailsFromDB(orgId),
+          getAllSeriesFromDB('all', orgId),
+          getScorecardsForOrgAction(orgId),
+        ]);
+        // Collect all team IDs from assigned series
+        const seriesTeamIds = new Set<string>();
+        assignedSeriesDocs
+          .filter(s => s.seriesAdminUids?.includes(uid))
+          .forEach(s => (s.participatingTeams || []).forEach((t: string) => seriesTeamIds.add(t)));
+        const playersCount = allPlayers.filter((p: any) =>
+          p.primaryTeamId && seriesTeamIds.has(p.primaryTeamId)
+        ).length;
+        setCounts({
+          orgs: null,
+          users: null,
+          players: playersCount,
+          teams: null,
+          series: seriesCount,
+          games: gamesCount,
+          scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
+        });
+
+      } else if (isTeamManagerUser) {
+        // Team Manager: scoped to assigned teams
+        const [gamesData, seriesCount, allPlayers, scorecardsData] = await Promise.all([
+          getGamesForUserViewAction(userProfile, orgId),
+          getSeriesCountForTeamIdsFromDB(assignedTeamIds, orgId),
+          getPlayersWithDetailsFromDB(orgId),
+          getScorecardsForOrgAction(orgId),
+        ]);
+        const playersCount = allPlayers.filter((p: any) =>
+          assignedTeamIds.includes(p.primaryTeamId)
+        ).length;
+        setCounts({
+          orgs: null,
+          users: null,
+          players: playersCount,
+          teams: assignedTeamIds.length,
+          series: seriesCount,
+          games: gamesData.length,
+          scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
+        });
+
+      } else if (isSelectorUser) {
+        // Selector: scoped to assigned games + assigned scorecards
+        const [gamesData, scorecardsData] = await Promise.all([
+          getGamesForUserViewAction(userProfile, orgId),
+          getScorecardsForSelectorAction(uid, orgId),
+        ]);
+        setCounts({
+          orgs: null,
+          users: null,
+          players: null,
+          teams: null,
+          series: null,
+          games: gamesData.length,
+          scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
+        });
+
+      } else {
+        // Fallback: org-wide
+        const [playersData, seriesData, gamesData, scorecardsData] = await Promise.all([
+          getPlayersWithDetailsFromDB(orgId),
+          getAllSeriesFromDB('active', orgId),
+          getAllGamesFromDB('all', orgId),
+          getScorecardsForOrgAction(orgId),
+        ]);
+        setCounts({
+          orgs: null,
+          users: null,
+          players: playersData.length,
+          teams: null,
           series: seriesData.length,
           games: gamesData.length,
           scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,

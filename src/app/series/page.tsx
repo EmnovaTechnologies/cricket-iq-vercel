@@ -53,10 +53,11 @@ function SeriesPageInner() {
       if(userProfile.roles.includes('admin') || userProfile.roles.includes('Organization Admin')) {
         orgSeries.forEach(s => visibleSeriesIds.add(s.id));
       } else {
-        if(userProfile.roles.includes('Series Admin') && userProfile.assignedSeriesIds && userProfile.assignedSeriesIds.length > 0) {
-          userProfile.assignedSeriesIds.forEach(id => {
-            if (orgSeries.some(s => s.id === id)) visibleSeriesIds.add(id);
-          });
+        if (userProfile.roles.includes('Series Admin')) {
+          // Use seriesAdminUids on the series doc as source of truth (matches dashboard count)
+          orgSeries
+            .filter(s => s.seriesAdminUids?.includes(userProfile.uid))
+            .forEach(s => visibleSeriesIds.add(s.id));
         }
         if(userProfile.roles.includes('Team Manager') && userProfile.assignedTeamIds && userProfile.assignedTeamIds.length > 0) {
           const managedTeamDetails = (await Promise.all(userProfile.assignedTeamIds.map(teamId => getTeamByIdFromDB(teamId))))

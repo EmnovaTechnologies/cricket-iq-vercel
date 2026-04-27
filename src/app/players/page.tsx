@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import PlayerCard from '@/components/player-card';
 import PlayerListRow from '@/components/player-list-row';
-import { getPlayersWithDetailsFromDB, getAllTeamsFromDB } from '@/lib/db'; // Added getAllTeamsFromDB
+import { getPlayersWithDetailsFromDB, getAllTeamsFromDB, getAllSeriesFromDB } from '@/lib/db';
 import type { PlayerWithRatings, Team } from '@/types'; // Added Team
 import { PlusCircle, Search as SearchIcon, Upload, Info, Loader2, ShieldAlert, AlertCircle, Filter as FilterIcon, UserSquare2, LayoutGrid, List } from 'lucide-react'; // Added FilterIcon
 import { useState, useEffect, useMemo, Suspense } from 'react';
@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const NO_PRIMARY_TEAM_VALUE = "__NO_PRIMARY_TEAM__"; // Constant for "No Primary Team" filter
 
 function PlayersPageInner() {
-  const { activeOrganizationId, loading: authLoading, isOrgLoading, effectivePermissions, isPermissionsLoading } = useAuth();
+  const { activeOrganizationId, loading: authLoading, isOrgLoading, effectivePermissions, isPermissionsLoading, userProfile } = useAuth();
   const [allPlayers, setAllPlayers] = useState<PlayerWithRatings[]>([]);
   const [allTeamsForOrg, setAllTeamsForOrg] = useState<Team[]>([]); // State for teams in org
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,6 +33,7 @@ function PlayersPageInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const [scopedTeamIds, setScopedTeamIds] = useState<string[] | null>(null); // null = no scope
   const { toast } = useToast();
 
   useEffect(() => {
@@ -51,12 +52,35 @@ function PlayersPageInner() {
       setIsLoading(true);
       setFetchError(null);
       try {
-        const [playersFromDB, teamsFromDB] = await Promise.all([
+        const [playersFromDB, teamsFromDB, allSeriesFromDB] = await Promise.all([
           getPlayersWithDetailsFromDB(activeOrganizationId),
-          getAllTeamsFromDB(activeOrganizationId)
+          getAllTeamsFromDB(activeOrganizationId),
+          getAllSeriesFromDB('all', activeOrganizationId),
         ]);
         setAllPlayers(playersFromDB);
         setAllTeamsForOrg(teamsFromDB);
+
+        // Compute role-based default team scope
+        const roles = userProfile?.roles || [];
+        const isSuperAdmin = roles.includes('admin');
+        const isOrgAdmin = roles.includes('Organization Admin');
+
+        if (isSuperAdmin || isOrgAdmin) {
+          setScopedTeamIds(null); // no restriction — see all
+        } else if (roles.includes('Series Admin')) {
+          // Scope to teams in series where user is listed in seriesAdminUids
+          const uid = userProfile?.uid || '';
+          const teamIdSet = new Set<string>();
+          allSeriesFromDB
+            .filter(s => s.seriesAdminUids?.includes(uid))
+            .forEach(s => (s.participatingTeams || []).forEach((t: string) => teamIdSet.add(t)));
+          setScopedTeamIds(teamIdSet.size > 0 ? Array.from(teamIdSet) : null);
+        } else if (roles.includes('Team Manager')) {
+          const assignedTeamIds = userProfile?.assignedTeamIds || [];
+          setScopedTeamIds(assignedTeamIds.length > 0 ? assignedTeamIds : null);
+        } else {
+          setScopedTeamIds(null); // Selector, Player etc — no restriction
+        }
       } catch (error) {
         console.error("Failed to fetch players or teams:", error);
         const errorMessage = error instanceof Error ? error.message : "Could not fetch page data.";
@@ -74,19 +98,21 @@ function PlayersPageInner() {
   const filteredPlayers = useMemo(() => {
     return allPlayers.filter(player => {
       const nameMatch = !searchQuery || player.name.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
       let teamMatch = true;
       if (selectedPrimaryTeamFilter === 'all') {
-        teamMatch = true;
+        // When 'all' selected, apply role-based scope as the default view
+        // User can pick a specific team or 'No Primary Team' to override
+        teamMatch = scopedTeamIds === null || scopedTeamIds.includes(player.primaryTeamId || '');
       } else if (selectedPrimaryTeamFilter === NO_PRIMARY_TEAM_VALUE) {
         teamMatch = !player.primaryTeamId || player.primaryTeamId === '';
       } else {
         teamMatch = player.primaryTeamId === selectedPrimaryTeamFilter;
       }
-      
+
       return nameMatch && teamMatch;
     });
-  }, [allPlayers, searchQuery, selectedPrimaryTeamFilter]);
+  }, [allPlayers, searchQuery, selectedPrimaryTeamFilter, scopedTeamIds]);
 
   const canViewPage = effectivePermissions[PERMISSIONS.PAGE_VIEW_PLAYERS_LIST];
   const canAddPlayers = effectivePermissions[PERMISSIONS.PAGE_VIEW_PLAYER_ADD];
@@ -237,7 +263,7 @@ function PlayersPageInner() {
                       <SelectValue placeholder={allTeamsForOrg.length === 0 ? "No teams in org" : "Select primary team"} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Primary Teams</SelectItem>
+                      <SelectItem value="all">{scopedTeamIds ? 'My Teams (default)' : 'All Primary Teams'}</SelectItem>
                       <SelectItem value={NO_PRIMARY_TEAM_VALUE}>No Primary Team</SelectItem>
                       {allTeamsForOrg.map(team => (
                         <SelectItem key={team.id} value={team.id}>{team.name} ({team.ageCategory})</SelectItem>
