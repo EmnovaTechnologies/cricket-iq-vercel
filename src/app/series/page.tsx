@@ -8,7 +8,8 @@ import SeriesListRow from '@/components/series-list-row';
 import { getAllSeriesFromDB, getGamesByIdsFromDB, getTeamByIdFromDB } from '@/lib/db';
 import type { Series } from '@/types';
 import { PlusCircle, Layers, Filter, Upload, AlertTriangle, Info, Loader2, LayoutGrid, List } from 'lucide-react';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { archiveSeriesAction, unarchiveSeriesAction } from '@/lib/actions/series-actions';
 import { checkSeriesBulkDeletableAction } from '@/lib/actions/series-admin-actions';
@@ -17,15 +18,18 @@ import { useAuth } from '@/contexts/auth-context';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 
-export default function SeriesPage() {
+function SeriesPageInner() {
   const { userProfile, activeOrganizationId, activeOrganizationDetails, loading: authLoading, isOrgLoading, effectivePermissions, isPermissionsLoading } = useAuth();
   const [allSeries, setAllSeries] = useState<Series[]>([]);
   const [seriesDeletable, setSeriesDeletable] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
+  const searchParams = useSearchParams();
   const currentYearString = useMemo(() => new Date().getFullYear().toString(), []);
-  const [selectedYear, setSelectedYear] = useState<string>(currentYearString);
+  const [selectedYear, setSelectedYear] = useState<string>(
+    searchParams.get('year') || currentYearString
+  );
   const [selectedStatus, setSelectedStatus] = useState<Series['status'] | 'all'>('active');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
@@ -287,5 +291,13 @@ export default function SeriesPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function SeriesPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+      <SeriesPageInner />
+    </Suspense>
   );
 }

@@ -48,7 +48,9 @@ function GamesPageInner() {
   const [mounted, setMounted] = useState(false);
 
   const currentYearString = useMemo(() => new Date().getFullYear().toString(), []);
-  const [selectedYear, setSelectedYear] = useState<string>(currentYearString);
+  const [selectedYear, setSelectedYear] = useState<string>(
+    searchParams.get('year') || currentYearString
+  );
   const [selectedSeriesId, setSelectedSeriesId] = useState<string>('all');
   const [selectedTeamName, setSelectedTeamName] = useState<string>('all');
   const searchParams = useSearchParams();

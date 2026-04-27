@@ -142,9 +142,9 @@ function useRoleDashboard(counts: Counts) {
         { label: 'Organizations', value: counts.orgs === null ? '…' : counts.orgs.toString(), icon: <Building className="h-3.5 w-3.5" />, href: '/admin/organizations' },
         { label: 'Users', value: counts.users === null ? '…' : counts.users.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/admin/users' },
         { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
-        { label: 'Series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series' },
+        { label: 'Series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series?year=all' },
         { label: 'Teams', value: counts.teams === null ? '…' : counts.teams.toString(), icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
-        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
+        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
         { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
       ] as StatCard[],
       pendingActions: [
@@ -176,9 +176,9 @@ function useRoleDashboard(counts: Counts) {
       subtitle: orgName,
       stats: [
         { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
-        { label: 'Series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series' },
+        { label: 'Series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series?year=all' },
         { label: 'Teams', value: counts.teams === null ? '…' : counts.teams.toString(), icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
-        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
+        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
         { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
         { label: 'Users', value: counts.users === null ? '…' : counts.users.toString(), icon: <UserCog className="h-3.5 w-3.5" />, href: '/admin/users' },
       ] as StatCard[],
@@ -208,8 +208,8 @@ function useRoleDashboard(counts: Counts) {
       greeting: `Series Admin`,
       subtitle: orgName,
       stats: [
-        { label: 'Assigned series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series' },
-        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
+        { label: 'Assigned series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series?year=all' },
+        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
         { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
         { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
       ] as StatCard[],
@@ -239,8 +239,8 @@ function useRoleDashboard(counts: Counts) {
       stats: [
         { label: 'My teams', value: teamCount.toString(), icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
         { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
-        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
-        { label: 'Series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series' },
+        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
+        { label: 'Series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series?year=all' },
       ] as StatCard[],
       pendingActions: [
         { label: 'Review team rosters for upcoming games', href: '/teams', variant: 'info' as const },
@@ -266,7 +266,7 @@ function useRoleDashboard(counts: Counts) {
       greeting: `Selector`,
       subtitle: orgName,
       stats: [
-        { label: 'Assigned games', value: assignedGames.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
+        { label: 'Assigned games', value: assignedGames.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
         { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
         { label: 'Selection model', value: selectionModel || '—', icon: <BarChart3 className="h-3.5 w-3.5" /> },
       ] as StatCard[],
