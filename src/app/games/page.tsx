@@ -77,8 +77,11 @@ function GamesPageInner() {
       setAllTeamsForOrg([]);
       setSelectedSeriesId('all');
       setSelectedTeamName('all');
-      setSelectedFinalizedStatus('all');
-      setNoSelectorsFilter(false);
+      // Preserve URL-param filters on first load; reset only on org switch
+      if (allGames.length > 0) {
+        setSelectedFinalizedStatus('all');
+        setNoSelectorsFilter(false);
+      }
       try {
         const gamesFromDB = await getGamesForUserViewAction(userProfile, activeOrganizationId);
         setAllGames(gamesFromDB);
@@ -309,8 +312,8 @@ function GamesPageInner() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"> {/* Adjusted grid */}
-                <div>
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="flex-1 min-w-[140px]">
                   <label htmlFor="year-filter" className="block text-sm font-medium text-muted-foreground mb-1">Filter by Year</label>
                   <Select value={selectedYear} onValueChange={setSelectedYear}>
                     <SelectTrigger id="year-filter"><SelectValue placeholder="Select Year" /></SelectTrigger>
@@ -322,7 +325,7 @@ function GamesPageInner() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+                <div className="flex-1 min-w-[140px]">
                   <label htmlFor="series-filter" className="block text-sm font-medium text-muted-foreground mb-1">Filter by Series</label>
                   <Select value={selectedSeriesId} onValueChange={setSelectedSeriesId} disabled={availableSeriesForFilter.length === 0 && selectedYear !== 'all'}>
                     <SelectTrigger id="series-filter">
@@ -336,7 +339,7 @@ function GamesPageInner() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+                <div className="flex-1 min-w-[140px]">
                   <label htmlFor="team-filter" className="block text-sm font-medium text-muted-foreground mb-1">Filter by Team</label>
                   <Select value={selectedTeamName} onValueChange={setSelectedTeamName} disabled={availableTeamsForFilter.length === 0 && (selectedYear !== 'all' || selectedSeriesId !== 'all')}>
                     <SelectTrigger id="team-filter">
@@ -353,7 +356,7 @@ function GamesPageInner() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+                <div className="flex-1 min-w-[140px]">
                   <label htmlFor="finalized-status-filter" className="block text-sm font-medium text-muted-foreground mb-1">Rating Status</label>
                   <Select value={selectedFinalizedStatus} onValueChange={(value) => setSelectedFinalizedStatus(value as FinalizedStatusFilter)}>
                     <SelectTrigger id="finalized-status-filter">
@@ -371,7 +374,7 @@ function GamesPageInner() {
                   </Select>
                 </div>
                 {isSelector && (
-                  <div>
+                  <div className="flex-1 min-w-[140px]">
                     <label htmlFor="my-pending-filter" className="block text-sm font-medium text-muted-foreground mb-1">My Certifications</label>
                     <Select value={selectorSpecificFilter} onValueChange={(value) => setSelectorSpecificFilter(value as SelectorSpecificFilterOption)}>
                       <SelectTrigger id="my-pending-filter">
