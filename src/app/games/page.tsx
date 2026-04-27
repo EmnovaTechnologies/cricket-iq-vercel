@@ -56,7 +56,7 @@ function GamesPageInner() {
     searchParams.get('ratingStatus') === 'unfinalized' ? 'notFinalized' : 'all'
   );
   const [selectorSpecificFilter, setSelectorSpecificFilter] = useState<SelectorSpecificFilterOption>('all');
-  const [noSelectorsFilter, setNoSelectorsFilter] = useState<boolean>(searchParams.get('selectors') === 'none');
+  const [selectorsFilter, setSelectorsFilter] = useState<'all' | 'none' | 'assigned'>(searchParams.get('selectors') === 'none' ? 'none' : searchParams.get('selectors') === 'assigned' ? 'assigned' : 'all');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
   useEffect(() => {
@@ -80,7 +80,7 @@ function GamesPageInner() {
       // Preserve URL-param filters on first load; reset only on org switch
       if (allGames.length > 0) {
         setSelectedFinalizedStatus('all');
-        setNoSelectorsFilter(false);
+        setSelectorsFilter('all');
       }
       try {
         const gamesFromDB = await getGamesForUserViewAction(userProfile, activeOrganizationId);
@@ -234,11 +234,11 @@ function GamesPageInner() {
 
       const myPendingMatch = selectorSpecificFilter === 'all' ||
                              (selectorSpecificFilter === 'myPending' && isGamePendingMyCertification(game, userProfile?.uid));
-      const noSelectorsMatch = !noSelectorsFilter || !game.selectorUserIds?.length;
+      const noSelectorsMatch = selectorsFilter === 'all' || (selectorsFilter === 'none' && !game.selectorUserIds?.length) || (selectorsFilter === 'assigned' && !!game.selectorUserIds?.length);
 
       return yearMatch && seriesMatch && teamMatch && finalizedMatch && myPendingMatch && noSelectorsMatch;
     });
-  }, [allGames, selectedYear, selectedSeriesId, selectedTeamName, selectedFinalizedStatus, selectorSpecificFilter, noSelectorsFilter, userProfile?.uid]);
+  }, [allGames, selectedYear, selectedSeriesId, selectedTeamName, selectedFinalizedStatus, selectorSpecificFilter, selectorsFilter, userProfile?.uid]);
 
   const canImportGames = effectivePermissions[PERMISSIONS.PAGE_VIEW_GAME_IMPORT];
   const canAddGames = effectivePermissions[PERMISSIONS.PAGE_VIEW_GAME_ADD];
@@ -358,11 +358,12 @@ function GamesPageInner() {
                 </div>
                 <div className="flex-1 min-w-[140px]">
                   <label htmlFor="selectors-filter" className="block text-sm font-medium text-muted-foreground mb-1">Selectors</label>
-                  <Select value={noSelectorsFilter ? 'none' : 'all'} onValueChange={(v) => setNoSelectorsFilter(v === 'none')}>
+                  <Select value={selectorsFilter} onValueChange={(v) => setSelectorsFilter(v as 'all' | 'none' | 'assigned')}>
                     <SelectTrigger id="selectors-filter"><SelectValue placeholder="All Games" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Games</SelectItem>
                       <SelectItem value="none">No Selectors</SelectItem>
+                      <SelectItem value="assigned">Selectors Assigned</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
