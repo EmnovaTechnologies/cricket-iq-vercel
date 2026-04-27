@@ -276,12 +276,11 @@ function useRoleDashboard(counts: Counts) {
           { label: 'Games awaiting your rating certification', href: '/games', variant: 'warning' as const },
         ]),
         { label: 'Scorecards assigned to you for match reports', href: '/scorecards', variant: 'warning' as const },
-        { label: 'View XI Selector recommendations', href: '/xi-selector', variant: 'info' as const },
       ],
       quickLinks: [
         { href: '/scorecards', label: 'My scorecards', icon: <Table className="h-4 w-4" /> },
         { href: '/games', label: 'My games', icon: <Gamepad2 className="h-4 w-4" /> },
-        { href: '/xi-selector', label: 'XI Selector', icon: <Target className="h-4 w-4" /> },
+        { href: '/team-composition', label: 'XI Selector', icon: <Target className="h-4 w-4" /> },
         { href: '/players', label: 'Players', icon: <Users className="h-4 w-4" /> },
       ] as QuickLink[],
       navSections: [],
