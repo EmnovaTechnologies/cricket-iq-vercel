@@ -65,12 +65,22 @@ const PlayerListRow: React.FC<PlayerListRowProps> = ({ player, isLast }) => {
               <Shield className="h-3 w-3" /> {player.clubName}
             </span>
           )}
+          {player.battingOrder && (
+            <span><span className="text-muted-foreground">Bat Order: </span><span className="font-medium text-foreground">{player.battingOrder}</span></span>
+          )}
+          <span><span className="text-muted-foreground">Bat Hand: </span><span className="font-medium text-foreground">{player.dominantHandBatting}</span></span>
+          {player.bowlingStyle && (
+            <span><span className="text-muted-foreground">Bowl Style: </span><span className="font-medium text-foreground">{player.bowlingStyle}</span></span>
+          )}
+          {player.dominantHandBowling && (
+            <span><span className="text-muted-foreground">Bowl Hand: </span><span className="font-medium text-foreground">{player.dominantHandBowling}</span></span>
+          )}
           <span>
             <span className="text-muted-foreground">Games: </span>
             <span className="font-medium text-foreground">{player.gamesPlayed}</span>
           </span>
           <span>
-            <span className="text-muted-foreground">Avg: </span>
+            <span className="text-muted-foreground">Avg Primary Skill Score: </span>
             <span className="font-medium text-foreground">
               {player.calculatedAverageScore === 0 && player.gamesPlayed === 0
                 ? 'N/A'
