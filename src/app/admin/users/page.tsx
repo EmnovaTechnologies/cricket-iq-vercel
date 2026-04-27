@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { UserProfile as UserProfileType, UserRole, Organization } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -214,7 +214,10 @@ export default function AdminUsersV2Page() {
   // Filters
   const [nameFilter, setNameFilter] = useState('');
   const [phoneFilter, setPhoneFilter] = useState('');
-  const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+  const searchParams = useSearchParams();
+  const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>(
+    (searchParams.get('role') as UserRole | 'all') || 'all'
+  );
   const [orgFilter, setOrgFilter] = useState<string>('all');
   const [clubFilter, setClubFilter] = useState<string>('all');
   const [clubFilterOpen, setClubFilterOpen] = useState(false);

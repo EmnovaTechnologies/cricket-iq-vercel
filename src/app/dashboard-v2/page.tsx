@@ -10,11 +10,13 @@ import {
   Users, Gamepad2, Target, Layers, Shield, MapPinned, Loader2, LogOut,
   Hourglass, FileText, ClipboardCheck, AlertCircle, CheckCircle,
   PlusCircle, Upload, Building, UserCog, BarChart3, ArrowRight,
-  CalendarDays, Table,
+  CalendarDays, Table, RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { getAllOrganizationsFromDB, getAllUsersFromDB, getUsersForOrgAdminViewFromDB as getUsersForOrgFromDB, getAllPlayersFromDB, getAllTeamsFromDB, getAllSeriesFromDB, getAllGamesFromDB } from '@/lib/db';
+import { getScorecardsForOrgAction } from '@/lib/actions/scorecard-actions';
 import { format } from 'date-fns';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -108,7 +110,17 @@ function QuickActions({ links }: { links: QuickLink[] }) {
 
 // ─── Role-based content builders ─────────────────────────────────────────────
 
-function useRoleDashboard() {
+interface Counts {
+  orgs: number | null;
+  users: number | null;
+  players: number | null;
+  teams: number | null;
+  series: number | null;
+  games: number | null;
+  scorecards: number | null;
+}
+
+function useRoleDashboard(counts: Counts) {
   const { userProfile, activeOrganizationDetails, effectivePermissions, currentUser } = useAuth();
   const roles = userProfile?.roles || [];
   const orgName = activeOrganizationDetails?.name || 'your organization';
@@ -127,16 +139,17 @@ function useRoleDashboard() {
       greeting: `System Admin`,
       subtitle: 'Full access across all organizations',
       stats: [
-        { label: 'Organizations', value: '—', icon: <Building className="h-3.5 w-3.5" />, href: '/admin/organizations' },
-        { label: 'Users', value: '—', icon: <Users className="h-3.5 w-3.5" />, href: '/admin/users' },
-        { label: 'Players', value: '—', icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
-        { label: 'Teams', value: '—', icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
-        { label: 'Series', value: '—', icon: <Layers className="h-3.5 w-3.5" />, href: '/series' },
-        { label: 'Games', value: '—', icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
+        { label: 'Organizations', value: counts.orgs === null ? '…' : counts.orgs.toString(), icon: <Building className="h-3.5 w-3.5" />, href: '/admin/organizations' },
+        { label: 'Users', value: counts.users === null ? '…' : counts.users.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/admin/users' },
+        { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
+        { label: 'Series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series' },
+        { label: 'Teams', value: counts.teams === null ? '…' : counts.teams.toString(), icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
+        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
+        { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
       ] as StatCard[],
       pendingActions: [
-        { label: 'Review users without assigned roles', href: '/admin/users', variant: 'warning' as const },
-        { label: 'Check organizations for inactive status', href: '/admin/organizations', variant: 'info' as const },
+        { label: 'Review users without assigned roles', href: '/admin/users?role=unassigned', variant: 'warning' as const },
+        { label: 'Check organizations for inactive status', href: '/admin/organizations?status=inactive', variant: 'info' as const },
       ],
       quickLinks: [
         { href: '/admin/organizations/add', label: 'Add org', icon: <PlusCircle className="h-4 w-4" /> },
@@ -162,12 +175,12 @@ function useRoleDashboard() {
       greeting: `Organization Admin`,
       subtitle: orgName,
       stats: [
-        { label: 'Players', value: '—', icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
-        { label: 'Teams', value: '—', icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
-        { label: 'Active series', value: '—', icon: <Layers className="h-3.5 w-3.5" />, href: '/series' },
-        { label: 'Games', value: '—', icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
-        { label: 'Scorecards', value: '—', icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
-        { label: 'Users', value: '—', icon: <UserCog className="h-3.5 w-3.5" />, href: '/admin/users' },
+        { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
+        { label: 'Series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series' },
+        { label: 'Teams', value: counts.teams === null ? '…' : counts.teams.toString(), icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
+        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
+        { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
+        { label: 'Users', value: counts.users === null ? '…' : counts.users.toString(), icon: <UserCog className="h-3.5 w-3.5" />, href: '/admin/users' },
       ] as StatCard[],
       pendingActions: [
         { label: 'Games with unfinalized ratings', href: '/games', variant: 'warning' as const },
@@ -197,9 +210,9 @@ function useRoleDashboard() {
       subtitle: orgName,
       stats: [
         { label: 'Assigned series', value: assignedCount.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series' },
-        { label: 'Games', value: '—', icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
-        { label: 'Scorecards', value: '—', icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
-        { label: 'Players', value: '—', icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
+        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
+        { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
+        { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
       ] as StatCard[],
       pendingActions: [
         { label: 'Games pending selector certification', href: '/games', variant: 'warning' as const },
@@ -226,9 +239,9 @@ function useRoleDashboard() {
       subtitle: orgName,
       stats: [
         { label: 'My teams', value: teamCount.toString(), icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
-        { label: 'Players', value: '—', icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
-        { label: 'Upcoming games', value: '—', icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
-        { label: 'Series', value: '—', icon: <Layers className="h-3.5 w-3.5" />, href: '/series' },
+        { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
+        { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
+        { label: 'Series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series' },
       ] as StatCard[],
       pendingActions: [
         { label: 'Review team rosters for upcoming games', href: '/teams', variant: 'info' as const },
@@ -255,7 +268,7 @@ function useRoleDashboard() {
       subtitle: orgName,
       stats: [
         { label: 'Assigned games', value: assignedGames.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games' },
-        { label: 'Scorecards', value: '—', icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
+        { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
         { label: 'Selection model', value: selectionModel || '—', icon: <BarChart3 className="h-3.5 w-3.5" /> },
       ] as StatCard[],
       pendingActions: [
@@ -322,7 +335,45 @@ export default function DashboardPage() {
     if (!currentUser && !isAuthLoading) router.push('/login');
   }, [currentUser, isAuthLoading, router]);
 
-  const dashboard = useRoleDashboard();
+  const [counts, setCounts] = useState<Counts>({
+    orgs: null, users: null, players: null,
+    teams: null, series: null, games: null, scorecards: null,
+  });
+  const [countsLoading, setCountsLoading] = useState(false);
+
+  const fetchCounts = useCallback(async () => {
+    if (!activeOrganizationDetails) return;
+    setCountsLoading(true);
+    try {
+      const isSuperAdminUser = userProfile?.roles.includes('admin');
+      const orgId = activeOrganizationDetails.id;
+      const [orgsData, usersData, playersData, teamsData, seriesData, gamesData, scorecardsData] = await Promise.all([
+        isSuperAdminUser ? getAllOrganizationsFromDB() : Promise.resolve([]),
+        isSuperAdminUser ? getAllUsersFromDB() : getUsersForOrgFromDB(orgId),
+        getAllPlayersFromDB(orgId),
+        getAllTeamsFromDB(orgId),
+        getAllSeriesFromDB('active', orgId),
+        getAllGamesFromDB('all', orgId),
+        getScorecardsForOrgAction(orgId),
+      ]);
+      setCounts({
+        orgs: isSuperAdminUser ? orgsData.length : null,
+        users: usersData.filter((u: any) => !u.roles?.includes('admin')).length,
+        players: playersData.length,
+        teams: teamsData.length,
+        series: seriesData.length,
+        games: gamesData.length,
+        scorecards: scorecardsData.success ? (scorecardsData.scorecards?.length ?? 0) : 0,
+      });
+    } catch (e) {
+      console.error('[Dashboard] counts fetch failed:', e);
+    }
+    setCountsLoading(false);
+  }, [activeOrganizationDetails, userProfile]);
+
+  useEffect(() => { if (mounted && activeOrganizationDetails) fetchCounts(); }, [mounted, activeOrganizationDetails]);
+
+  const dashboard = useRoleDashboard(counts);
   const today = mounted ? format(new Date(), 'EEEE, MMM d') : '';
 
   if (isLoggingOut) {
@@ -407,6 +458,15 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+        <button
+          onClick={fetchCounts}
+          disabled={countsLoading}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-1"
+          title="Refresh counts"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${countsLoading ? 'animate-spin' : ''}`} />
+          {countsLoading ? 'Refreshing…' : 'Refresh'}
+        </button>
       </div>
 
       {/* ── Stats ── */}
