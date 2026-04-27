@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const NO_PRIMARY_TEAM_VALUE = "__NO_PRIMARY_TEAM__"; // Constant for "No Primary Team" filter
 
 export default function PlayersPage() {
-  const { activeOrganizationId, loading: authLoading, effectivePermissions, isPermissionsLoading } = useAuth();
+  const { activeOrganizationId, loading: authLoading, isOrgLoading, effectivePermissions, isPermissionsLoading } = useAuth();
   const [allPlayers, setAllPlayers] = useState<PlayerWithRatings[]>([]);
   const [allTeamsForOrg, setAllTeamsForOrg] = useState<Team[]>([]); // State for teams in org
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,7 +98,7 @@ export default function PlayersPage() {
       );
     }
 
-    if (!activeOrganizationId) {
+    if (!activeOrganizationId && !isOrgLoading) {
       return (
         <Alert variant="default" className="border-primary/50">
           <Info className="h-5 w-5 text-primary" />
