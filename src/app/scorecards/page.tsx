@@ -50,6 +50,7 @@ function ScorecardsPageInner() {
   const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const defaultTab = searchParams.get('tab') === 'missing' ? 'missing' : 'imported';
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
@@ -207,7 +208,7 @@ function ScorecardsPageInner() {
     });
   }, [seriesGames, scorecards, selectedSeries]);
 
-  const showMissingTab = !isSelectorOnly && (defaultTab === 'missing' || (selectedSeries && selectedSeries !== 'all' && selectedSeries !== 'none'));
+  const showMissingTab = !isSelectorOnly && (activeTab === 'missing' || defaultTab === 'missing' || (selectedSeries && selectedSeries !== 'all' && selectedSeries !== 'none'));
 
   if (!mounted) return <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   if (authLoading || isPermissionsLoading || (isLoading && !!activeOrganizationId)) return <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -328,7 +329,7 @@ function ScorecardsPageInner() {
             </Card>
 
             {/* Tabs: Imported + Missing */}
-            <Tabs defaultValue={defaultTab}>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList>
                 <TabsTrigger value="imported">
                   Imported
