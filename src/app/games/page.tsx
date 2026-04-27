@@ -4,10 +4,11 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import GameCard from '@/components/game-card';
+import GameListRow from '@/components/game-list-row';
 import { getAllSeriesFromDB, getAllTeamsFromDB } from '@/lib/db';
 import { getGamesForUserViewAction } from '@/lib/actions/game-actions';
 import type { Game, Series, Team } from '@/types';
-import { PlusCircle, Filter, Upload, Info, Loader2, Gamepad2, CheckSquare, Square, UserCheck } from 'lucide-react'; // Added UserCheck
+import { PlusCircle, Filter, Upload, Info, Loader2, Gamepad2, CheckSquare, Square, UserCheck , LayoutGrid, List } from 'lucide-react'; // Added UserCheck
 import { useState, useEffect, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -49,6 +50,7 @@ export default function GamesPage() {
   const [selectedTeamName, setSelectedTeamName] = useState<string>('all');
   const [selectedFinalizedStatus, setSelectedFinalizedStatus] = useState<FinalizedStatusFilter>('all');
   const [selectorSpecificFilter, setSelectorSpecificFilter] = useState<SelectorSpecificFilterOption>('all');
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
   useEffect(() => {
     setMounted(true);
@@ -370,6 +372,25 @@ export default function GamesPage() {
                     </Select>
                   </div>
                 )}
+                <div className="flex flex-col items-end justify-end gap-1">
+                  <span className="text-xs text-muted-foreground">{filteredGames.length} {filteredGames.length === 1 ? 'game' : 'games'}</span>
+                  <div className="flex rounded-md border border-input overflow-hidden">
+                    <button
+                      onClick={() => setViewMode('cards')}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${viewMode === 'cards' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                      title="Card view"
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors border-l border-input ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                      title="List view"
+                    >
+                      <List className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -380,10 +401,20 @@ export default function GamesPage() {
             <p className="text-muted-foreground text-center py-6">
               No games found matching your criteria for this organization. Try adjusting the filters or add some games.
             </p>
-          ) : (
+          ) : viewMode === 'cards' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredGames.map((game) => (
                 <GameCard key={game.id} game={game} />
+              ))}
+            </div>
+          ) : (
+            <div className="border rounded-lg overflow-hidden bg-card">
+              {filteredGames.map((game, idx) => (
+                <GameListRow
+                  key={game.id}
+                  game={game}
+                  isLast={idx === filteredGames.length - 1}
+                />
               ))}
             </div>
           )}
