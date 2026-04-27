@@ -128,8 +128,8 @@ export default function TeamsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="relative">
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="relative flex-1 min-w-[200px]">
                   <label htmlFor="team-search" className="block text-sm font-medium text-muted-foreground mb-1">Search by Name</label>
                   <SearchIcon className="absolute left-3 top-[calc(50%_+_6px)] -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
@@ -142,7 +142,7 @@ export default function TeamsPage() {
                     aria-label="Search teams"
                   />
                 </div>
-                <div>
+                <div className="flex-1 min-w-[200px]">
                   <label htmlFor="age-category-filter" className="block text-sm font-medium text-muted-foreground mb-1">Filter by Age Category</label>
                   <Select value={selectedAgeCategory} onValueChange={(value) => setSelectedAgeCategory(value as AgeCategory | 'all')}>
                     <SelectTrigger id="age-category-filter" className="w-full h-10 rounded-md shadow-sm">
