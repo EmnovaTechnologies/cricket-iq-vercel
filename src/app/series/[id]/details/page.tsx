@@ -1190,6 +1190,18 @@ export default function SeriesDetailsPage() {
                   )}
                 </div>
               </div>
+
+              {/* Coach / Selector Assignment */}
+              {currentUser && canManage && (
+                <CampSelectorPanel
+                  campId={camp.id}
+                  assignments={camp.assignedSelectors || []}
+                  availableSelectors={campAvailableSelectors}
+                  assignedBy={currentUser.uid}
+                  onAssignmentsChanged={updated => setCamp((prev: SelectionCamp | null) => prev ? { ...prev, assignedSelectors: updated } : prev)}
+                />
+              )}
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   { label: 'Players invited', value: campPlayers.length, max: camp.quota, icon: <Users className="h-4 w-4" /> },
@@ -1236,17 +1248,6 @@ export default function SeriesDetailsPage() {
                   </Card>
                 ))}
               </div>
-
-              {/* Coach / Selector Assignment */}
-              {currentUser && canManage && (
-                <CampSelectorPanel
-                  campId={camp.id}
-                  assignments={camp.assignedSelectors || []}
-                  availableSelectors={campAvailableSelectors}
-                  assignedBy={currentUser.uid}
-                  onAssignmentsChanged={updated => setCamp((prev: SelectionCamp | null) => prev ? { ...prev, assignedSelectors: updated } : prev)}
-                />
-              )}
             </div>
           ) : (
             <div className="space-y-4">
