@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
+import { checkOrgAccess, ORG_MISMATCH_ERROR } from '@/lib/utils/org-guard';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { getScorecardByIdAction, deleteScorecardAction, linkScorecardToGameAction, unlinkScorecardFromGameAction, getUnlinkedGamesForSeriesAction } from '@/lib/actions/scorecard-actions';
 import { getMatchReportsForScorecardAction } from '@/lib/actions/match-report-actions';
@@ -123,9 +124,8 @@ export default function ScorecardDetailsPage() {
     getScorecardByIdAction(params.id).then(async res => {
       if (res.success && res.scorecard) {
         // Org guard — prevent cross-org access
-        if (activeOrganizationId && res.scorecard.organizationId &&
-            res.scorecard.organizationId !== activeOrganizationId) {
-          setError('This scorecard belongs to a different organization. Please switch to the correct organization to view it.');
+        if (!checkOrgAccess(res.scorecard.organizationId, activeOrganizationId)) {
+          setError(ORG_MISMATCH_ERROR);
           return;
         }
         setScorecard(res.scorecard);
