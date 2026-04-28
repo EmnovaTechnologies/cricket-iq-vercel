@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
+import { checkOrgAccess, ORG_MISMATCH_ERROR } from '@/lib/utils/org-guard';
 import { useToast } from '@/hooks/use-toast';
 import { addPlayerToGameRosterAction, updatePlayerGameInclusionAction, updateGameSelectorsAction, bulkSetGameRosterAction } from '@/lib/actions/game-actions';
 import { getScorecardForGameAction, getScorecardByIdAction } from '@/lib/actions/scorecard-actions';
@@ -84,6 +85,7 @@ export default function GameDetailsPage() {
   }, [existingScorecardId]);
 
   const [game, setGame] = useState<Game | undefined>(undefined);
+  const [orgAccessError, setOrgAccessError] = useState<string | null>(null);
   const [series, setSeries] = useState<Series | undefined>(undefined);
   const [formattedGameDate, setFormattedGameDate] = useState<string | null>(null);
   const [isFutureGame, setIsFutureGame] = useState(false);
@@ -175,6 +177,11 @@ export default function GameDetailsPage() {
     
     try {
       const fetchedGame = await getGameByIdFromDB(gameId);
+      // Org guard — prevent cross-org access
+      if (fetchedGame && !checkOrgAccess(fetchedGame.organizationId, activeOrganizationId)) {
+        setOrgAccessError(ORG_MISMATCH_ERROR);
+        return;
+      }
       setGame(fetchedGame);
       if (fetchedGame) setGameUrl((fetchedGame as any).externalScoreUrl || '');
 
@@ -451,6 +458,21 @@ export default function GameDetailsPage() {
       </TableBody></Table>
     </div>
   );
+
+  if (orgAccessError) {
+    return (
+      <div className="max-w-2xl mx-auto mt-8 space-y-4">
+        <Button asChild variant="outline" size="sm">
+          <Link href="/games"><ArrowLeft className="mr-2 h-4 w-4" />Back to Games</Link>
+        </Button>
+        <Alert variant="destructive">
+          <ShieldAlert className="h-5 w-5" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>{orgAccessError}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
