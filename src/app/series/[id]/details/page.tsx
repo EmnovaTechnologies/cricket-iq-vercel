@@ -16,7 +16,7 @@ import {
 import { addTeamToSeriesAction, addVenueToSeriesAction, updateSeriesAdminsAction, archiveSeriesAction, unarchiveSeriesAction, updateSeriesFitnessCriteriaAction, updateSeriesBasicInfoAction } from '@/lib/actions/series-actions';
 import { checkSeriesDeletableAction, deleteSeriesAdminAction } from '@/lib/actions/series-admin-actions';
 import {
-  createCampAction, updateCampAction, getCampsForSeriesAction,
+  createCampAction, updateCampAction, deleteCampAction, getCampsForSeriesAction,
   getCampPlayersAction, getCampAssessmentsAction, getCampFitnessResultsAction
 } from '@/lib/actions/camp-actions';
 import { CampSelectorPanel } from '@/components/camp/camp-selector-panel';
@@ -106,6 +106,7 @@ export default function SeriesDetailsPage() {
   const [isCampLoading, setIsCampLoading] = useState(false);
   const [isCampLoaded, setIsCampLoaded] = useState(false);
   const [isCreatingCamp, setIsCreatingCamp] = useState(false);
+  const [isDeletingCamp, setIsDeletingCamp] = useState(false);
   const [isEditingCamp, setIsEditingCamp] = useState(false);
   const [campAvailableSelectors, setCampAvailableSelectors] = useState<any[]>([]);
   const [campForm, setCampForm] = useState({
@@ -542,6 +543,24 @@ export default function SeriesDetailsPage() {
     } else {
       toast({ title: 'Error', description: res.error, variant: 'destructive' });
     }
+  };
+
+  const handleDeleteCamp = async () => {
+    if (!camp) return;
+    if (!window.confirm(`Delete camp "${camp.name}"? This cannot be undone.`)) return;
+    setIsDeletingCamp(true);
+    const res = await deleteCampAction(camp.id);
+    if (res.success) {
+      toast({ title: 'Camp deleted' });
+      setCamp(null);
+      setCampPlayers([]);
+      setCampAssessments([]);
+      setCampFitnessResults([]);
+      setIsCampLoaded(true); // stay loaded but show create form
+    } else {
+      toast({ title: 'Cannot delete', description: res.error, variant: 'destructive' });
+    }
+    setIsDeletingCamp(false);
   };
 
   const canManage = effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] ||
@@ -1189,9 +1208,17 @@ export default function SeriesDetailsPage() {
                     'bg-muted text-muted-foreground border'
                   }`}>{camp.status}</span>
                   {canManage && (
-                    <Button size="sm" variant="outline" onClick={() => setIsEditingCamp(true)}>
-                      <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
-                    </Button>
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => setIsEditingCamp(true)}>
+                        <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
+                      </Button>
+                      {campPlayers.length === 0 && (
+                        <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive/10"
+                          onClick={handleDeleteCamp} disabled={isDeletingCamp}>
+                          {isDeletingCamp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

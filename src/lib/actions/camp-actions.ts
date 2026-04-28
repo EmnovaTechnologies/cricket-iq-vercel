@@ -63,6 +63,34 @@ export async function updateCampAction(
   }
 }
 
+export async function deleteCampAction(
+  campId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Check no players invited
+    const playersSnap = await adminDb.collection('campPlayers')
+      .where('campId', '==', campId)
+      .limit(1)
+      .get();
+    if (!playersSnap.empty) {
+      return { success: false, error: 'Cannot delete camp — players have been invited. Remove all players first.' };
+    }
+    // Delete assessments and fitness results too (should be empty but just in case)
+    const batch = adminDb.batch();
+    const [assessSnap, fitnessSnap] = await Promise.all([
+      adminDb.collection('campAssessments').where('campId', '==', campId).get(),
+      adminDb.collection('campFitnessResults').where('campId', '==', campId).get(),
+    ]);
+    assessSnap.docs.forEach(d => batch.delete(d.ref));
+    fitnessSnap.docs.forEach(d => batch.delete(d.ref));
+    batch.delete(adminDb.collection('selectionCamps').doc(campId));
+    await batch.commit();
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
 export async function getCampsForSeriesAction(
   seriesId: string
 ): Promise<{ success: boolean; camps?: SelectionCamp[]; error?: string }> {
