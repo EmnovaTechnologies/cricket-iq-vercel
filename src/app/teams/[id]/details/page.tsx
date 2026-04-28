@@ -26,6 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { differenceInYears, parseISO, isValid } from 'date-fns';
 import { useAuth } from '@/contexts/auth-context';
+import { checkOrgAccess, ORG_MISMATCH_ERROR } from '@/lib/utils/org-guard';
 import { getPotentialTeamManagersForOrg, getUserProfile } from '@/lib/actions/user-actions';
 import { CricketBatIcon, CricketBallIcon } from '@/components/custom-icons';
 
@@ -45,6 +46,7 @@ export default function TeamDetailsPage() {
   const { userProfile: currentAuthProfile, activeOrganizationId, effectivePermissions } = useAuth();
 
   const [team, setTeam] = useState<Team | undefined>(undefined);
+  const [orgAccessError, setOrgAccessError] = useState<string | null>(null);
   const [organizationName, setOrganizationName] = useState<string>('');
   const [roster, setRoster] = useState<Player[]>([]);
   const [availablePlayersInOrg, setAvailablePlayersInOrg] = useState<Player[]>([]);
@@ -91,6 +93,11 @@ export default function TeamDetailsPage() {
     if (teamId) {
       setIsLoadingData(true);
       const currentTeam = await getTeamByIdFromDB(teamId);
+      // Org guard — prevent cross-org access
+      if (currentTeam && !checkOrgAccess(currentTeam.organizationId, activeOrganizationId)) {
+        setOrgAccessError(ORG_MISMATCH_ERROR);
+        return;
+      }
       setTeam(currentTeam);
   
       if (currentTeam) {
@@ -256,6 +263,21 @@ export default function TeamDetailsPage() {
 
   if (isLoadingData) {
      return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />Loading team details...</div>;
+  }
+
+  if (orgAccessError) {
+    return (
+      <div className="max-w-2xl mx-auto mt-8 space-y-4">
+        <Button asChild variant="outline" size="sm">
+          <Link href="/teams"><ArrowLeft className="mr-2 h-4 w-4" />Back to Teams</Link>
+        </Button>
+        <Alert variant="destructive">
+          <ShieldAlert className="h-5 w-5" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>{orgAccessError}</AlertDescription>
+        </Alert>
+      </div>
+    );
   }
 
   if (!team) {
