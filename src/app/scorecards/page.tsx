@@ -441,6 +441,42 @@ function ScorecardsPageInner() {
                       <p className="text-sm text-muted-foreground mb-3">
                         {missingGames.length} game{missingGames.length !== 1 ? 's' : ''} without a scorecard
                       </p>
+                      {viewMode === 'list' ? (
+                        <div className="border rounded-lg overflow-hidden bg-card">
+                          {missingGames.map((game, idx) => {
+                            const hasUrl = !!(game as any).externalScoreUrl;
+                            const seriesName = allSeries.find(s => s.id === game.seriesId)?.name || '';
+                            const importUrl = `/scorecards/import?gameId=${game.id}&url=${encodeURIComponent((game as any).externalScoreUrl || '')}&team1=${encodeURIComponent(game.team1)}&team2=${encodeURIComponent(game.team2)}&date=${encodeURIComponent(game.date)}&venue=${encodeURIComponent(game.venue || '')}&seriesId=${encodeURIComponent(game.seriesId || '')}&seriesName=${encodeURIComponent(seriesName)}`;
+                            return (
+                              <div key={game.id} className={`flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40 transition-colors ${idx !== missingGames.length - 1 ? 'border-b' : ''}`}>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-primary truncate">{game.team1} vs {game.team2}</p>
+                                  <div className="flex items-center gap-3 mt-0.5">
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <CalendarFold className="h-3 w-3" />
+                                      {game.date ? (() => { try { return format(parseISO(game.date), 'PP'); } catch { return game.date; } })() : 'No date'}
+                                    </span>
+                                    {!hasUrl && <Badge variant="outline" className="text-xs border-amber-400 text-amber-600"><Link2 className="h-3 w-3 mr-1" />No URL</Badge>}
+                                    <span className="text-xs text-amber-600 flex items-center gap-1"><AlertCircle className="h-3 w-3" />Not imported</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Button asChild variant="outline" size="sm" className="border-primary text-primary hover:bg-primary/10 text-xs h-7">
+                                    <Link href={`/games/${game.id}/details`}>Game Details <ArrowRight className="h-3 w-3 ml-1" /></Link>
+                                  </Button>
+                                  {canImport && (hasUrl ? (
+                                    <Button asChild size="sm" className="bg-primary hover:bg-primary/90 text-xs h-7">
+                                      <Link href={importUrl}><PlusCircle className="h-3 w-3 mr-1" />Import</Link>
+                                    </Button>
+                                  ) : (
+                                    <Button size="sm" disabled className="text-xs h-7"><PlusCircle className="h-3 w-3 mr-1" />Import</Button>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {missingGames.map(game => {
                           const hasUrl = !!(game as any).externalScoreUrl;
@@ -498,6 +534,7 @@ function ScorecardsPageInner() {
                           );
                         })}
                       </div>
+                      )}
                     </>
                   )}
                 </TabsContent>
