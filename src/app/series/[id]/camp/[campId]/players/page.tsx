@@ -30,6 +30,7 @@ export default function CampPlayersPage() {
   const [orgPlayers, setOrgPlayers] = useState<PlayerWithRatings[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [seriesPlayerIds, setSeriesPlayerIds] = useState<Set<string>>(new Set());
+  const [isSeriesScopingLoaded, setIsSeriesScopingLoaded] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
   const [bibInput, setBibInput] = useState('');
@@ -48,17 +49,24 @@ export default function CampPlayersPage() {
       if (campRes.success) setCamp(campRes.camp!);
       if (playersRes.success) setCampPlayers(playersRes.players || []);
       setOrgPlayers(orgRes);
-      // Scope to series teams only
-      if (campRes.success && campRes.camp?.seriesId) {
-        try {
-          const seriesDoc = await getSeriesByIdFromDB(campRes.camp.seriesId);
-          if (seriesDoc?.participatingTeams?.length) {
-            const teams = await Promise.all(seriesDoc.participatingTeams.map((tid: string) => getTeamByIdFromDB(tid)));
-            const playerIds = new Set<string>();
-            teams.forEach(t => (t.playerIds || []).forEach((pid: string) => playerIds.add(pid)));
-            setSeriesPlayerIds(playerIds);
-          }
-        } catch (e) { console.warn('[CampPlayers] Could not scope to series:', e); }
+      // Scope to series teams only — use seriesId from URL params
+      try {
+        const seriesDoc = await getSeriesByIdFromDB(seriesId);
+        if (seriesDoc?.participatingTeams?.length) {
+          const teams = await Promise.all(
+            seriesDoc.participatingTeams.map((tid: string) => getTeamByIdFromDB(tid))
+          );
+          const playerIds = new Set<string>();
+          teams.forEach(t => (t?.playerIds || []).forEach((pid: string) => playerIds.add(pid)));
+          setSeriesPlayerIds(playerIds);
+          console.log('[CampPlayers] Series scoping loaded:', playerIds.size, 'players');
+        } else {
+          console.warn('[CampPlayers] Series has no participating teams');
+        }
+      } catch (e) {
+        console.error('[CampPlayers] Could not scope to series:', e);
+      } finally {
+        setIsSeriesScopingLoaded(true);
       }
       setIsLoading(false);
     });
@@ -77,11 +85,11 @@ export default function CampPlayersPage() {
   const availablePlayers = useMemo(() =>
     orgPlayers.filter(p =>
       !invitedPlayerIds.has(p.id) &&
-      // Scope to series players only (if series data loaded)
-      (seriesPlayerIds.size === 0 || seriesPlayerIds.has(p.id)) &&
+      // Scope to series players only
+      (!isSeriesScopingLoaded || seriesPlayerIds.has(p.id)) &&
       (!search || p.name.toLowerCase().includes(search.toLowerCase()))
     ),
-    [orgPlayers, invitedPlayerIds, search, seriesPlayerIds]
+    [orgPlayers, invitedPlayerIds, search, seriesPlayerIds, isSeriesScopingLoaded]
   );
 
   const handleInvite = async () => {
@@ -194,7 +202,7 @@ export default function CampPlayersPage() {
           <div className="flex gap-3">
             <Select value={selectedPlayerId} onValueChange={setSelectedPlayerId}>
               <SelectTrigger className="flex-1">
-                <SelectValue placeholder={availablePlayers.length === 0 ? 'All org players invited' : 'Select player...'} />
+                <SelectValue placeholder={!isSeriesScopingLoaded ? 'Loading...' : availablePlayers.length === 0 ? 'No eligible players' : 'Select player...'} />
               </SelectTrigger>
               <SelectContent>
                 {availablePlayers.slice(0, 50).map(p => (
