@@ -355,13 +355,13 @@ export default function CampAssessPage() {
             <CardContent className="space-y-3">
               <div className="space-y-1">
                 <label className="text-sm font-medium">Suggested Primary Skill</label>
-                <Select disabled={isLocked} value={form.coachSuggestedSkill}
-                  onValueChange={v => setF('coachSuggestedSkill', v)}>
+                <Select disabled={isLocked} value={form.coachSuggestedSkill || 'keep'}
+                  onValueChange={v => setF('coachSuggestedSkill', v === 'keep' ? '' : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder={`Keep as ${currentPlayer.playerPrimarySkill}`} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Keep player's own: {currentPlayer.playerPrimarySkill}</SelectItem>
+                    <SelectItem value="keep">Keep player's own: {currentPlayer.playerPrimarySkill}</SelectItem>
                     {EFFECTIVE_SKILLS.map(s => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
@@ -371,22 +371,22 @@ export default function CampAssessPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Batting Order</label>
-                  <Select disabled={isLocked} value={form.coachSuggestedBattingOrder}
-                    onValueChange={v => setF('coachSuggestedBattingOrder', v)}>
+                  <Select disabled={isLocked} value={form.coachSuggestedBattingOrder || 'none_batting'}
+                    onValueChange={v => setF('coachSuggestedBattingOrder', v === 'none_batting' ? '' : v)}>
                     <SelectTrigger><SelectValue placeholder="Not set" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Not set</SelectItem>
+                      <SelectItem value="none_batting">Not set</SelectItem>
                       {BATTING_ORDERS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Bowling Style</label>
-                  <Select disabled={isLocked} value={form.coachSuggestedBowlingStyle}
-                    onValueChange={v => setF('coachSuggestedBowlingStyle', v)}>
+                  <Select disabled={isLocked} value={form.coachSuggestedBowlingStyle || 'none_bowling'}
+                    onValueChange={v => setF('coachSuggestedBowlingStyle', v === 'none_bowling' ? '' : v)}>
                     <SelectTrigger><SelectValue placeholder="Not set" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Not set</SelectItem>
+                      <SelectItem value="none_bowling">Not set</SelectItem>
                       {BOWLING_STYLES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>

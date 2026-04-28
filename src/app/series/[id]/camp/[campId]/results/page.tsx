@@ -358,13 +358,13 @@ export default function CampResultsPage() {
                         )}
                       </div>
                       <div className="shrink-0 w-36">
-                        <Select value={selection.get(r.campPlayer.id) || ''}
-                          onValueChange={v => setPlayerSelection(r.campPlayer.id, v as CampSelectionStatus | '')}>
+                        <Select value={selection.get(r.campPlayer.id) || 'unset'}
+                          onValueChange={v => setPlayerSelection(r.campPlayer.id, (v === 'unset' ? '' : v) as CampSelectionStatus | '')}>
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue placeholder="Set status..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Unset</SelectItem>
+                            <SelectItem value="unset">Unset</SelectItem>
                             <SelectItem value="selected">✓ Selected</SelectItem>
                             <SelectItem value="reserve">↑ Reserve</SelectItem>
                             <SelectItem value="not_selected">✗ Not Selected</SelectItem>
@@ -546,13 +546,13 @@ export default function CampResultsPage() {
                           <Badge variant="outline" className="text-xs">{r.resolvedSkill}</Badge>
                           {r.avgOverall > 0 && <span className="text-xs text-muted-foreground">Avg: {r.avgOverall.toFixed(1)}</span>}
                         </div>
-                        <Select value={selection.get(r.campPlayer.id) || ''}
-                          onValueChange={v => setPlayerSelection(r.campPlayer.id, v as CampSelectionStatus | '')}>
+                        <Select value={selection.get(r.campPlayer.id) || 'unset'}
+                          onValueChange={v => setPlayerSelection(r.campPlayer.id, (v === 'unset' ? '' : v) as CampSelectionStatus | '')}>
                           <SelectTrigger className="h-7 text-xs w-32 shrink-0">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Unset</SelectItem>
+                            <SelectItem value="unset">Unset</SelectItem>
                             <SelectItem value="selected">✓ Selected</SelectItem>
                             <SelectItem value="reserve">↑ Reserve</SelectItem>
                             <SelectItem value="not_selected">✗ Not Selected</SelectItem>
