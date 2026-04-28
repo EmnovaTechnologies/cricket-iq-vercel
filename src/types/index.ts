@@ -675,3 +675,102 @@ export interface MatchReport {
   editedAt?: string;
   editedNote?: string;
 }
+
+// ─── Selection Camp Module ────────────────────────────────────────────────────
+
+export type CampStatus = 'upcoming' | 'active' | 'completed';
+export type CampPlayerStatus = 'invited' | 'confirmed' | 'withdrawn';
+export type CampSelectionStatus = 'selected' | 'reserve' | 'not_selected';
+
+export interface SelectionCamp {
+  id: string;
+  organizationId: string;
+  seriesId: string;
+  name: string;
+  year: number;
+  startDate: string;
+  endDate: string;
+  venue: string;
+  quota: number;              // max players invited
+  selectionTarget: number;    // final team size
+  status: CampStatus;
+  // Fitness test config (one per camp, like series)
+  fitnessTestType?: string;
+  fitnessTestPassingScore?: number;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface CampPlayer {
+  id: string;
+  campId: string;
+  organizationId: string;
+  playerId: string;
+  bibNumber: number;          // unique within camp
+  playerName: string;         // copied at invite time
+  playerPrimarySkill: string; // copied from player profile
+  playerBowlingStyle?: string;
+  playerBattingOrder?: string;
+  status: CampPlayerStatus;
+  // Final selection
+  selectionStatus?: CampSelectionStatus;
+  selectionNotes?: string;
+  invitedAt: string;
+  invitedBy: string;
+}
+
+export interface CampAssessment {
+  id: string;
+  campId: string;
+  organizationId: string;
+  bibNumber: number;          // coach sees ONLY bib — truly blind
+  assessedByUid: string;
+  assessedByName: string;
+  assessedAt: string;
+  // Coach's suggested skill (may differ from player self-selected)
+  coachSuggestedSkill?: string;
+  coachSuggestedBowlingStyle?: string;
+  coachSuggestedBattingOrder?: string;
+  // Ratings 1-5
+  batting: number;
+  bowling: number;
+  fielding: number;
+  fitness: number;
+  attitude: number;
+  overall: number;
+  notes?: string;
+  isLocked: boolean;
+  lockedAt?: string;
+}
+
+export interface CampFitnessResult {
+  id: string;
+  campId: string;
+  organizationId: string;
+  playerId: string;
+  bibNumber: number;
+  testType: string;
+  score: number;
+  passed: boolean;            // score >= camp fitnessTestPassingScore
+  recordedAt: string;
+  recordedByUid: string;
+  recordedByName: string;
+}
+
+// Aggregated view for results page (computed client-side, not stored)
+export interface CampPlayerResult {
+  campPlayer: CampPlayer;
+  assessments: CampAssessment[];
+  fitnessResult?: CampFitnessResult;
+  // Averages across all coaches
+  avgBatting: number;
+  avgBowling: number;
+  avgFielding: number;
+  avgFitness: number;
+  avgAttitude: number;
+  avgOverall: number;
+  coachCount: number;
+  fitnessPassed?: boolean;
+  // Resolved coach suggested skill (majority vote or latest)
+  resolvedSkill: string;
+}
