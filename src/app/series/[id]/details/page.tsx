@@ -629,7 +629,7 @@ export default function SeriesDetailsPage() {
       )}
 
       {/* ── Tabs ────────────────────────────────────────────────────── */}
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue="overview" onValueChange={v => { if (v === "camp" && !isCampLoaded) loadCamp(); }}>
         <TabsList className="w-full grid grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="venues">Venues</TabsTrigger>
@@ -1148,13 +1148,9 @@ export default function SeriesDetailsPage() {
 
         {/* ── Selection Camps ── */}
         <TabsContent value="camp" className="space-y-4 mt-4">
-          {!isCampLoaded ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <Trophy className="h-10 w-10 text-muted-foreground/30" />
-              <Button variant="outline" onClick={loadCamp} disabled={isCampLoading}>
-                {isCampLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trophy className="mr-2 h-4 w-4" />}
-                {isCampLoading ? 'Loading...' : 'Load Selection Camp'}
-              </Button>
+          {!isCampLoaded || isCampLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : camp && !isEditingCamp ? (
             <div className="space-y-4">
