@@ -12,6 +12,7 @@ import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { Loader2, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/auth-context';
+import { checkOrgAccess, ORG_MISMATCH_ERROR } from '@/lib/utils/org-guard';
 import { AuthProviderClientComponent } from '@/components/auth-provider-client-component';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -26,9 +27,11 @@ export default function PlayerProfilePage() {
     isAuthLoading,
     effectivePermissions,
     isPermissionsLoading,
+    activeOrganizationId,
   } = useAuth();
 
   const [currentPlayerDetails, setCurrentPlayerDetails] = useState<PlayerWithRatings | null>(null);
+  const [orgAccessError, setOrgAccessError] = useState<string | null>(null);
   const [isLoadingPlayerDetails, setIsLoadingPlayerDetails] = useState(true);
 
   useEffect(() => {
@@ -40,6 +43,12 @@ export default function PlayerProfilePage() {
       const fetchDetails = async () => {
         try {
           const playerDetails = await getPlayerDetailsAction(playerIdFromUrl);
+          // Org guard — prevent cross-org access
+          if (playerDetails && !checkOrgAccess((playerDetails as any).organizationId, activeOrganizationId)) {
+            setOrgAccessError(ORG_MISMATCH_ERROR);
+            setIsLoadingPlayerDetails(false);
+            return;
+          }
           setCurrentPlayerDetails(playerDetails);
 
           if (!playerDetails) {
@@ -72,6 +81,21 @@ export default function PlayerProfilePage() {
   }
 
   // Permission checks are now handled within AuthProviderClientComponent
+
+  if (orgAccessError) {
+    return (
+      <div className="max-w-2xl mx-auto mt-8 space-y-4">
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/players"><ArrowLeft className="mr-2 h-4 w-4" />Back to Players</Link>
+        </Button>
+        <Alert variant="destructive">
+          <ShieldAlert className="h-5 w-5" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>{orgAccessError}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
   
   return (
     <AuthProviderClientComponent
