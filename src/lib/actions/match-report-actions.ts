@@ -17,6 +17,7 @@ const serializeReport = (doc: any): MatchReport => ({
   submittedAt: toISO(doc.data().submittedAt) || new Date().toISOString(),
   certifiedAt: toISO(doc.data().certifiedAt),
   selectorCertifiedAt: toISO(doc.data().selectorCertifiedAt),
+  editedAt: toISO(doc.data().editedAt),
 });
 
 const COLLECTION = 'matchReports';
@@ -216,6 +217,60 @@ export async function selectorUncertifyMatchReportAction(
     });
     return { success: true };
   } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── Admin Edit Report ───────────────────────────────────────────────────────
+// Certifiers can edit any uncertified report. Auto-locks after edit.
+
+export async function adminEditMatchReportAction(
+  reportId: string,
+  editorUid: string,
+  editorName: string,
+  updates: {
+    opposingTeam: string;
+    top3Players: string[];
+    highlights: string;
+    missedCatches: string;
+    missedRunOuts: string;
+    greatCatchesRunOuts: string;
+    sportsmanship: string;
+    editedNote?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const doc = await adminDb.collection(COLLECTION).doc(reportId).get();
+    if (!doc.exists) return { success: false, error: 'Report not found.' };
+    const data = doc.data()!;
+    if (data.isCertified) return { success: false, error: 'Report has been certified and cannot be edited.' };
+
+    // Derive reportingTeam from opposingTeam
+    const reportingTeam = updates.opposingTeam === data.reportingTeam
+      ? data.opposingTeam
+      : data.reportingTeam;
+
+    await adminDb.collection(COLLECTION).doc(reportId).update({
+      opposingTeam: updates.opposingTeam,
+      reportingTeam,
+      top3Players: updates.top3Players,
+      highlights: updates.highlights,
+      missedCatches: updates.missedCatches,
+      missedRunOuts: updates.missedRunOuts,
+      greatCatchesRunOuts: updates.greatCatchesRunOuts,
+      sportsmanship: updates.sportsmanship,
+      // Edit audit trail
+      editedByUid: editorUid,
+      editedByName: editorName,
+      editedAt: admin.firestore.FieldValue.serverTimestamp(),
+      editedNote: updates.editedNote || null,
+      // Auto-lock after admin edit
+      isSelectorCertified: true,
+      selectorCertifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error('[adminEditMatchReportAction] Error:', error);
     return { success: false, error: error.message };
   }
 }

@@ -668,4 +668,9 @@ export interface MatchReport {
   certifiedBy?: string;
   certifiedByName?: string;
   certifiedAt?: string;
+  // Admin edit (certifier edited the report before certifying)
+  editedByUid?: string;
+  editedByName?: string;
+  editedAt?: string;
+  editedNote?: string;
 }
