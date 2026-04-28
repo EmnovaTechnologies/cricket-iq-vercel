@@ -6,7 +6,7 @@ import type { Game, Player, PlayerRating, Series, UserProfile, RatingValue, Perm
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { CalendarDays, MapPin, Users, ArrowLeft, Layers, UserSquare2, UserPlus, CheckSquare, Square, Edit3, UserCog, Save, Check, ChevronsUpDown, Loader2, ExternalLink, Link2, Share2, CheckCheck, Table2, FileText } from 'lucide-react';
+import { CalendarDays, MapPin, Users, ArrowLeft, Layers, UserSquare2, UserPlus, CheckSquare, Square, Edit3, UserCog, Save, Check, ChevronsUpDown, Loader2, ExternalLink, Link2, Share2, CheckCheck, Table2, FileText , ShieldAlert } from 'lucide-react';
 import { format, parseISO, startOfDay } from 'date-fns';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
