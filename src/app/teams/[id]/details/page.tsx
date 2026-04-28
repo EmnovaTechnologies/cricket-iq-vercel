@@ -97,7 +97,7 @@ export default function TeamDetailsPage() {
       // Org guard — prevent cross-org access
       if (currentTeam && !checkOrgAccess(currentTeam.organizationId, activeOrganizationId)) {
         setOrgAccessError(ORG_MISMATCH_ERROR);
-        setIsLoading(false);
+        setIsLoadingData(false);
         return;
       }
       setTeam(currentTeam);
