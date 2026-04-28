@@ -92,8 +92,8 @@ export default function CampFitnessPage() {
   };
 
   if (isLoading) return (
-    <div className="flex justify-center py-12">
-      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+    <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
     </div>
   );
 
@@ -110,7 +110,7 @@ export default function CampFitnessPage() {
   const passed = Array.from(fitnessResults.values()).filter(f => f.passed).length;
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-8">
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm" asChild>
           <Link href={`/series/${seriesId}/camp/${campId}`}>
@@ -118,9 +118,7 @@ export default function CampFitnessPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-lg font-semibold text-primary flex items-center gap-2">
-            <Activity className="h-5 w-5" /> Fitness Tests
-          </h1>
+          <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2"><Activity className="h-8 w-8" /> Fitness Tests</h1>
           <p className="text-xs text-muted-foreground">
             {camp.fitnessTestType} · Passing score: {camp.fitnessTestPassingScore} ·
             {recorded}/{sortedPlayers.length} recorded · {passed} passed

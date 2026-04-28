@@ -135,8 +135,8 @@ export default function CampPlayersPage() {
   };
 
   if (isLoading) return (
-    <div className="flex justify-center py-12">
-      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+    <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
     </div>
   );
 
@@ -150,7 +150,7 @@ export default function CampPlayersPage() {
   const sortedCampPlayers = [...campPlayers].sort((a, b) => a.bibNumber - b.bibNumber);
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-8">
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm" asChild>
           <Link href={`/series/${seriesId}/camp/${campId}`}>
@@ -158,9 +158,7 @@ export default function CampPlayersPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-lg font-semibold text-primary flex items-center gap-2">
-            <Users className="h-5 w-5" /> Players & Bibs
-          </h1>
+          <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2"><Users className="h-8 w-8" /> Players & Bibs</h1>
           <p className="text-xs text-muted-foreground">{campPlayers.length} / {camp.quota} invited</p>
         </div>
       </div>

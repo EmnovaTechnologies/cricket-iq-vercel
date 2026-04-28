@@ -71,8 +71,8 @@ export default function CampOverviewPage() {
   };
 
   if (isLoading) return (
-    <div className="flex justify-center py-12">
-      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+    <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
     </div>
   );
 
@@ -97,7 +97,7 @@ export default function CampOverviewPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
@@ -107,9 +107,7 @@ export default function CampOverviewPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-xl font-headline font-bold text-primary flex items-center gap-2">
-              <Trophy className="h-5 w-5" /> {camp.name}
-            </h1>
+            <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2"><Trophy className="h-8 w-8" /> {camp.name}</h1>
             <div className="flex items-center gap-3 mt-1 flex-wrap">
               {camp.startDate && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1">

@@ -239,8 +239,8 @@ export default function CampResultsPage() {
   const weightTotal = aiCriteria.weightAssessment + aiCriteria.weightFitness + aiCriteria.weightSeriesPerformance;
 
   if (isLoading) return (
-    <div className="flex justify-center py-12">
-      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+    <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
     </div>
   );
 
@@ -252,7 +252,7 @@ export default function CampResultsPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -262,9 +262,7 @@ export default function CampResultsPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-xl font-headline font-bold text-primary flex items-center gap-2">
-              <Trophy className="h-5 w-5" /> {camp.name} — Results
-            </h1>
+            <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2"><Trophy className="h-8 w-8" /> {camp.name} — Results</h1>
             <p className="text-xs text-muted-foreground">
               {players.length} players · {assessments.length} assessments · Target: {camp.selectionTarget}
             </p>

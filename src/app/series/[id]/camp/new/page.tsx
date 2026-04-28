@@ -70,16 +70,14 @@ export default function NewCampPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-8">
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm" asChild>
           <Link href={`/series/${seriesId}/camp`}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Camps
           </Link>
         </Button>
-        <h1 className="text-2xl font-headline font-bold text-primary flex items-center gap-2">
-          <Trophy className="h-6 w-6" /> New Selection Camp
-        </h1>
+        <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2"><Trophy className="h-8 w-8" /> New Selection Camp</h1>
       </div>
 
       <Card>

@@ -221,8 +221,8 @@ export default function CampAssessPage() {
     setForm(prev => ({ ...prev, [key]: value }));
 
   if (isLoading) return (
-    <div className="flex justify-center items-center min-h-[60vh]">
-      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+    <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
     </div>
   );
 
@@ -240,7 +240,7 @@ export default function CampAssessPage() {
   const totalPlayers = campPlayers.length;
 
   return (
-    <div className="max-w-lg mx-auto space-y-4 pb-10">
+    <div className="max-w-lg mx-auto space-y-6 pb-10">
       {/* Header */}
       <div className="flex items-center gap-3">
         {step === 'assess' ? (
@@ -255,7 +255,7 @@ export default function CampAssessPage() {
           </Button>
         )}
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-semibold truncate">{camp.name}</h1>
+          <h1 className="text-xl font-headline font-bold text-primary truncate">{camp.name}</h1>
           <p className="text-xs text-muted-foreground">
             {assessedCount}/{totalPlayers} assessed
           </p>

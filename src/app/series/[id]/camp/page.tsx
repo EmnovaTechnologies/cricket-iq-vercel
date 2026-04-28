@@ -58,7 +58,7 @@ export default function CampListPage() {
         </Alert>
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" asChild>
@@ -66,9 +66,7 @@ export default function CampListPage() {
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to Series
               </Link>
             </Button>
-            <h1 className="text-2xl font-headline font-bold text-primary flex items-center gap-2">
-              <Trophy className="h-6 w-6" /> Selection Camps
-            </h1>
+            <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2"><Trophy className="h-8 w-8" /> Selection Camps</h1>
           </div>
           {canManageCamp && (
             <Button asChild>
@@ -80,8 +78,8 @@ export default function CampListPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
           </div>
         ) : error ? (
           <Alert variant="destructive">
