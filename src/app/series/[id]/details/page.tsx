@@ -466,35 +466,40 @@ export default function SeriesDetailsPage() {
   const loadCamp = async () => {
     if (!seriesId || isCampLoaded) return;
     setIsCampLoading(true);
-    const res = await getCampsForSeriesAction(seriesId);
-    if (res.success && res.camps && res.camps.length > 0) {
-      const c = res.camps[0];
-      setCamp(c);
-      setCampForm({
-        name: c.name, startDate: c.startDate, endDate: c.endDate,
-        venue: c.venue || '', quota: c.quota, selectionTarget: c.selectionTarget,
-        status: c.status, fitnessTestType: c.fitnessTestType || '',
-        fitnessTestPassingScore: c.fitnessTestPassingScore?.toString() || '',
-      });
-      const [playersRes, assessRes, fitnessRes] = await Promise.all([
-        getCampPlayersAction(c.id),
-        getCampAssessmentsAction(c.id),
-        getCampFitnessResultsAction(c.id),
-      ]);
-      if (playersRes.success) setCampPlayers(playersRes.players || []);
-      if (assessRes.success) setCampAssessments(assessRes.assessments || []);
-      if (fitnessRes.success) setCampFitnessResults(fitnessRes.results || []);
+    try {
+      const res = await getCampsForSeriesAction(seriesId);
+      if (res.success && res.camps && res.camps.length > 0) {
+        const c = res.camps[0];
+        setCamp(c);
+        setCampForm({
+          name: c.name, startDate: c.startDate, endDate: c.endDate,
+          venue: c.venue || '', quota: c.quota, selectionTarget: c.selectionTarget,
+          status: c.status, fitnessTestType: c.fitnessTestType || '',
+          fitnessTestPassingScore: c.fitnessTestPassingScore?.toString() || '',
+        });
+        const [playersRes, assessRes, fitnessRes] = await Promise.all([
+          getCampPlayersAction(c.id),
+          getCampAssessmentsAction(c.id),
+          getCampFitnessResultsAction(c.id),
+        ]);
+        if (playersRes.success) setCampPlayers(playersRes.players || []);
+        if (assessRes.success) setCampAssessments(assessRes.assessments || []);
+        if (fitnessRes.success) setCampFitnessResults(fitnessRes.results || []);
+      }
+      if (activeOrganizationId) {
+        try {
+          const users = await getUsersForOrgAdminViewFromDB(activeOrganizationId);
+          setCampAvailableSelectors(users.filter((u: any) =>
+            u.roles?.includes('selector') || u.roles?.includes('Series Admin')
+          ));
+        } catch (e) { console.warn('[loadCamp] Could not load selectors:', e); }
+      }
+    } catch (e) {
+      console.error('[loadCamp] Error:', e);
+    } finally {
+      setIsCampLoaded(true);
+      setIsCampLoading(false);
     }
-    if (activeOrganizationId) {
-      try {
-        const users = await getUsersForOrgAdminViewFromDB(activeOrganizationId);
-        setCampAvailableSelectors(users.filter((u: any) =>
-          u.roles?.includes('selector') || u.roles?.includes('Series Admin')
-        ));
-      } catch (e) { console.warn('[loadCamp] Could not load selectors:', e); }
-    }
-    setIsCampLoaded(true);
-    setIsCampLoading(false);
   };
 
   const handleCreateCamp = async () => {
