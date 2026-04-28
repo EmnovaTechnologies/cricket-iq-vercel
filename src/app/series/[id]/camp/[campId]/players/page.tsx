@@ -13,7 +13,7 @@ import {
   getCampByIdAction, getCampPlayersAction,
   invitePlayerToCampAction, removeCampPlayerAction, updateCampPlayerAction
 } from '@/lib/actions/camp-actions';
-import { getPlayersWithDetailsFromDB } from '@/lib/db';
+import { getPlayersWithDetailsFromDB, getTeamByIdFromDB, getSeriesByIdFromDB } from '@/lib/db';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import type { SelectionCamp, CampPlayer, PlayerWithRatings } from '@/types';
@@ -29,6 +29,7 @@ export default function CampPlayersPage() {
   const [campPlayers, setCampPlayers] = useState<CampPlayer[]>([]);
   const [orgPlayers, setOrgPlayers] = useState<PlayerWithRatings[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [seriesPlayerIds, setSeriesPlayerIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
   const [bibInput, setBibInput] = useState('');
@@ -43,10 +44,22 @@ export default function CampPlayersPage() {
       getCampByIdAction(campId),
       getCampPlayersAction(campId),
       getPlayersWithDetailsFromDB(activeOrganizationId),
-    ]).then(([campRes, playersRes, orgRes]) => {
+    ]).then(async ([campRes, playersRes, orgRes]) => {
       if (campRes.success) setCamp(campRes.camp!);
       if (playersRes.success) setCampPlayers(playersRes.players || []);
       setOrgPlayers(orgRes);
+      // Scope to series teams only
+      if (campRes.success && campRes.camp?.seriesId) {
+        try {
+          const seriesDoc = await getSeriesByIdFromDB(campRes.camp.seriesId);
+          if (seriesDoc?.participatingTeams?.length) {
+            const teams = await Promise.all(seriesDoc.participatingTeams.map((tid: string) => getTeamByIdFromDB(tid)));
+            const playerIds = new Set<string>();
+            teams.forEach(t => (t.playerIds || []).forEach((pid: string) => playerIds.add(pid)));
+            setSeriesPlayerIds(playerIds);
+          }
+        } catch (e) { console.warn('[CampPlayers] Could not scope to series:', e); }
+      }
       setIsLoading(false);
     });
   }, [campId, activeOrganizationId]);
@@ -64,9 +77,11 @@ export default function CampPlayersPage() {
   const availablePlayers = useMemo(() =>
     orgPlayers.filter(p =>
       !invitedPlayerIds.has(p.id) &&
+      // Scope to series players only (if series data loaded)
+      (seriesPlayerIds.size === 0 || seriesPlayerIds.has(p.id)) &&
       (!search || p.name.toLowerCase().includes(search.toLowerCase()))
     ),
-    [orgPlayers, invitedPlayerIds, search]
+    [orgPlayers, invitedPlayerIds, search, seriesPlayerIds]
   );
 
   const handleInvite = async () => {
@@ -135,8 +150,8 @@ export default function CampPlayersPage() {
   };
 
   if (isLoading) return (
-    <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+    <div className="flex justify-center py-12">
+      <Loader2 className="h-10 w-10 animate-spin text-primary" />
     </div>
   );
 
@@ -150,7 +165,7 @@ export default function CampPlayersPage() {
   const sortedCampPlayers = [...campPlayers].sort((a, b) => a.bibNumber - b.bibNumber);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm" asChild>
           <Link href={`/series/${seriesId}/camp/${campId}`}>
@@ -158,7 +173,9 @@ export default function CampPlayersPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2"><Users className="h-8 w-8" /> Players & Bibs</h1>
+          <h1 className="text-lg font-semibold text-primary flex items-center gap-2">
+            <Users className="h-5 w-5" /> Players & Bibs
+          </h1>
           <p className="text-xs text-muted-foreground">{campPlayers.length} / {camp.quota} invited</p>
         </div>
       </div>
