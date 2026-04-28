@@ -262,7 +262,8 @@ export function MatchReportTab({
     const res = await certifyMatchReportAction(
       reportId,
       currentUser.uid,
-      userProfile.displayName || userProfile.email || 'Admin'
+      userProfile.displayName || userProfile.email || 'Admin',
+      organizationId
     );
     if (res.success) {
       toast({ title: 'Report certified' });
@@ -291,6 +292,7 @@ export function MatchReportTab({
         greatCatchesRunOuts: editFields!.greatCatchesRunOuts,
         sportsmanship: editFields!.sportsmanship,
         editedNote: editFields!.editedNote,
+        organizationId,
       }
     );
     if (res.success) {

@@ -122,6 +122,12 @@ export default function ScorecardDetailsPage() {
     if (!params.id) return;
     getScorecardByIdAction(params.id).then(async res => {
       if (res.success && res.scorecard) {
+        // Org guard — prevent cross-org access
+        if (activeOrganizationId && res.scorecard.organizationId &&
+            res.scorecard.organizationId !== activeOrganizationId) {
+          setError('This scorecard belongs to a different organization. Please switch to the correct organization to view it.');
+          return;
+        }
         setScorecard(res.scorecard);
         // Check if match reports exist (to disable delete)
         getMatchReportsForScorecardAction(res.scorecard.id).then(rRes => {

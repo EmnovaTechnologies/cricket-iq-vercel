@@ -116,9 +116,15 @@ export async function getMatchReportsForSeriesAction(
 export async function certifyMatchReportAction(
   reportId: string,
   certifiedBy: string,
-  certifiedByName: string
+  certifiedByName: string,
+  organizationId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const doc = await adminDb.collection(COLLECTION).doc(reportId).get();
+    if (!doc.exists) return { success: false, error: 'Report not found.' };
+    if (organizationId && doc.data()?.organizationId !== organizationId) {
+      return { success: false, error: 'You do not have permission to certify reports from another organization.' };
+    }
     await adminDb.collection(COLLECTION).doc(reportId).update({
       isCertified: true,
       certifiedBy,
@@ -237,6 +243,7 @@ export async function adminEditMatchReportAction(
     greatCatchesRunOuts: string;
     sportsmanship: string;
     editedNote?: string;
+    organizationId?: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -244,6 +251,10 @@ export async function adminEditMatchReportAction(
     if (!doc.exists) return { success: false, error: 'Report not found.' };
     const data = doc.data()!;
     if (data.isCertified) return { success: false, error: 'Report has been certified and cannot be edited.' };
+    // Org guard — prevent cross-org edits
+    if (updates.organizationId && data.organizationId !== updates.organizationId) {
+      return { success: false, error: 'You do not have permission to edit reports from another organization.' };
+    }
 
     // Derive reportingTeam from opposingTeam
     const reportingTeam = updates.opposingTeam === data.reportingTeam
