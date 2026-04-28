@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { getTeamByIdFromDB, getPlayersForTeamFromDB, getAllPlayersFromDB, isPlayerAgeEligibleForTeamCategory, getAllTeamsFromDB, getOrganizationByIdFromDB } from '@/lib/db';
 import { linkPlayerToTeamAction, updateTeamManagersAction, searchGlobalPlayersAction } from '@/lib/actions/team-actions';
 import type { Team, Player, UserProfile, AgeCategory, GlobalPlayerSearchResult } from '@/types';
-import { ArrowLeft, Users, Tag, UserPlus, UserSquare2, Shield, Binary, UserCog, Save, Edit3, Search, Globe, Loader2, Check, ChevronsUpDown, Trash2 } from 'lucide-react';
+import { ArrowLeft, Users, Tag, UserPlus, UserSquare2, Shield, Binary, UserCog, Save, Edit3, Search, Globe, Loader2, Check, ChevronsUpDown, Trash2 , ShieldAlert } from 'lucide-react';
 import { checkTeamDeletableAction, deleteTeamAdminAction } from '@/lib/actions/team-admin-actions';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';

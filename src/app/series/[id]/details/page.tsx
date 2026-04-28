@@ -16,7 +16,7 @@ import {
 import { addTeamToSeriesAction, addVenueToSeriesAction, updateSeriesAdminsAction, archiveSeriesAction, unarchiveSeriesAction, updateSeriesFitnessCriteriaAction, updateSeriesBasicInfoAction } from '@/lib/actions/series-actions';
 import { checkSeriesDeletableAction, deleteSeriesAdminAction } from '@/lib/actions/series-admin-actions';
 import type { Series, Team, Venue, Game, UserProfile, FitnessTestType, FitnessTestHeader } from '@/types'; // Added FitnessTestHeader
-import { Layers, Tag, CalendarFold, ArrowLeft, Users, PlusCircle, MapPin, Gamepad2, Map as MapIconLucide, UserCog, Edit3, Save, Archive, ArchiveRestore, Info, Search, CalendarDays, Activity, Dumbbell, ShieldCheck, ListChecks, FileText, Target, Trash2, Loader2, BarChart3 } from 'lucide-react';import Link from 'next/link';
+import { Layers, Tag, CalendarFold, ArrowLeft, Users, PlusCircle, MapPin, Gamepad2, Map as MapIconLucide, UserCog, Edit3, Save, Archive, ArchiveRestore, Info, Search, CalendarDays, Activity, Dumbbell, ShieldCheck, ListChecks, FileText, Target, Trash2, Loader2, BarChart3 , ShieldAlert } from 'lucide-react';import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import GameCard from '@/components/game-card';
