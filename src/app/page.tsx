@@ -516,7 +516,7 @@ export default function DashboardPage() {
   const displayName = userProfile?.displayName || userProfile?.email?.split('@')[0] || 'there';
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 w-full">
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 p-5 rounded-xl bg-muted/40 border">
