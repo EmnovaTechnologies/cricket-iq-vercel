@@ -682,6 +682,14 @@ export type CampStatus = 'upcoming' | 'active' | 'completed';
 export type CampPlayerStatus = 'invited' | 'confirmed' | 'withdrawn';
 export type CampSelectionStatus = 'selected' | 'reserve' | 'not_selected';
 
+export interface CampSelectorAssignment {
+  uid: string;
+  name: string;
+  clubName?: string;
+  assignedAt: string;
+  assignedBy: string;
+}
+
 export interface SelectionCamp {
   id: string;
   organizationId: string;
@@ -697,6 +705,8 @@ export interface SelectionCamp {
   // Fitness test config (one per camp, like series)
   fitnessTestType?: string;
   fitnessTestPassingScore?: number;
+  // Assigned coaches/selectors
+  assignedSelectors?: CampSelectorAssignment[];
   createdBy: string;
   createdAt: string;
 }

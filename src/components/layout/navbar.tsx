@@ -143,6 +143,7 @@ const Navbar = () => {
 
     if (!isEffectivelyUnassigned) {
         mobileLinks = [
+            ...(selectorCampLink ? [selectorCampLink] : []),
             ...visibleMainNavLinks,
             ...loggedInUserLinks.filter(link => hasAnyRole(userProfile?.roles, link.roles || [])),
             ...superAdminLinks.filter(link => hasAnyRole(userProfile?.roles, link.roles || [])),
@@ -178,6 +179,14 @@ const Navbar = () => {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
+          {currentUser && !isAuthLoading && !isEffectivelyUnassigned && selectorCampLink && (
+            <Button variant="ghost" asChild className="text-foreground hover:bg-primary/10 hover:text-primary text-sm px-3">
+              <Link href={selectorCampLink.href} className="flex items-center gap-2">
+                {selectorCampLink.icon}
+                {selectorCampLink.label}
+              </Link>
+            </Button>
+          )}
           {currentUser && !isAuthLoading && !isEffectivelyUnassigned && mainNavLinks.map((link) => {
             const canViewLink = userProfile?.roles?.includes('admin') || (link.permission && effectivePermissions[link.permission]);
             const selectionModel = activeOrganizationDetails?.selectionModel;

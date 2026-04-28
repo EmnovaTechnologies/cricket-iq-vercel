@@ -19,7 +19,9 @@ import {
   createCampAction, updateCampAction, getCampsForSeriesAction,
   getCampPlayersAction, getCampAssessmentsAction, getCampFitnessResultsAction
 } from '@/lib/actions/camp-actions';
-import type { Series, Team, Venue, Game, UserProfile, FitnessTestType, FitnessTestHeader, SelectionCamp, CampPlayer, CampAssessment, CampFitnessResult } from '@/types';
+import { CampSelectorPanel } from '@/components/camp/camp-selector-panel';
+import { getUsersForOrgAdminViewFromDB } from '@/lib/db';
+import type { Series, Team, Venue, Game, UserProfile, FitnessTestType, FitnessTestHeader, SelectionCamp, CampPlayer, CampAssessment, CampFitnessResult, CampSelectorAssignment } from '@/types';
 import { Layers, Tag, CalendarFold, ArrowLeft, Users, PlusCircle, MapPin, Gamepad2, Map as MapIconLucide, UserCog, Edit3, Save, Archive, ArchiveRestore, Info, Search, CalendarDays, Activity, Dumbbell, ShieldCheck, ListChecks, FileText, Target, Trash2, Loader2, BarChart3, ShieldAlert, Trophy, Star, Lock, Brain, CheckCircle } from 'lucide-react';import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -105,6 +107,7 @@ export default function SeriesDetailsPage() {
   const [isCampLoaded, setIsCampLoaded] = useState(false);
   const [isCreatingCamp, setIsCreatingCamp] = useState(false);
   const [isEditingCamp, setIsEditingCamp] = useState(false);
+  const [campAvailableSelectors, setCampAvailableSelectors] = useState<any[]>([]);
   const [campForm, setCampForm] = useState({
     name: '', startDate: '', endDate: '', venue: '',
     quota: 40, selectionTarget: 15, status: 'upcoming' as SelectionCamp['status'],
@@ -481,6 +484,14 @@ export default function SeriesDetailsPage() {
       if (playersRes.success) setCampPlayers(playersRes.players || []);
       if (assessRes.success) setCampAssessments(assessRes.assessments || []);
       if (fitnessRes.success) setCampFitnessResults(fitnessRes.results || []);
+    }
+    if (activeOrganizationId) {
+      try {
+        const users = await getUsersForOrgAdminViewFromDB(activeOrganizationId);
+        setCampAvailableSelectors(users.filter((u: any) =>
+          u.roles?.includes('selector') || u.roles?.includes('Series Admin')
+        ));
+      } catch (e) { console.warn('[loadCamp] Could not load selectors:', e); }
     }
     setIsCampLoaded(true);
     setIsCampLoading(false);
@@ -1225,6 +1236,17 @@ export default function SeriesDetailsPage() {
                   </Card>
                 ))}
               </div>
+
+              {/* Coach / Selector Assignment */}
+              {currentUser && canManage && (
+                <CampSelectorPanel
+                  campId={camp.id}
+                  assignments={camp.assignedSelectors || []}
+                  availableSelectors={campAvailableSelectors}
+                  assignedBy={currentUser.uid}
+                  onAssignmentsChanged={updated => setCamp((prev: SelectionCamp | null) => prev ? { ...prev, assignedSelectors: updated } : prev)}
+                />
+              )}
             </div>
           ) : (
             <div className="space-y-4">

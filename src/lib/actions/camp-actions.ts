@@ -4,7 +4,7 @@ import { adminDb } from '../firebase-admin';
 import * as admin from 'firebase-admin';
 import type {
   SelectionCamp, CampPlayer, CampAssessment,
-  CampFitnessResult, CampSelectionStatus
+  CampFitnessResult, CampSelectionStatus, CampSelectorAssignment
 } from '@/types';
 
 const toISO = (val: any): string | undefined => {
@@ -69,9 +69,10 @@ export async function getCampsForSeriesAction(
   try {
     const snap = await adminDb.collection('selectionCamps')
       .where('seriesId', '==', seriesId)
-      .orderBy('createdAt', 'desc')
       .get();
-    return { success: true, camps: snap.docs.map(serializeCamp) };
+    const camps = snap.docs.map(serializeCamp)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return { success: true, camps };
   } catch (e: any) {
     return { success: false, error: e.message };
   }
@@ -150,9 +151,11 @@ export async function getCampPlayersAction(
   try {
     const snap = await adminDb.collection('campPlayers')
       .where('campId', '==', campId)
-      .orderBy('bibNumber', 'asc')
       .get();
-    return { success: true, players: snap.docs.map(serializeCampPlayer) };
+    // Sort client-side to avoid composite index requirement
+    const players = snap.docs.map(serializeCampPlayer)
+      .sort((a, b) => a.bibNumber - b.bibNumber);
+    return { success: true, players };
   } catch (e: any) {
     return { success: false, error: e.message };
   }
@@ -259,7 +262,6 @@ export async function getCampAssessmentsAction(
   try {
     const snap = await adminDb.collection('campAssessments')
       .where('campId', '==', campId)
-      .orderBy('assessedAt', 'desc')
       .get();
     return { success: true, assessments: snap.docs.map(serializeAssessment) };
   } catch (e: any) {
@@ -275,9 +277,77 @@ export async function getMyCampAssessmentsAction(
     const snap = await adminDb.collection('campAssessments')
       .where('campId', '==', campId)
       .where('assessedByUid', '==', coachUid)
-      .orderBy('bibNumber', 'asc')
       .get();
-    return { success: true, assessments: snap.docs.map(serializeAssessment) };
+    const assessments = snap.docs.map(serializeAssessment)
+      .sort((a, b) => a.bibNumber - b.bibNumber);
+    return { success: true, assessments };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+// ─── Camp Selector Assignment ────────────────────────────────────────────────
+
+export async function assignSelectorToCampAction(
+  campId: string,
+  selector: { uid: string; name: string; clubName?: string },
+  assignedBy: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const doc = await adminDb.collection('selectionCamps').doc(campId).get();
+    if (!doc.exists) return { success: false, error: 'Camp not found.' };
+    const existing: any[] = doc.data()?.assignedSelectors || [];
+    if (existing.some((s: any) => s.uid === selector.uid)) {
+      return { success: false, error: 'This selector is already assigned to this camp.' };
+    }
+    const newAssignment = {
+      uid: selector.uid,
+      name: selector.name,
+      clubName: selector.clubName || null,
+      assignedAt: new Date().toISOString(),
+      assignedBy,
+    };
+    await adminDb.collection('selectionCamps').doc(campId).update({
+      assignedSelectors: admin.firestore.FieldValue.arrayUnion(newAssignment),
+    });
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function removeSelectorFromCampAction(
+  campId: string,
+  selectorUid: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const doc = await adminDb.collection('selectionCamps').doc(campId).get();
+    if (!doc.exists) return { success: false, error: 'Camp not found.' };
+    const existing: any[] = doc.data()?.assignedSelectors || [];
+    const updated = existing.filter((s: any) => s.uid !== selectorUid);
+    await adminDb.collection('selectionCamps').doc(campId).update({ assignedSelectors: updated });
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function getCampsForSelectorAction(
+  selectorUid: string,
+  organizationId: string
+): Promise<{ success: boolean; camps?: SelectionCamp[]; error?: string }> {
+  try {
+    // Query camps where this selector is assigned - Firestore array-contains on nested field
+    // requires querying by a specific field, so we use assignedSelectors array
+    const snap = await adminDb.collection('selectionCamps')
+      .where('organizationId', '==', organizationId)
+      .get();
+    // Filter client-side for selector uid
+    const camps = snap.docs
+      .map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate?.()?.toISOString() || d.data().createdAt } as SelectionCamp))
+      .filter(c => (c.assignedSelectors || []).some((s: any) => s.uid === selectorUid))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return { success: true, camps };
   } catch (e: any) {
     return { success: false, error: e.message };
   }
@@ -317,9 +387,10 @@ export async function getCampFitnessResultsAction(
   try {
     const snap = await adminDb.collection('campFitnessResults')
       .where('campId', '==', campId)
-      .orderBy('bibNumber', 'asc')
       .get();
-    return { success: true, results: snap.docs.map(serializeFitness) };
+    const results = snap.docs.map(serializeFitness)
+      .sort((a, b) => a.bibNumber - b.bibNumber);
+    return { success: true, results };
   } catch (e: any) {
     return { success: false, error: e.message };
   }
