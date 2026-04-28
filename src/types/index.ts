@@ -463,6 +463,7 @@ export interface ScorecardSelectorAssignment {
   name: string;
   teamAssociation: string | 'neutral'; // team name from the scorecard or 'neutral'
   assignedAt?: string;
+  clubName?: string; // for display in match report tab
 }
 
 export interface MatchScorecard {

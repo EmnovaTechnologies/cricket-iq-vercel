@@ -13,7 +13,7 @@ import {
   selectorUncertifyMatchReportAction,
   getUserReportForGameAction,
 } from '@/lib/actions/match-report-actions';
-import type { MatchReport, ScorecardSelectorAssignment } from '@/types';
+import type { MatchReport, ScorecardSelectorAssignment, UserProfile } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -43,6 +43,8 @@ interface MatchReportTabProps {
   isAssignedSelector: boolean;
   /** Direct selector assignments on this scorecard (optional) */
   selectorAssignments?: ScorecardSelectorAssignment[];
+  /** Available selectors (with clubName) for badge display */
+  availableSelectors?: UserProfile[];
   /** Org-level report scope policy */
   selectorReportScope?: 'opposing_only' | 'both_teams' | 'own_team_only';
 }
@@ -58,10 +60,12 @@ export function MatchReportTab({
   userTeam,
   isAssignedSelector,
   selectorAssignments = [],
+  availableSelectors = [],
   selectorReportScope = 'opposing_only',
 }: MatchReportTabProps) {
   const { currentUser, userProfile, effectivePermissions } = useAuth();
   const { toast } = useToast();
+  const selectorProfileMap = new Map(availableSelectors.map((u: UserProfile) => [u.uid, u]));
 
   const [reports, setReports] = useState<MatchReport[]>([]);
   const [myReport, setMyReport] = useState<MatchReport | null>(null);
@@ -325,22 +329,44 @@ export function MatchReportTab({
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
             <FileText className="h-4 w-4" /> Assigned Selectors
           </h3>
-          <div className="flex flex-wrap gap-2">
-            {selectorAssignments.map(a => (
-              <div key={a.uid} className="flex items-center gap-1.5 bg-muted/40 border rounded-lg px-2.5 py-1.5 text-xs">
-                <span className="font-medium">{a.name}</span>
-                <Badge
-                  variant="outline"
-                  className={`text-xs h-4 px-1.5 ${
-                    a.teamAssociation === team1 ? 'border-blue-300 text-blue-700 bg-blue-50' :
-                    a.teamAssociation === team2 ? 'border-green-300 text-green-700 bg-green-50' :
-                    'border-muted-foreground/30 text-muted-foreground'
-                  }`}
-                >
-                  {a.teamAssociation === 'neutral' ? 'Neutral' : a.teamAssociation}
-                </Badge>
-              </div>
-            ))}
+          <div className="space-y-1.5">
+            {selectorAssignments.map(a => {
+              const profile = selectorProfileMap.get(a.uid);
+              const clubName = profile?.clubName || a.clubName;
+              return (
+                <div key={a.uid} className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium">{a.name}</span>
+                  {clubName && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700 border border-green-200 shrink-0">
+                      {clubName}
+                    </span>
+                  )}
+                  {a.teamAssociation && a.teamAssociation !== 'neutral' ? (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700 border border-blue-200 shrink-0">
+                      → {a.teamAssociation}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-muted text-muted-foreground border shrink-0">
+                      Neutral
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 text-xs">Club</span>
+              club association
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 text-xs">→ Team</span>
+              scoped to rate this team
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted text-muted-foreground border text-xs">Neutral</span>
+              no scope set
+            </span>
           </div>
         </div>
       )}

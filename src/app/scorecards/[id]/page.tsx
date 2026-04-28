@@ -489,6 +489,7 @@ export default function ScorecardDetailsPage() {
               playersByTeam={buildPlayersByTeam(scorecard)}
               isAssignedSelector={isAssignedSelector}
               selectorAssignments={selectorAssignments}
+              availableSelectors={availableSelectors}
               selectorReportScope={activeOrganizationDetails?.selectorReportScope}
               scorecardMode={true}
             />
@@ -536,6 +537,7 @@ export default function ScorecardDetailsPage() {
               playersByTeam={buildPlayersByTeam(scorecard)}
               isAssignedSelector={isAssignedSelector}
               selectorAssignments={selectorAssignments}
+              availableSelectors={availableSelectors}
               selectorReportScope={activeOrganizationDetails?.selectorReportScope}
               scorecardMode={true}
             />
