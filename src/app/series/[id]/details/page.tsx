@@ -15,8 +15,12 @@ import {
 
 import { addTeamToSeriesAction, addVenueToSeriesAction, updateSeriesAdminsAction, archiveSeriesAction, unarchiveSeriesAction, updateSeriesFitnessCriteriaAction, updateSeriesBasicInfoAction } from '@/lib/actions/series-actions';
 import { checkSeriesDeletableAction, deleteSeriesAdminAction } from '@/lib/actions/series-admin-actions';
-import type { Series, Team, Venue, Game, UserProfile, FitnessTestType, FitnessTestHeader } from '@/types'; // Added FitnessTestHeader
-import { Layers, Tag, CalendarFold, ArrowLeft, Users, PlusCircle, MapPin, Gamepad2, Map as MapIconLucide, UserCog, Edit3, Save, Archive, ArchiveRestore, Info, Search, CalendarDays, Activity, Dumbbell, ShieldCheck, ListChecks, FileText, Target, Trash2, Loader2, BarChart3, ShieldAlert, Trophy } from 'lucide-react';import Link from 'next/link';
+import {
+  createCampAction, updateCampAction, getCampsForSeriesAction,
+  getCampPlayersAction, getCampAssessmentsAction, getCampFitnessResultsAction
+} from '@/lib/actions/camp-actions';
+import type { Series, Team, Venue, Game, UserProfile, FitnessTestType, FitnessTestHeader, SelectionCamp, CampPlayer, CampAssessment, CampFitnessResult } from '@/types';
+import { Layers, Tag, CalendarFold, ArrowLeft, Users, PlusCircle, MapPin, Gamepad2, Map as MapIconLucide, UserCog, Edit3, Save, Archive, ArchiveRestore, Info, Search, CalendarDays, Activity, Dumbbell, ShieldCheck, ListChecks, FileText, Target, Trash2, Loader2, BarChart3, ShieldAlert, Trophy, Star, Lock, Brain, CheckCircle } from 'lucide-react';import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import GameCard from '@/components/game-card';
@@ -91,6 +95,22 @@ export default function SeriesDetailsPage() {
   const [currentFitnessTestTypeForEdit, setCurrentFitnessTestTypeForEdit] = useState<FitnessTestType | typeof NO_FITNESS_TEST_VALUE | undefined>(undefined);
   const [currentFitnessPassingScoreForEdit, setCurrentFitnessPassingScoreForEdit] = useState<string>('');
   const [isLoadingFitnessUpdate, setIsLoadingFitnessUpdate] = useState(false);
+
+  // ── Camp state ─────────────────────────────────────────────────────────────
+  const [camp, setCamp] = useState<SelectionCamp | null>(null);
+  const [campPlayers, setCampPlayers] = useState<CampPlayer[]>([]);
+  const [campAssessments, setCampAssessments] = useState<CampAssessment[]>([]);
+  const [campFitnessResults, setCampFitnessResults] = useState<CampFitnessResult[]>([]);
+  const [isCampLoading, setIsCampLoading] = useState(false);
+  const [isCampLoaded, setIsCampLoaded] = useState(false);
+  const [isCreatingCamp, setIsCreatingCamp] = useState(false);
+  const [isEditingCamp, setIsEditingCamp] = useState(false);
+  const [campForm, setCampForm] = useState({
+    name: '', startDate: '', endDate: '', venue: '',
+    quota: 40, selectionTarget: 15, status: 'upcoming' as SelectionCamp['status'],
+    fitnessTestType: '', fitnessTestPassingScore: '',
+  });
+  const setC = (key: string, value: any) => setCampForm(prev => ({ ...prev, [key]: value }));
 
   const [fitnessTests, setFitnessTests] = useState<FitnessTestHeader[]>([]);
 
@@ -439,6 +459,78 @@ export default function SeriesDetailsPage() {
       </div>
     );
   }
+
+  const loadCamp = async () => {
+    if (!seriesId || isCampLoaded) return;
+    setIsCampLoading(true);
+    const res = await getCampsForSeriesAction(seriesId);
+    if (res.success && res.camps && res.camps.length > 0) {
+      const c = res.camps[0];
+      setCamp(c);
+      setCampForm({
+        name: c.name, startDate: c.startDate, endDate: c.endDate,
+        venue: c.venue || '', quota: c.quota, selectionTarget: c.selectionTarget,
+        status: c.status, fitnessTestType: c.fitnessTestType || '',
+        fitnessTestPassingScore: c.fitnessTestPassingScore?.toString() || '',
+      });
+      const [playersRes, assessRes, fitnessRes] = await Promise.all([
+        getCampPlayersAction(c.id),
+        getCampAssessmentsAction(c.id),
+        getCampFitnessResultsAction(c.id),
+      ]);
+      if (playersRes.success) setCampPlayers(playersRes.players || []);
+      if (assessRes.success) setCampAssessments(assessRes.assessments || []);
+      if (fitnessRes.success) setCampFitnessResults(fitnessRes.results || []);
+    }
+    setIsCampLoaded(true);
+    setIsCampLoading(false);
+  };
+
+  const handleCreateCamp = async () => {
+    if (!campForm.name || !campForm.startDate || !campForm.endDate || !currentUser || !activeOrganizationId || !seriesId) return;
+    setIsCreatingCamp(true);
+    const res = await createCampAction({
+      organizationId: activeOrganizationId, seriesId,
+      name: campForm.name, year: new Date(campForm.startDate).getFullYear(),
+      startDate: campForm.startDate, endDate: campForm.endDate,
+      venue: campForm.venue, quota: Number(campForm.quota),
+      selectionTarget: Number(campForm.selectionTarget), status: campForm.status,
+      fitnessTestType: campForm.fitnessTestType || undefined,
+      fitnessTestPassingScore: campForm.fitnessTestPassingScore ? Number(campForm.fitnessTestPassingScore) : undefined,
+      createdBy: currentUser.uid,
+    });
+    if (res.success) {
+      toast({ title: 'Camp created!' });
+      setIsCampLoaded(false);
+      await loadCamp();
+    } else {
+      toast({ title: 'Error', description: res.error, variant: 'destructive' });
+    }
+    setIsCreatingCamp(false);
+  };
+
+  const handleUpdateCamp = async () => {
+    if (!camp) return;
+    const res = await updateCampAction(camp.id, {
+      name: campForm.name, startDate: campForm.startDate, endDate: campForm.endDate,
+      venue: campForm.venue, quota: Number(campForm.quota),
+      selectionTarget: Number(campForm.selectionTarget), status: campForm.status,
+      fitnessTestType: campForm.fitnessTestType || undefined,
+      fitnessTestPassingScore: campForm.fitnessTestPassingScore ? Number(campForm.fitnessTestPassingScore) : undefined,
+    });
+    if (res.success) {
+      toast({ title: 'Camp updated!' });
+      setIsEditingCamp(false);
+      setIsCampLoaded(false);
+      await loadCamp();
+    } else {
+      toast({ title: 'Error', description: res.error, variant: 'destructive' });
+    }
+  };
+
+  const canManage = effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] ||
+    effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
+    effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY];
 
   return (
     <div className="space-y-6">
@@ -1056,24 +1148,153 @@ export default function SeriesDetailsPage() {
 
         {/* ── Selection Camps ── */}
         <TabsContent value="camp" className="space-y-4 mt-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <Trophy className="h-5 w-5" /> Selection Camps
-            </h3>
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/series/${seriesId}/camp`}>
-                Manage Camps →
-              </Link>
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Selection camps let you invite players, assign bib numbers, collect blind coach assessments, record fitness tests and run AI-powered squad selection.
-          </p>
-          <Button asChild>
-            <Link href={`/series/${seriesId}/camp`}>
-              <Trophy className="mr-2 h-4 w-4" /> View All Camps
-            </Link>
-          </Button>
+          {!isCampLoaded ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Trophy className="h-10 w-10 text-muted-foreground/30" />
+              <Button variant="outline" onClick={loadCamp} disabled={isCampLoading}>
+                {isCampLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trophy className="mr-2 h-4 w-4" />}
+                {isCampLoading ? 'Loading...' : 'Load Selection Camp'}
+              </Button>
+            </div>
+          ) : camp && !isEditingCamp ? (
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <h3 className="text-base font-semibold text-primary flex items-center gap-2">
+                    <Trophy className="h-4 w-4" /> {camp.name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {camp.startDate && format(parseISO(camp.startDate), 'PP')}
+                    {camp.endDate && camp.endDate !== camp.startDate && ` → ${format(parseISO(camp.endDate), 'PP')}`}
+                    {camp.venue && ` · ${camp.venue}`}
+                    {camp.fitnessTestType && ` · ${camp.fitnessTestType} (pass ≥ ${camp.fitnessTestPassingScore})`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs border capitalize ${
+                    camp.status === 'active' ? 'bg-green-100 text-green-700 border-green-200' :
+                    camp.status === 'upcoming' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                    'bg-muted text-muted-foreground border'
+                  }`}>{camp.status}</span>
+                  {canManage && (
+                    <Button size="sm" variant="outline" onClick={() => setIsEditingCamp(true)}>
+                      <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Players invited', value: campPlayers.length, max: camp.quota, icon: <Users className="h-4 w-4" /> },
+                  { label: 'Bibs assessed', value: new Set(campAssessments.map((a: CampAssessment) => a.bibNumber)).size, max: campPlayers.length, icon: <Star className="h-4 w-4" /> },
+                  { label: 'Locked', value: campAssessments.filter((a: CampAssessment) => a.isLocked).length, max: campAssessments.length, icon: <Lock className="h-4 w-4" /> },
+                  { label: 'Fitness done', value: campFitnessResults.length, max: campPlayers.length, icon: <Activity className="h-4 w-4" /> },
+                ].map(stat => (
+                  <Card key={stat.label}>
+                    <CardContent className="p-3">
+                      <div className="flex items-center gap-1.5 text-muted-foreground mb-1">{stat.icon}<span className="text-xs">{stat.label}</span></div>
+                      <p className="text-2xl font-bold text-primary">{stat.value}<span className="text-sm font-normal text-muted-foreground">/{stat.max}</span></p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              {(() => {
+                const sel = campPlayers.filter((p: CampPlayer) => p.selectionStatus === 'selected').length;
+                const res = campPlayers.filter((p: CampPlayer) => p.selectionStatus === 'reserve').length;
+                return (sel > 0 || res > 0) ? (
+                  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />
+                    <p className="text-sm text-green-700 flex-1">{sel} selected · {res} reserve · Target: {camp.selectionTarget}</p>
+                    <Button asChild size="sm" className="bg-green-700 hover:bg-green-800">
+                      <Link href={`/series/${seriesId}/camp/${camp.id}/results`}>View Results</Link>
+                    </Button>
+                  </div>
+                ) : null;
+              })()}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  { title: 'Players & Bibs', sub: `${campPlayers.length} / ${camp.quota} invited`, icon: <Users className="h-5 w-5 text-primary" />, bg: 'bg-primary/10', href: `/series/${seriesId}/camp/${camp.id}/players`, link: 'Manage players' },
+                  { title: 'Coach Assessment', sub: `${new Set(campAssessments.map((a: CampAssessment) => a.bibNumber)).size} bibs assessed · ${campAssessments.filter((a: CampAssessment) => a.isLocked).length} locked`, icon: <Star className="h-5 w-5 text-amber-500" />, bg: 'bg-amber-50', href: `/series/${seriesId}/camp/${camp.id}/assess`, link: 'Start assessing' },
+                  ...(camp.fitnessTestType ? [{ title: 'Fitness Tests', sub: `${campFitnessResults.length} / ${campPlayers.length} recorded`, icon: <Activity className="h-5 w-5 text-blue-500" />, bg: 'bg-blue-50', href: `/series/${seriesId}/camp/${camp.id}/fitness`, link: 'Record scores' }] : []),
+                  { title: 'Results & AI Selection', sub: `Target: ${camp.selectionTarget} players`, icon: <Brain className="h-5 w-5 text-purple-500" />, bg: 'bg-purple-50', href: `/series/${seriesId}/camp/${camp.id}/results`, link: 'View results' },
+                ].map(card => (
+                  <Card key={card.title} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push(card.href)}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`p-2 rounded-lg ${card.bg}`}>{card.icon}</div>
+                        <div><CardTitle className="text-sm">{card.title}</CardTitle><CardDescription className="text-xs">{card.sub}</CardDescription></div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0"><Button variant="link" className="p-0 h-auto text-xs">{card.link} →</Button></CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-primary flex items-center gap-2">
+                  <Trophy className="h-4 w-4" /> {isEditingCamp ? 'Edit Camp' : 'Create Selection Camp'}
+                </h3>
+                {isEditingCamp && <Button size="sm" variant="outline" onClick={() => setIsEditingCamp(false)}>Cancel</Button>}
+              </div>
+              <Card>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Camp Name *</label>
+                    <Input placeholder="e.g. SoCal Hub U15 Selection Camp 2026" value={campForm.name} onChange={e => setC('name', e.target.value)} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5"><label className="text-sm font-medium">Start Date *</label><Input type="date" value={campForm.startDate} onChange={e => setC('startDate', e.target.value)} /></div>
+                    <div className="space-y-1.5"><label className="text-sm font-medium">End Date *</label><Input type="date" value={campForm.endDate} onChange={e => setC('endDate', e.target.value)} /></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5"><label className="text-sm font-medium">Venue</label><Input placeholder="e.g. Canyonside Park" value={campForm.venue} onChange={e => setC('venue', e.target.value)} /></div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Status</label>
+                      <Select value={campForm.status} onValueChange={v => setC('status', v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="upcoming">Upcoming</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5"><label className="text-sm font-medium">Player Quota</label><Input type="number" min={1} value={campForm.quota} onChange={e => setC('quota', e.target.value)} /></div>
+                    <div className="space-y-1.5"><label className="text-sm font-medium">Selection Target</label><Input type="number" min={1} value={campForm.selectionTarget} onChange={e => setC('selectionTarget', e.target.value)} /></div>
+                  </div>
+                  <div className="border-t pt-4 space-y-3">
+                    <p className="text-sm font-medium text-muted-foreground">Fitness Test (optional)</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Test Type</label>
+                        <Select value={campForm.fitnessTestType || 'none'} onValueChange={v => setC('fitnessTestType', v === 'none' ? '' : v)}>
+                          <SelectTrigger><SelectValue placeholder="Select test type..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {FITNESS_TEST_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {campForm.fitnessTestType && (
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Passing Score</label>
+                          <Input type="number" step="0.1" placeholder="e.g. 16.1" value={campForm.fitnessTestPassingScore} onChange={e => setC('fitnessTestPassingScore', e.target.value)} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <Button className="w-full" onClick={isEditingCamp ? handleUpdateCamp : handleCreateCamp} disabled={isCreatingCamp}>
+                    {isCreatingCamp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trophy className="mr-2 h-4 w-4" />}
+                    {isEditingCamp ? 'Save Changes' : 'Create Camp'}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
       </Tabs>
