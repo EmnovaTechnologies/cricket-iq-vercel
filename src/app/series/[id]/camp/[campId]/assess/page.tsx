@@ -21,7 +21,7 @@ import type { SelectionCamp, CampPlayer, CampAssessment } from '@/types';
 import { EFFECTIVE_SKILLS, BOWLING_STYLES, BATTING_ORDERS } from '@/lib/constants';
 import {
   Loader2, ArrowLeft, Star, Lock, Unlock,
-  ChevronLeft, ChevronRight, ShieldAlert, Trophy, Check
+  ChevronLeft, ChevronRight, ShieldAlert, Trophy, Check, Search
 } from 'lucide-react';
 
 const RATING_LABELS = ['', 'Poor', 'Below Average', 'Average', 'Good', 'Excellent'];
@@ -283,30 +283,113 @@ export default function CampAssessPage() {
         </Card>
       )}
 
-      {/* BIB ENTRY STEP */}
+      {/* BIB ENTRY STEP — searchable list + manual bib entry */}
       {step === 'bib' && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Enter Bib Number</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center">
-              <Input
-                type="number"
-                min={1}
-                placeholder="Bib #"
-                value={bibInput}
-                onChange={e => setBibInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleBibSubmit()}
-                className="text-4xl font-bold text-center h-20 text-primary"
-                autoFocus
-              />
-            </div>
-            <Button className="w-full h-12 text-base" onClick={handleBibSubmit}>
-              Start Assessment <ChevronRight className="ml-2 h-5 w-5" />
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="space-y-3">
+          {/* Search / manual bib input */}
+          <Card>
+            <CardContent className="p-3 space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search by name or type bib #..."
+                  value={bibInput}
+                  onChange={e => setBibInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      // If input is a number treat as bib
+                      const asNum = parseInt(bibInput);
+                      if (!isNaN(asNum)) handleBibSubmit();
+                    }
+                  }}
+                  autoFocus
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Player list */}
+          <Card>
+            <CardContent className="p-0">
+              {campPlayers.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-8">No players in this camp yet.</p>
+              ) : (
+                <div className="divide-y max-h-[60vh] overflow-y-auto">
+                  {campPlayers
+                    .filter(p => {
+                      if (!bibInput) return true;
+                      const asNum = parseInt(bibInput);
+                      if (!isNaN(asNum)) return p.bibNumber === asNum;
+                      return p.playerName.toLowerCase().includes(bibInput.toLowerCase());
+                    })
+                    .sort((a, b) => a.bibNumber - b.bibNumber)
+                    .map(p => {
+                      const existing = myAssessments.get(p.bibNumber);
+                      const isAssessed = !!existing;
+                      const isLocked = existing?.isLocked === true;
+                      return (
+                        <button
+                          key={p.id}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors text-left"
+                          onClick={() => {
+                            setBibInput(p.bibNumber.toString());
+                            setCurrentBib(p.bibNumber);
+                            setCurrentPlayer(p);
+                            if (existing) {
+                              setForm({
+                                batting: existing.batting,
+                                bowling: existing.bowling,
+                                fielding: existing.fielding,
+                                fitness: existing.fitness,
+                                attitude: existing.attitude,
+                                overall: existing.overall,
+                                coachSuggestedSkill: existing.coachSuggestedSkill || '',
+                                coachSuggestedBowlingStyle: existing.coachSuggestedBowlingStyle || '',
+                                coachSuggestedBattingOrder: existing.coachSuggestedBattingOrder || '',
+                                notes: existing.notes || '',
+                              });
+                            } else {
+                              setForm(emptyForm());
+                            }
+                            setStep('assess');
+                          }}
+                        >
+                          {/* Bib number */}
+                          <span className="text-lg font-bold text-primary w-10 shrink-0">#{p.bibNumber}</span>
+
+                          {/* Player info — skill only, no name in assessment mode */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{p.playerName}</p>
+                            <p className="text-xs text-muted-foreground">{p.playerPrimarySkill}
+                              {p.playerBowlingStyle ? ` · ${p.playerBowlingStyle}` : ''}
+                              {p.playerBattingOrder ? ` · ${p.playerBattingOrder}` : ''}
+                            </p>
+                          </div>
+
+                          {/* Assessment status */}
+                          <div className="shrink-0">
+                            {isLocked ? (
+                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">
+                                <Lock className="h-3 w-3" /> Locked
+                              </span>
+                            ) : isAssessed ? (
+                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                                Draft
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Not assessed</span>
+                            )}
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* ASSESSMENT STEP */}
