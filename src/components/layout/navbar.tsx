@@ -4,7 +4,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Leaf, Users, UserSquare2, Gamepad2, Target, Menu, Layers, MapPinned, LogIn, LogOut, UserPlus, UserCog, ShieldCheck, Building, ChevronsUpDown, Check, Hourglass, ListFilter, ImageIcon, User, Download, ChevronRight, BarChart3, Table, ClipboardCheck } from 'lucide-react';
+import { Leaf, Users, UserSquare2, Gamepad2, Target, Menu, Layers, MapPinned, LogIn, LogOut, UserPlus, UserCog, ShieldCheck, Building, ChevronsUpDown, Check, Hourglass, ListFilter, ImageIcon, User, Download, ChevronRight, BarChart3, Table, ClipboardCheck, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useState, useEffect } from 'react';
@@ -148,8 +148,8 @@ const Navbar = () => {
 
     if (!isEffectivelyUnassigned) {
         mobileLinks = [
-            ...(selectorCampLink ? [selectorCampLink] : []),
             ...visibleMainNavLinks,
+            ...(selectorCampLink ? [selectorCampLink] : []),
             ...loggedInUserLinks.filter(link => hasAnyRole(userProfile?.roles, link.roles || [])),
             ...superAdminLinks.filter(link => hasAnyRole(userProfile?.roles, link.roles || [])),
         ];
@@ -184,14 +184,6 @@ const Navbar = () => {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
-          {currentUser && !isAuthLoading && !isEffectivelyUnassigned && selectorCampLink && (
-            <Button variant="ghost" asChild className="text-foreground hover:bg-primary/10 hover:text-primary text-sm px-3">
-              <Link href={selectorCampLink.href} className="flex items-center gap-2">
-                {selectorCampLink.icon}
-                {selectorCampLink.label}
-              </Link>
-            </Button>
-          )}
           {currentUser && !isAuthLoading && !isEffectivelyUnassigned && mainNavLinks.map((link) => {
             const canViewLink = userProfile?.roles?.includes('admin') || (link.permission && effectivePermissions[link.permission]);
             const selectionModel = activeOrganizationDetails?.selectionModel;
@@ -208,6 +200,14 @@ const Navbar = () => {
             }
             return null;
           })}
+          {currentUser && !isAuthLoading && !isEffectivelyUnassigned && selectorCampLink && (
+            <Button variant="ghost" asChild className="text-foreground hover:bg-primary/10 hover:text-primary text-sm px-3">
+              <Link href={selectorCampLink.href} className="flex items-center gap-2">
+                {selectorCampLink.icon}
+                {selectorCampLink.label}
+              </Link>
+            </Button>
+          )}
           {currentUser && !isAuthLoading && isEffectivelyUnassigned && mainNavLinks.filter(link => link.href === '/').map((link) => {
              const canViewLink = userProfile?.roles?.includes('admin') || (link.permission && effectivePermissions[link.permission]);
              if (canViewLink) {
