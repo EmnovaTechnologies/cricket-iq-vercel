@@ -56,8 +56,11 @@ export async function calculateEffectivePermissions(userProfile: UserProfile): P
                     [PERMISSIONS.PAGE_VIEW_ADMIN_USERS_LIST]: true, [PERMISSIONS.PAGE_VIEW_ADMIN_ORGANIZATION_DETAILS]: true,
                     [PERMISSIONS.PAGE_VIEW_ADMIN_ORGANIZATION_BILLING]: true, [PERMISSIONS.AI_USE_TEAM_COMPOSITION]: true,
                     [PERMISSIONS.USERS_VIEW_LIST_ASSIGNED_ORG]: true, [PERMISSIONS.USERS_MANAGE_ROLES_ASSIGNED_ORG]: true,
-                    [PERMISSIONS.VENUES_DELETE_ANY]: true,
-                    [PERMISSIONS.SERIES_ADD]: true, // Added permission
+                    [PERMISSIONS.VENUES_DELETE_ANY]: true, [PERMISSIONS.SERIES_ADD]: true,
+                    [PERMISSIONS.GAMES_CERTIFY_ANY]: true, [PERMISSIONS.GAMES_FINALIZE_ANY]: true,
+                    [PERMISSIONS.GAMES_RATE_ANY]: true, [PERMISSIONS.GAMES_MANAGE_SELECTORS_ANY]: true,
+                    [PERMISSIONS.SCORECARDS_VIEW]: true, [PERMISSIONS.SCORECARDS_IMPORT]: true,
+                    [PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED]: true,
                 };
             } else if (roleName === 'Series Admin') {
                 rolePerms = {
@@ -71,6 +74,9 @@ export async function calculateEffectivePermissions(userProfile: UserProfile): P
                     [PERMISSIONS.AI_USE_TEAM_COMPOSITION]: true, [PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED]: true,
                     [PERMISSIONS.SERIES_MANAGE_VENUES_ASSIGNED]: true, [PERMISSIONS.GAMES_ADD_TO_ANY_SERIES]: true,
                     [PERMISSIONS.SERIES_ARCHIVE_ASSIGNED]: true, [PERMISSIONS.SERIES_UNARCHIVE_ASSIGNED]: true,
+                    [PERMISSIONS.GAMES_CERTIFY_ANY]: true, [PERMISSIONS.GAMES_FINALIZE_ANY]: true,
+                    [PERMISSIONS.GAMES_RATE_ANY]: true, [PERMISSIONS.GAMES_MANAGE_SELECTORS_ANY]: true,
+                    [PERMISSIONS.SCORECARDS_VIEW]: true, [PERMISSIONS.SCORECARDS_IMPORT]: true,
                 };
             } else if (roleName === 'Team Manager') {
                 rolePerms = {

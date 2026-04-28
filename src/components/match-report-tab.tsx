@@ -119,7 +119,7 @@ export function MatchReportTab({
   // Selectors can view their own submitted report (but not others)
   const canView = canViewAdmin || (isSelector && !!myReport);
 
-  const canCertify = effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
+  const canCertify = effectivePermissions[PERMISSIONS.GAMES_CERTIFY_ANY] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY] ||
     userProfile?.roles?.includes('admin');
 
