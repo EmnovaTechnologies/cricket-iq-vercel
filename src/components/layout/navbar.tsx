@@ -135,6 +135,11 @@ const Navbar = () => {
   
   const isEffectivelyUnassigned = userProfile && userProfile.roles.length === 1 && userProfile.roles[0] === 'unassigned';
 
+  // Camps link — shown to selectors and series admins always
+  const selectorCampLink = (userProfile?.roles?.includes('selector') || userProfile?.roles?.includes('Series Admin'))
+    ? { href: '/selector/camps', label: 'Camps', icon: <Trophy className="h-5 w-5" /> }
+    : null;
+
   let mobileLinks: Array<{ href: string; label: string; icon: JSX.Element; roles?: string[]; permission?: PermissionKey }> = [];
   if (currentUser && !isAuthLoading) {
     const visibleMainNavLinks = mainNavLinks.filter(link => {
