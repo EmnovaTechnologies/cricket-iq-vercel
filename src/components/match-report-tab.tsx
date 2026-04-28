@@ -91,11 +91,14 @@ export function MatchReportTab({
   // Derive what teams this selector can report on based on assignment + org policy
   const getReportableTeams = (): string[] => {
     if (myTeamAssociation && myTeamAssociation !== 'neutral') {
-      // Directly assigned to a team — scope determines what they report on
-      if (selectorReportScope === 'own_team_only') return [myTeamAssociation];
+      // teamAssociation = the team this selector is scoped TO RATE (already the opposing team)
       if (selectorReportScope === 'both_teams') return [team1, team2];
-      // Default opposing_only: report on the other team
-      return [myTeamAssociation === team1 ? team2 : team1];
+      if (selectorReportScope === 'own_team_only') {
+        // rate their own team = the one that is NOT teamAssociation
+        return [myTeamAssociation === team1 ? team2 : team1];
+      }
+      // Default opposing_only: teamAssociation IS the team to report on
+      return [myTeamAssociation];
     }
     // Neutral or no direct assignment — use org policy
     if (selectorReportScope === 'both_teams') return [team1, team2];
@@ -144,9 +147,8 @@ export function MatchReportTab({
   }, [gameId, currentUser?.uid, isAssignedSelector, userProfile?.roles]);
 
   // Derive opposing team from userTeam
-  const opposingTeam = userTeam
-    ? (userTeam === team1 ? team2 : team1)
-    : selectedOpposingTeam;
+  // userTeam = team the selector is scoped to RATE, so opposingTeam = userTeam directly
+  const opposingTeam = userTeam || selectedOpposingTeam;
 
   const opposingPlayers = playersByTeam[effectiveOpposingTeam] || playersByTeam[selectedOpposingTeam] || playersByTeam[team2] || [];
 
@@ -315,7 +317,7 @@ export function MatchReportTab({
                 <span>Reporting on: <strong>{effectiveOpposingTeam}</strong></span>
                 {myTeamAssociation && myTeamAssociation !== 'neutral' && (
                   <Badge variant="outline" className="ml-auto text-xs">
-                    {myTeamAssociation} selector
+                    {myTeamAssociation === team1 ? team2 : team1} selector
                   </Badge>
                 )}
               </div>
