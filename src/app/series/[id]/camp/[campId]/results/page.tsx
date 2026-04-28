@@ -254,28 +254,24 @@ export default function CampResultsPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/series/${seriesId}/camp/${campId}`}>
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2"><Trophy className="h-8 w-8" /> {camp.name} — Results</h1>
-            <p className="text-xs text-muted-foreground">
-              {players.length} players · {assessments.length} assessments · Target: {camp.selectionTarget}
-            </p>
-          </div>
-        </div>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/series/${seriesId}/camp/${campId}`}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Camp
+          </Link>
+        </Button>
         <Button onClick={handleSaveFinalSelection} disabled={isSaving || hasSaved}>
           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> :
             hasSaved ? <CheckCircle className="mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
           {hasSaved ? 'Saved' : 'Save Final Selection'}
         </Button>
       </div>
+      <div>
+        <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2"><Trophy className="h-8 w-8" /> {camp.name} — Results</h1>
+        <p className="text-sm text-muted-foreground mt-1">{players.length} players · {assessments.length} assessments · Target: {camp.selectionTarget}</p>
+      </div>
 
-      {/* Selection summary */}
+      {/* Selection summary */
       <div className="flex gap-3 flex-wrap">
         <Badge className="bg-green-100 text-green-700 border-green-200 text-sm px-3 py-1">
           <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> {selCounts.selected} Selected

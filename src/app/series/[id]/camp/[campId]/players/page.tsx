@@ -180,12 +180,12 @@ export default function CampPlayersPage() {
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Camp
           </Link>
         </Button>
-        <div>
-          <h1 className="text-lg font-semibold text-primary flex items-center gap-2">
-            <Users className="h-5 w-5" /> Players & Bibs
-          </h1>
-          <p className="text-xs text-muted-foreground">{campPlayers.length} / {camp.quota} invited</p>
-        </div>
+      </div>
+      <div>
+        <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2">
+          <Users className="h-8 w-8" /> Players & Bibs
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">{campPlayers.length} / {camp.quota} invited</p>
       </div>
 
       {/* Invite form */}

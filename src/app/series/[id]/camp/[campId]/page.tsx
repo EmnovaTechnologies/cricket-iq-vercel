@@ -98,32 +98,13 @@ export default function CampOverviewPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/series/${seriesId}/camp`}>
-              <ArrowLeft className="mr-2 h-4 w-4" /> All Camps
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2"><Trophy className="h-8 w-8" /> {camp.name}</h1>
-            <div className="flex items-center gap-3 mt-1 flex-wrap">
-              {camp.startDate && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <CalendarDays className="h-3 w-3" />
-                  {format(parseISO(camp.startDate), 'PP')}
-                  {camp.endDate !== camp.startDate && ` → ${format(parseISO(camp.endDate), 'PP')}`}
-                </span>
-              )}
-              {camp.venue && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-3 w-3" /> {camp.venue}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
+      {/* Top navigation bar — matches other detail pages */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/series/${seriesId}/details`}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Series
+          </Link>
+        </Button>
         {canManage ? (
           <Select value={camp.status} onValueChange={v => handleStatusChange(v as SelectionCamp['status'])}
             disabled={isUpdatingStatus}>
@@ -141,6 +122,32 @@ export default function CampOverviewPage() {
             {camp.status}
           </span>
         )}
+      </div>
+
+      {/* Page title — full width, standard style */}
+      <div>
+        <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2">
+          <Trophy className="h-8 w-8" /> {camp.name}
+        </h1>
+        <div className="flex items-center gap-4 mt-1 flex-wrap">
+          {camp.startDate && (
+            <span className="text-sm text-muted-foreground flex items-center gap-1">
+              <CalendarDays className="h-3.5 w-3.5" />
+              {format(parseISO(camp.startDate), 'PP')}
+              {camp.endDate !== camp.startDate && ` → ${format(parseISO(camp.endDate), 'PP')}`}
+            </span>
+          )}
+          {camp.venue && (
+            <span className="text-sm text-muted-foreground flex items-center gap-1">
+              <MapPin className="h-3.5 w-3.5" /> {camp.venue}
+            </span>
+          )}
+          {camp.fitnessTestType && (
+            <span className="text-sm text-muted-foreground flex items-center gap-1">
+              <Activity className="h-3.5 w-3.5" /> {camp.fitnessTestType} · pass ≥ {camp.fitnessTestPassingScore}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Stats row */}
