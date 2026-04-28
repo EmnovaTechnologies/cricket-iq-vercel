@@ -463,8 +463,8 @@ export default function SeriesDetailsPage() {
     );
   }
 
-  const loadCamp = async () => {
-    if (!seriesId || isCampLoaded) return;
+  const loadCamp = async (force = false) => {
+    if (!seriesId || (isCampLoaded && !force)) return;
     setIsCampLoading(true);
     try {
       const res = await getCampsForSeriesAction(seriesId);
@@ -518,7 +518,7 @@ export default function SeriesDetailsPage() {
     if (res.success) {
       toast({ title: 'Camp created!' });
       setIsCampLoaded(false);
-      await loadCamp();
+      await loadCamp(true);
     } else {
       toast({ title: 'Error', description: res.error, variant: 'destructive' });
     }
@@ -538,7 +538,7 @@ export default function SeriesDetailsPage() {
       toast({ title: 'Camp updated!' });
       setIsEditingCamp(false);
       setIsCampLoaded(false);
-      await loadCamp();
+      await loadCamp(true);
     } else {
       toast({ title: 'Error', description: res.error, variant: 'destructive' });
     }
