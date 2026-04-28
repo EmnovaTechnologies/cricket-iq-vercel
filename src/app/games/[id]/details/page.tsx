@@ -171,7 +171,7 @@ export default function GameDetailsPage() {
 
 
   const refreshGameAndPlayerData = async () => {
-    if (!gameId) return;
+    if (!gameId || !activeOrganizationId) return;
 
     setIsLoadingPageData(true);
     
@@ -269,7 +269,7 @@ export default function GameDetailsPage() {
     if (!isPermissionsLoading) {
       refreshGameAndPlayerData();
     }
-  }, [gameId, currentAuthProfile, isPermissionsLoading]);
+  }, [gameId, currentAuthProfile, isPermissionsLoading, activeOrganizationId]);
 
 
   const handlePlayerRosterUpdate = async (playerId: string, teamIdentifier: 'team1' | 'team2', isIncluded: boolean) => {

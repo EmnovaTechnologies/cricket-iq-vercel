@@ -90,6 +90,7 @@ export default function TeamDetailsPage() {
   }, [selectableManagers, managerSearchQuery]);
 
   const fetchData = async () => {
+    if (!activeOrganizationId) return;
     if (teamId) {
       setIsLoadingData(true);
       const currentTeam = await getTeamByIdFromDB(teamId);

@@ -1,17 +1,17 @@
 // src/lib/utils/org-guard.ts
 // Shared utility to prevent cross-org access on entity detail pages.
-// Call after loading an entity by ID — if the entity's org doesn't match
-// the user's active org, deny access.
 
 /**
  * Returns true if access is allowed, false if org mismatch detected.
- * If either orgId is missing/undefined, access is allowed (can't check).
+ * If activeOrgId is missing (not yet loaded), returns false to be safe.
+ * If entityOrgId is missing, returns true (entity may not have org field).
  */
 export function checkOrgAccess(
   entityOrgId: string | undefined | null,
   activeOrgId: string | undefined | null
 ): boolean {
-  if (!entityOrgId || !activeOrgId) return true;
+  if (!entityOrgId) return true;  // entity has no org field — can't check, allow
+  if (!activeOrgId) return false; // active org not loaded yet — deny until we know
   return entityOrgId === activeOrgId;
 }
 

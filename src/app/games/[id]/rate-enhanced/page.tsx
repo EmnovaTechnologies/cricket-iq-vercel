@@ -48,6 +48,7 @@ function RateGameEnhancedContent() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!activeOrganizationId) return;
       setIsLoadingPageData(true);
       let fetchedGame: Game | undefined;
       if (gameId) {
@@ -154,7 +155,7 @@ function RateGameEnhancedContent() {
     };
 
     if (!isAuthLoading) fetchData();
-  }, [gameId, isAuthLoading, refreshTrigger, currentUserProfile, toast, effectivePermissions]);
+  }, [gameId, isAuthLoading, refreshTrigger, currentUserProfile, toast, effectivePermissions, activeOrganizationId]);
 
   if (isAuthLoading || isLoadingPageData) {
     return (

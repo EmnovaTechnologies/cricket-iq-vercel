@@ -104,7 +104,7 @@ export default function SeriesDetailsPage() {
   const [isSavingBasicInfo, setIsSavingBasicInfo] = useState(false); // New state for fitness tests
 
   const refreshSeriesData = async () => {
-    if (seriesId) {
+    if (seriesId && activeOrganizationId) {
       setIsLoadingSeries(true);
       try {
         const currentSeries = await getSeriesByIdFromDB(seriesId);
@@ -178,7 +178,7 @@ export default function SeriesDetailsPage() {
         refreshSeriesData();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seriesId, isPermissionsLoading]);
+  }, [seriesId, isPermissionsLoading, activeOrganizationId]);
 
   useEffect(() => { 
     if (series) {

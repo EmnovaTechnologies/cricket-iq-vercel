@@ -38,7 +38,7 @@ export default function PlayerProfilePage() {
     if (isAuthLoading) {
       return; // Wait for auth to complete before fetching
     }
-    if (playerIdFromUrl) {
+    if (playerIdFromUrl && activeOrganizationId) {
       setIsLoadingPlayerDetails(true);
       const fetchDetails = async () => {
         try {
@@ -67,7 +67,7 @@ export default function PlayerProfilePage() {
       setCurrentPlayerDetails(null);
       setIsLoadingPlayerDetails(false);
     }
-  }, [playerIdFromUrl, toast, isAuthLoading]);
+  }, [playerIdFromUrl, toast, isAuthLoading, activeOrganizationId]);
   
   const isLoading = isAuthLoading || isPermissionsLoading || isLoadingPlayerDetails;
 

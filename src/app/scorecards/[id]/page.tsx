@@ -120,7 +120,7 @@ export default function ScorecardDetailsPage() {
   };
 
   useEffect(() => {
-    if (!params.id) return;
+    if (!params.id || !activeOrganizationId) return;
     getScorecardByIdAction(params.id).then(async res => {
       if (res.success && res.scorecard) {
         // Org guard — prevent cross-org access
@@ -154,7 +154,7 @@ export default function ScorecardDetailsPage() {
       }
       setIsLoading(false);
     });
-  }, [params.id, currentUser?.uid]);
+  }, [params.id, currentUser?.uid, activeOrganizationId]);
 
   // Fetch available selectors — same logic as game details page
   useEffect(() => {
