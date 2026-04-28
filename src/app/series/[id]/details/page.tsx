@@ -111,6 +111,7 @@ export default function SeriesDetailsPage() {
         // Org guard — prevent cross-org access
         if (currentSeries && !checkOrgAccess(currentSeries.organizationId, activeOrganizationId)) {
           setOrgAccessError(ORG_MISMATCH_ERROR);
+          setIsLoadingSeries(false);
           return;
         }
         setSeries(currentSeries);

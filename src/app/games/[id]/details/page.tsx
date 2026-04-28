@@ -180,6 +180,7 @@ export default function GameDetailsPage() {
       // Org guard — prevent cross-org access
       if (fetchedGame && !checkOrgAccess(fetchedGame.organizationId, activeOrganizationId)) {
         setOrgAccessError(ORG_MISMATCH_ERROR);
+        setIsLoadingPageData(false);
         return;
       }
       setGame(fetchedGame);

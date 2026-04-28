@@ -126,6 +126,7 @@ export default function ScorecardDetailsPage() {
         // Org guard — prevent cross-org access
         if (!checkOrgAccess(res.scorecard.organizationId, activeOrganizationId)) {
           setError(ORG_MISMATCH_ERROR);
+          setIsLoading(false);
           return;
         }
         setScorecard(res.scorecard);
