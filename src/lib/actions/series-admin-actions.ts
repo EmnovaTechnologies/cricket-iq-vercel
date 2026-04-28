@@ -36,6 +36,20 @@ export async function checkSeriesDeletableAction(
       };
     }
 
+    // Check for selection camps linked to this series
+    const campsSnap = await adminDb.collection('selectionCamps')
+      .where('seriesId', '==', seriesId)
+      .limit(1)
+      .get();
+
+    if (!campsSnap.empty) {
+      const camp = campsSnap.docs[0].data();
+      return {
+        canDelete: false,
+        reason: `Series has a selection camp (${camp.name}). Delete the camp first.`,
+      };
+    }
+
     return { canDelete: true };
   } catch (error: any) {
     console.error('[checkSeriesDeletableAction] Error:', error);
@@ -87,6 +101,18 @@ export async function checkSeriesBulkDeletableAction(
         .where('seriesId', 'in', chunk)
         .get();
       scorecardsSnap.docs.forEach(d => {
+        const sid = d.data().seriesId;
+        if (sid) seriesWithGames.add(sid);
+      });
+    }
+
+    // Approach 4: check selection camps linked to these series
+    for (let i = 0; i < seriesIds.length; i += 30) {
+      const chunk = seriesIds.slice(i, i + 30);
+      const campsSnap = await adminDb.collection('selectionCamps')
+        .where('seriesId', 'in', chunk)
+        .get();
+      campsSnap.docs.forEach(d => {
         const sid = d.data().seriesId;
         if (sid) seriesWithGames.add(sid);
       });
