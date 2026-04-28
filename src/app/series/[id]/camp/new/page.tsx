@@ -137,10 +137,10 @@ export default function NewCampPage() {
             <p className="text-sm font-medium text-muted-foreground">Fitness Test (optional)</p>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Test Type</label>
-              <Select value={form.fitnessTestType} onValueChange={v => set('fitnessTestType', v)}>
+              <Select value={form.fitnessTestType || 'none'} onValueChange={v => set('fitnessTestType', v === 'none' ? '' : v)}>
                 <SelectTrigger><SelectValue placeholder="Select test type..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {FITNESS_TEST_TYPES.map(t => (
                     <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
