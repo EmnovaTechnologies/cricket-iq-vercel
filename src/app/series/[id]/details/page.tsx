@@ -29,6 +29,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/auth-context';
+import { checkOrgAccess, ORG_MISMATCH_ERROR } from '@/lib/utils/org-guard';
 import { getPotentialSeriesAdminsForOrg } from '@/lib/actions/user-actions';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -62,6 +63,7 @@ export default function SeriesDetailsPage() {
   const { userProfile: currentAuthProfile, effectivePermissions, isPermissionsLoading, activeOrganizationId } = useAuth();
 
   const [series, setSeries] = useState<Series | undefined>(undefined);
+  const [orgAccessError, setOrgAccessError] = useState<string | null>(null);
   const [canDelete, setCanDelete] = useState<boolean | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [participatingTeams, setParticipatingTeams] = useState<Team[]>([]);
@@ -106,6 +108,11 @@ export default function SeriesDetailsPage() {
       setIsLoadingSeries(true);
       try {
         const currentSeries = await getSeriesByIdFromDB(seriesId);
+        // Org guard — prevent cross-org access
+        if (currentSeries && !checkOrgAccess(currentSeries.organizationId, activeOrganizationId)) {
+          setOrgAccessError(ORG_MISMATCH_ERROR);
+          return;
+        }
         setSeries(currentSeries);
 
         if (currentSeries) {
@@ -406,6 +413,21 @@ export default function SeriesDetailsPage() {
 
   if (isLoadingSeries || isPermissionsLoading) {
     return <p className="text-center text-muted-foreground">Loading series details...</p>;
+  }
+
+  if (orgAccessError) {
+    return (
+      <div className="max-w-2xl mx-auto mt-8 space-y-4">
+        <Button asChild variant="outline" size="sm">
+          <Link href="/series"><ArrowLeft className="mr-2 h-4 w-4" />Back to Series</Link>
+        </Button>
+        <Alert variant="destructive">
+          <ShieldAlert className="h-5 w-5" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>{orgAccessError}</AlertDescription>
+        </Alert>
+      </div>
+    );
   }
 
   if (!series) {
