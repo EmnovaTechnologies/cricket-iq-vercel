@@ -12,6 +12,7 @@ import { format, parseISO, startOfDay } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info, Users, UserCog, ArrowLeft, Edit, CheckCircle, Clock, ShieldAlert, Users2, Loader2, CalendarX, QrCode, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { checkOrgAccess, ORG_MISMATCH_ERROR } from '@/lib/utils/org-guard';
 import { getUserProfile } from '@/lib/user-actions';
 import { Badge } from '@/components/ui/badge';
 import { finalizeGameRatingsAction, certifyRatingsAction, adminForceFinalizeGameRatingsAction } from '@/lib/actions/game-actions';
@@ -25,10 +26,11 @@ function RateGameEnhancedContent() {
   const searchParamsHook = useSearchParams();
   const router = useRouter();
   const gameId = params.id;
-  const { userProfile: currentUserProfile, isAuthLoading, effectivePermissions } = useAuth();
+  const { userProfile: currentUserProfile, isAuthLoading, effectivePermissions, activeOrganizationId } = useAuth();
   const { toast } = useToast();
 
   const [game, setGame] = useState<Game | undefined>(undefined);
+  const [orgAccessError, setOrgAccessError] = useState<string | null>(null);
   const [initialRatings, setInitialRatings] = useState<PlayerRating[]>([]);
   const [playersInGame, setPlayersInGame] = useState<PlayerInGameDetails[]>([]);
   const [formattedGameDate, setFormattedGameDate] = useState<string | null>(null);
@@ -50,6 +52,12 @@ function RateGameEnhancedContent() {
       let fetchedGame: Game | undefined;
       if (gameId) {
         fetchedGame = await getGameByIdFromDB(gameId);
+        // Org guard — prevent cross-org access
+        if (fetchedGame && !checkOrgAccess(fetchedGame.organizationId, activeOrganizationId)) {
+          setOrgAccessError(ORG_MISMATCH_ERROR);
+          setIsLoadingPageData(false);
+          return;
+        }
         setGame(fetchedGame);
         if (fetchedGame) {
           try {
@@ -153,6 +161,18 @@ function RateGameEnhancedContent() {
       <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="ml-4 text-lg text-muted-foreground">Loading page data...</p>
+      </div>
+    );
+  }
+
+  if (orgAccessError) {
+    return (
+      <div className="max-w-2xl mx-auto mt-8 space-y-4">
+        <Alert variant="destructive">
+          <ShieldAlert className="h-5 w-5" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>{orgAccessError}</AlertDescription>
+        </Alert>
       </div>
     );
   }
