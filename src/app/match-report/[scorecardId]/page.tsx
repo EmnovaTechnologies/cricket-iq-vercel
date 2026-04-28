@@ -18,6 +18,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
+import { checkOrgAccess, ORG_MISMATCH_ERROR } from '@/lib/utils/org-guard';
 import { useToast } from '@/hooks/use-toast';
 import { getScorecardByIdAction } from '@/lib/actions/scorecard-actions';
 import { submitMatchReportAction, getUserReportForGameAction, selectorCertifyMatchReportAction, selectorUncertifyMatchReportAction } from '@/lib/actions/match-report-actions';
@@ -131,6 +132,15 @@ function MobileMatchReportPage() {
           return;
         }
         const sc = result.scorecard;
+        // Org guard — check scorecard belongs to same org as the selector's profile
+        // userProfile may not be loaded yet for phone-auth users — skip if not available
+        if (userProfile?.organizationId && sc.organizationId &&
+            !checkOrgAccess(sc.organizationId, userProfile.organizationId)) {
+          setIsAuthorized(false);
+          setAuthChecked(true);
+          setIsLoadingData(false);
+          return;
+        }
         setScorecard(sc);
 
         // 2. Authorization — same pattern as /rate/[gameId]
