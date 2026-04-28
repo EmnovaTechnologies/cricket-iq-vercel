@@ -40,7 +40,8 @@ function ScorecardsPageInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingGames, setIsLoadingGames] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [scorecardsWithReports, setScorecardsWithReports] = useState<Set<string>>(new Set());
+  const [scorecardReportStatus, setScorecardReportStatus] = useState<Map<string, 'none' | 'pending' | 'pending_certification' | 'certified'>>(new Map());
+  const [selectedReportStatus, setSelectedReportStatus] = useState<string>('all');
   const [mounted, setMounted] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedSeries, setSelectedSeries] = useState<string>('all');
@@ -103,10 +104,20 @@ function ScorecardsPageInner() {
       const reportChecks = await Promise.all(
         loadedScorecards.map(async sc => {
           const r = await getMatchReportsForScorecardAction(sc.id);
-          return { id: sc.id, hasReports: (r.reports?.length ?? 0) > 0 };
+          const reports = r.reports || [];
+          let status: 'none' | 'pending' | 'pending_certification' | 'certified' = 'none';
+          if (reports.length > 0) {
+            const allCertified = reports.every(r => r.isCertified);
+            const allSelectorLocked = reports.every(r => r.isSelectorCertified || r.isCertified);
+            if (allCertified) status = 'certified';
+            else if (allSelectorLocked) status = 'pending_certification';
+            else status = 'pending';
+          }
+          return { id: sc.id, status };
         })
       );
-      setScorecardsWithReports(new Set(reportChecks.filter(c => c.hasReports).map(c => c.id)));
+      const statusMap = new Map(reportChecks.map(c => [c.id, c.status]));
+      setScorecardReportStatus(statusMap);
     }
     setIsLoading(false);
   }, [activeOrganizationId, currentUser, userProfile]);
@@ -188,9 +199,11 @@ function ScorecardsPageInner() {
       const seriesMatch = selectedSeries === 'all' || (selectedSeries === 'none' && !sc.seriesId) || sc.seriesId === selectedSeries;
       const teamMatch = selectedTeam === 'all' || sc.team1 === selectedTeam || sc.team2 === selectedTeam;
       const dateMatch = !selectedDate || sc.date?.slice(0, 10) === selectedDate;
-      return yearMatch && seriesMatch && teamMatch && dateMatch;
+      const reportStatus = scorecardReportStatus.get(sc.id) || 'none';
+      const reportStatusMatch = selectedReportStatus === 'all' || reportStatus === selectedReportStatus;
+      return yearMatch && seriesMatch && teamMatch && dateMatch && reportStatusMatch;
     });
-  }, [scorecards, selectedYear, selectedSeries, selectedTeam, selectedDate]);
+  }, [scorecards, selectedYear, selectedSeries, selectedTeam, selectedDate, selectedReportStatus, scorecardReportStatus]);
 
   const missingGames = useMemo(() => {
     if (!seriesGames.length) return [];
@@ -305,6 +318,19 @@ function ScorecardsPageInner() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="flex-1 min-w-[140px]">
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Report Status</label>
+                    <Select value={selectedReportStatus} onValueChange={setSelectedReportStatus}>
+                      <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="none">No Reports</SelectItem>
+                        <SelectItem value="pending">Pending Reports</SelectItem>
+                        <SelectItem value="pending_certification">Pending Certification</SelectItem>
+                        <SelectItem value="certified">Certified</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="flex flex-col items-end justify-end gap-1">
                     <span className="text-xs text-muted-foreground">{filteredScorecards.length} {filteredScorecards.length === 1 ? 'scorecard' : 'scorecards'}</span>
                     <div className="flex rounded-md border border-input overflow-hidden">
@@ -367,7 +393,8 @@ function ScorecardsPageInner() {
                         isSelector={!!isSelector}
                         currentUser={currentUser}
                         canImport={!!canImport}
-                        hasReports={scorecardsWithReports.has(sc.id)}
+                        hasReports={(scorecardReportStatus.get(sc.id) || 'none') !== 'none'}
+                        reportStatus={scorecardReportStatus.get(sc.id) || 'none'}
                         deletingId={deletingId}
                         onDelete={handleDelete}
                       />
@@ -383,7 +410,8 @@ function ScorecardsPageInner() {
                         isSelector={!!isSelector}
                         currentUser={currentUser}
                         canImport={!!canImport}
-                        hasReports={scorecardsWithReports.has(sc.id)}
+                        hasReports={(scorecardReportStatus.get(sc.id) || 'none') !== 'none'}
+                        reportStatus={scorecardReportStatus.get(sc.id) || 'none'}
                         deletingId={deletingId}
                         onDelete={handleDelete}
                         isLast={idx === filteredScorecards.length - 1}
