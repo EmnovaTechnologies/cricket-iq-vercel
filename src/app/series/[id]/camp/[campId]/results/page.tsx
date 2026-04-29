@@ -271,7 +271,7 @@ export default function CampResultsPage() {
         <p className="text-sm text-muted-foreground mt-1">{players.length} players · {assessments.length} assessments · Target: {camp.selectionTarget}</p>
       </div>
 
-      {/* Selection summary */
+      {/* Selection summary */}
       <div className="flex gap-3 flex-wrap">
         <Badge className="bg-green-100 text-green-700 border-green-200 text-sm px-3 py-1">
           <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> {selCounts.selected} Selected
