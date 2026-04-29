@@ -20,6 +20,7 @@ import {
   getCampPlayersAction, getCampAssessmentsAction, getCampFitnessResultsAction
 } from '@/lib/actions/camp-actions';
 import { CampSelectorPanel } from '@/components/camp/camp-selector-panel';
+import { CampTabContent } from '@/components/camp/camp-tab-content';
 import { getUsersForOrgAdminViewFromDB } from '@/lib/db';
 import type { Series, Team, Venue, Game, UserProfile, FitnessTestType, FitnessTestHeader, SelectionCamp, CampPlayer, CampAssessment, CampFitnessResult, CampSelectorAssignment } from '@/types';
 import { Layers, Tag, CalendarFold, ArrowLeft, Users, PlusCircle, MapPin, Gamepad2, Map as MapIconLucide, UserCog, Edit3, Save, Archive, ArchiveRestore, Info, Search, CalendarDays, Activity, Dumbbell, ShieldCheck, ListChecks, FileText, Target, Trash2, Loader2, BarChart3, ShieldAlert, Trophy, Star, Lock, Brain, CheckCircle } from 'lucide-react';import Link from 'next/link';
@@ -1249,37 +1250,13 @@ export default function SeriesDetailsPage() {
                   </Card>
                 ))}
               </div>
-              {(() => {
-                const sel = campPlayers.filter((p: CampPlayer) => p.selectionStatus === 'selected').length;
-                const res = campPlayers.filter((p: CampPlayer) => p.selectionStatus === 'reserve').length;
-                return (sel > 0 || res > 0) ? (
-                  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />
-                    <p className="text-sm text-green-700 flex-1">{sel} selected · {res} reserve · Target: {camp.selectionTarget}</p>
-                    <Button asChild size="sm" className="bg-green-700 hover:bg-green-800">
-                      <Link href={`/series/${seriesId}/camp/${camp.id}/results`}>View Results</Link>
-                    </Button>
-                  </div>
-                ) : null;
-              })()}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[
-                  { title: 'Players & Bibs', sub: `${campPlayers.length} / ${camp.quota} invited`, icon: <Users className="h-5 w-5 text-primary" />, bg: 'bg-primary/10', href: `/series/${seriesId}/camp/${camp.id}/players`, link: 'Manage players' },
-                  { title: 'Coach Assessment', sub: `${new Set(campAssessments.map((a: CampAssessment) => a.bibNumber)).size} bibs assessed · ${campAssessments.filter((a: CampAssessment) => a.isLocked).length} locked`, icon: <Star className="h-5 w-5 text-amber-500" />, bg: 'bg-amber-50', href: `/series/${seriesId}/camp/${camp.id}/assess`, link: 'Start assessing' },
-                  ...(camp.fitnessTestType ? [{ title: 'Fitness Tests', sub: `${campFitnessResults.length} / ${campPlayers.length} recorded`, icon: <Activity className="h-5 w-5 text-blue-500" />, bg: 'bg-blue-50', href: `/series/${seriesId}/camp/${camp.id}/fitness`, link: 'Record scores' }] : []),
-                  { title: 'Results & AI Selection', sub: `Target: ${camp.selectionTarget} players`, icon: <Brain className="h-5 w-5 text-purple-500" />, bg: 'bg-purple-50', href: `/series/${seriesId}/camp/${camp.id}/results`, link: 'View results' },
-                ].map(card => (
-                  <Card key={card.title} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push(card.href)}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`p-2 rounded-lg ${card.bg}`}>{card.icon}</div>
-                        <div><CardTitle className="text-sm">{card.title}</CardTitle><CardDescription className="text-xs">{card.sub}</CardDescription></div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-0"><Button variant="link" className="p-0 h-auto text-xs">{card.link} →</Button></CardContent>
-                  </Card>
-                ))}
-              </div>
+              <CampTabContent
+                camp={camp}
+                seriesId={seriesId}
+                initialPlayers={campPlayers}
+                initialAssessments={campAssessments}
+                initialFitness={campFitnessResults}
+              />
             </div>
           ) : (
             <div className="space-y-4">
