@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import type { Series } from '@/types';
 import { ArrowLeft, Trophy, Loader2 } from 'lucide-react';
 import { FITNESS_TEST_TYPES } from '@/lib/constants';
 
-export default function NewCampPage() {
+function NewCampForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -222,5 +222,13 @@ export default function NewCampPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function NewCampPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+      <NewCampForm />
+    </Suspense>
   );
 }
