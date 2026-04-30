@@ -241,7 +241,7 @@ export default function CampPlayersPage() {
               {sortedCampPlayers.map(cp => (
                 <div key={cp.id} className="flex items-center gap-3 px-4 py-3">
                   {/* Bib number — editable */}
-                  {editingBibId === cp.id ? (
+                  {canManage && editingBibId === cp.id ? (
                     <div className="flex items-center gap-1">
                       <Input type="number" className="w-16 h-7 text-sm" value={editBibValue}
                         onChange={e => setEditBibValue(e.target.value)}
@@ -250,11 +250,11 @@ export default function CampPlayersPage() {
                       <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingBibId(null)}>✕</Button>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => { setEditingBibId(cp.id); setEditBibValue(cp.bibNumber.toString()); }}
-                      className="text-xl font-bold text-primary w-12 text-center hover:underline cursor-pointer shrink-0">
+                    <span
+                      onClick={() => canManage && (setEditingBibId(cp.id), setEditBibValue(cp.bibNumber.toString()))}
+                      className={`text-xl font-bold text-primary w-12 text-center shrink-0 ${canManage ? 'hover:underline cursor-pointer' : ''}`}>
                       #{cp.bibNumber}
-                    </button>
+                    </span>
                   )}
 
                   {/* Player info */}
@@ -270,14 +270,16 @@ export default function CampPlayersPage() {
                   {/* Status */}
                   <Badge variant="outline" className="text-xs capitalize shrink-0">{cp.status}</Badge>
 
-                  {/* Remove */}
-                  <button onClick={() => handleRemove(cp.id, cp.playerName)}
-                    disabled={removingId === cp.id}
-                    className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
-                    {removingId === cp.id
-                      ? <Loader2 className="h-4 w-4 animate-spin" />
-                      : <X className="h-4 w-4" />}
-                  </button>
+                  {/* Remove — admins only */}
+                  {canManage && (
+                    <button onClick={() => handleRemove(cp.id, cp.playerName)}
+                      disabled={removingId === cp.id}
+                      className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
+                      {removingId === cp.id
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <X className="h-4 w-4" />}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
