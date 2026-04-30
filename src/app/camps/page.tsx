@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getCampsForOrgAction } from '@/lib/actions/camp-actions';
+import { getCampsForOrgAction, getCampPlayersAction } from '@/lib/actions/camp-actions';
 import { getSeriesByIdFromDB } from '@/lib/db';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
@@ -38,6 +38,7 @@ export default function CampsListPage() {
   const [filterYear, setFilterYear] = useState('all');
   const [filterSeries, setFilterSeries] = useState('all');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const [playerCounts, setPlayerCounts] = useState<Map<string, { invited: number; selected: number }>>(new Map());
 
   const canManage = effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
@@ -58,6 +59,20 @@ export default function CampsListPage() {
           } catch {}
         }));
         setSeriesNames(nameMap);
+        // Load player counts for each camp
+        const countMap = new Map<string, { invited: number; selected: number }>();
+        await Promise.all((res.camps || []).map(async c => {
+          try {
+            const pr = await getCampPlayersAction(c.id);
+            if (pr.success && pr.players) {
+              countMap.set(c.id, {
+                invited: pr.players.filter(p => p.status !== 'withdrawn').length,
+                selected: pr.players.filter(p => p.selectionStatus === 'selected').length,
+              });
+            }
+          } catch {}
+        }));
+        setPlayerCounts(countMap);
       } else {
         setError(res.error || 'Could not load camps.');
       }
@@ -209,10 +224,10 @@ export default function CampsListPage() {
                   </div>
                   <div className="flex gap-4">
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Users className="h-3 w-3" /> {camp.quota} invited
+                      <Users className="h-3 w-3" /> {playerCounts.get(camp.id)?.invited ?? 0}/{camp.quota} invited
                     </span>
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Target className="h-3 w-3" /> {camp.selectionTarget} to select
+                      <Target className="h-3 w-3" /> {playerCounts.get(camp.id)?.selected ?? 0}/{camp.selectionTarget} selected
                     </span>
                   </div>
                   <Button size="sm" className="w-full mt-auto"
@@ -254,7 +269,8 @@ export default function CampsListPage() {
                       </span>
                     )}
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Users className="h-3 w-3" /> {camp.quota} invited · <Target className="h-3 w-3 ml-1" /> {camp.selectionTarget} to select
+                      <Users className="h-3 w-3" /> {playerCounts.get(camp.id)?.invited ?? 0}/{camp.quota} invited
+                      <Target className="h-3 w-3 ml-2" /> {playerCounts.get(camp.id)?.selected ?? 0}/{camp.selectionTarget} selected
                     </span>
                   </div>
                 </div>
