@@ -391,10 +391,11 @@ export function CampTabContent({
                         <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingBibId(null)}>✕</Button>
                       </div>
                     ) : (
-                      <button onClick={() => { setEditingBibId(cp.id); setEditBibValue(cp.bibNumber.toString()); }}
-                        className="text-xl font-bold text-primary w-12 text-center hover:underline shrink-0">
+                      <span
+                        onClick={() => canManage && (setEditingBibId(cp.id), setEditBibValue(cp.bibNumber.toString()))}
+                        className={`text-xl font-bold text-primary w-12 text-center shrink-0 ${canManage ? 'hover:underline cursor-pointer' : ''}`}>
                         #{cp.bibNumber}
-                      </button>
+                      </span>
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{cp.playerName}</p>
@@ -404,11 +405,13 @@ export function CampTabContent({
                       </div>
                     </div>
                     <Badge variant="outline" className="text-xs capitalize shrink-0">{cp.status}</Badge>
-                    <button onClick={() => handleRemovePlayer(cp.id, cp.playerName)}
-                      disabled={removingId === cp.id}
-                      className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
-                      {removingId === cp.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
-                    </button>
+                    {canManage && (
+                      <button onClick={() => handleRemovePlayer(cp.id, cp.playerName)}
+                        disabled={removingId === cp.id}
+                        className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
+                        {removingId === cp.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
