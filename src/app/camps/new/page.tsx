@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createCampAction, getCampsForOrgAction } from '@/lib/actions/camp-actions';
-import { getSeriesForOrgFromDB } from '@/lib/db';
+import { getAllSeriesFromDB } from '@/lib/db';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import type { Series } from '@/types';
@@ -43,7 +43,7 @@ export default function NewCampPage() {
   useEffect(() => {
     if (!activeOrganizationId) return;
     Promise.all([
-      getSeriesForOrgFromDB(activeOrganizationId),
+      getAllSeriesFromDB(activeOrganizationId),
       getCampsForOrgAction(activeOrganizationId),
     ]).then(([series, campsRes]) => {
       setSeriesList((series || []).filter((s: Series) => s.status !== 'archived'));
