@@ -346,6 +346,7 @@ export function CampTabContent({
 
       {/* ── PLAYERS TAB ── */}
       <TabsContent value="players" className="space-y-4 mt-4">
+        {canManage && (
         <Card>
           <CardContent className="pt-4 space-y-3">
             <div className="relative">
@@ -377,7 +378,8 @@ export function CampTabContent({
               <p className="text-xs text-destructive">Bib #{bibInput} already assigned</p>
             )}
           </CardContent>
-        </Card>}
+        </Card>
+        )}
 
         <Card>
           <CardContent className="p-0">
