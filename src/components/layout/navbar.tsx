@@ -98,6 +98,7 @@ const Navbar = () => {
     { href: '/team-composition', label: 'Team AI', icon: <Target className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAM_COMPOSITION, selectionModels: ['rating', 'hybrid'] },
     { href: '/export', label: 'Export', icon: <Download className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_EXPORT },
     { href: '/scorecards', label: 'Scorecards', icon: <Table className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SCORECARDS, selectionModels: ['performance', 'hybrid'] },
+    { href: '/camps', label: 'Camps', icon: <Trophy className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SERIES_DETAILS },
     { href: '/scorecard-selection', label: 'XI Selector', icon: <ClipboardCheck className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_XI_SELECTOR, selectionModels: ['performance', 'hybrid'] },
   ];
 
@@ -137,7 +138,7 @@ const Navbar = () => {
 
   // Camps link — shown to selectors and series admins always
   const selectorCampLink = (userProfile?.roles?.includes('selector') || userProfile?.roles?.includes('Series Admin'))
-    ? { href: '/selector/camps', label: 'Camps', icon: <Trophy className="h-5 w-5" /> }
+    ? { href: '/camps', label: 'Camps', icon: <Trophy className="h-5 w-5" /> }
     : null;
 
   let mobileLinks: Array<{ href: string; label: string; icon: JSX.Element; roles?: string[]; permission?: PermissionKey }> = [];

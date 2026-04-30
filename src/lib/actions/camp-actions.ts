@@ -360,6 +360,22 @@ export async function removeSelectorFromCampAction(
   }
 }
 
+export async function getCampsForOrgAction(
+  organizationId: string
+): Promise<{ success: boolean; camps?: SelectionCamp[]; error?: string }> {
+  try {
+    const snap = await adminDb.collection('selectionCamps')
+      .where('organizationId', '==', organizationId)
+      .get();
+    const camps = snap.docs
+      .map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate?.()?.toISOString() || d.data().createdAt } as SelectionCamp))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return { success: true, camps };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
 export async function getCampsForSelectorAction(
   selectorUid: string,
   organizationId: string

@@ -1188,9 +1188,9 @@ export default function SeriesDetailsPage() {
             <div className="flex justify-center items-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          ) : camp && !isEditingCamp ? (
-            <div className="space-y-4">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
+          ) : camp ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3 p-4 border rounded-lg bg-card">
                 <div>
                   <h3 className="text-base font-semibold text-primary flex items-center gap-2">
                     <Trophy className="h-4 w-4" /> {camp.name}
@@ -1199,128 +1199,39 @@ export default function SeriesDetailsPage() {
                     {camp.startDate && format(parseISO(camp.startDate), 'PP')}
                     {camp.endDate && camp.endDate !== camp.startDate && ` → ${format(parseISO(camp.endDate), 'PP')}`}
                     {camp.venue && ` · ${camp.venue}`}
-                    {camp.fitnessTestType && ` · ${camp.fitnessTestType} (pass ≥ ${camp.fitnessTestPassingScore})`}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {campPlayers.length}/{camp.quota} invited ·{' '}
+                    {campPlayers.filter((p: CampPlayer) => p.selectionStatus === 'selected').length}/{camp.selectionTarget} selected
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs border capitalize ${
                     camp.status === 'active' ? 'bg-green-100 text-green-700 border-green-200' :
                     camp.status === 'upcoming' ? 'bg-blue-100 text-blue-700 border-blue-200' :
                     'bg-muted text-muted-foreground border'
                   }`}>{camp.status}</span>
-                  {canManage && (
-                    <>
-                      <Button size="sm" variant="outline" onClick={() => setIsEditingCamp(true)}>
-                        <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
-                      </Button>
-                      {campPlayers.length === 0 && (
-                        <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive/10"
-                          onClick={handleDeleteCamp} disabled={isDeletingCamp}>
-                          {isDeletingCamp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                        </Button>
-                      )}
-                    </>
-                  )}
+                  <Button asChild size="sm">
+                    <Link href={`/camps/${camp.id}`}>Open Camp →</Link>
+                  </Button>
                 </div>
               </div>
-
-              {/* Coach / Selector Assignment */}
-              {currentUser && canManage && (
-                <CampSelectorPanel
-                  campId={camp.id}
-                  assignments={camp.assignedSelectors || []}
-                  availableSelectors={campAvailableSelectors}
-                  assignedBy={currentUser.uid}
-                  onAssignmentsChanged={updated => setCamp((prev: SelectionCamp | null) => prev ? { ...prev, assignedSelectors: updated } : prev)}
-                />
-              )}
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  { label: 'Players invited', value: campPlayers.length, max: camp.quota, icon: <Users className="h-4 w-4" /> },
-                  { label: 'Bibs assessed', value: new Set(campAssessments.map((a: CampAssessment) => a.bibNumber)).size, max: campPlayers.length, icon: <Star className="h-4 w-4" /> },
-                  { label: 'Locked', value: campAssessments.filter((a: CampAssessment) => a.isLocked).length, max: campAssessments.length, icon: <Lock className="h-4 w-4" /> },
-                  { label: 'Fitness done', value: campFitnessResults.length, max: campPlayers.length, icon: <Activity className="h-4 w-4" /> },
-                ].map(stat => (
-                  <Card key={stat.label}>
-                    <CardContent className="p-3">
-                      <div className="flex items-center gap-1.5 text-muted-foreground mb-1">{stat.icon}<span className="text-xs">{stat.label}</span></div>
-                      <p className="text-2xl font-bold text-primary">{stat.value}<span className="text-sm font-normal text-muted-foreground">/{stat.max}</span></p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              <CampTabContent
-                camp={camp}
-                seriesId={seriesId}
-                initialPlayers={campPlayers}
-                initialAssessments={campAssessments}
-                initialFitness={campFitnessResults}
-              />
+              <p className="text-xs text-muted-foreground text-center">
+                Full camp management is available in the{' '}
+                <Link href="/camps" className="text-primary hover:underline">Camps section</Link>.
+              </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-primary flex items-center gap-2">
-                  <Trophy className="h-4 w-4" /> {isEditingCamp ? 'Edit Camp' : 'Create Selection Camp'}
-                </h3>
-                {isEditingCamp && <Button size="sm" variant="outline" onClick={() => setIsEditingCamp(false)}>Cancel</Button>}
-              </div>
-              <Card>
-                <CardContent className="pt-4 space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Camp Name *</label>
-                    <Input placeholder="e.g. SoCal Hub U15 Selection Camp 2026" value={campForm.name} onChange={e => setC('name', e.target.value)} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5"><label className="text-sm font-medium">Start Date *</label><Input type="date" value={campForm.startDate} onChange={e => setC('startDate', e.target.value)} /></div>
-                    <div className="space-y-1.5"><label className="text-sm font-medium">End Date *</label><Input type="date" value={campForm.endDate} onChange={e => setC('endDate', e.target.value)} /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5"><label className="text-sm font-medium">Venue</label><Input placeholder="e.g. Canyonside Park" value={campForm.venue} onChange={e => setC('venue', e.target.value)} /></div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Status</label>
-                      <Select value={campForm.status} onValueChange={v => setC('status', v)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="upcoming">Upcoming</SelectItem>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5"><label className="text-sm font-medium">Player Quota</label><Input type="number" min={1} value={campForm.quota} onChange={e => setC('quota', e.target.value)} /></div>
-                    <div className="space-y-1.5"><label className="text-sm font-medium">Selection Target</label><Input type="number" min={1} value={campForm.selectionTarget} onChange={e => setC('selectionTarget', e.target.value)} /></div>
-                  </div>
-                  <div className="border-t pt-4 space-y-3">
-                    <p className="text-sm font-medium text-muted-foreground">Fitness Test (optional)</p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium">Test Type</label>
-                        <Select value={campForm.fitnessTestType || 'none'} onValueChange={v => setC('fitnessTestType', v === 'none' ? '' : v)}>
-                          <SelectTrigger><SelectValue placeholder="Select test type..." /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {FITNESS_TEST_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {campForm.fitnessTestType && (
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium">Passing Score</label>
-                          <Input type="number" step="0.1" placeholder="e.g. 16.1" value={campForm.fitnessTestPassingScore} onChange={e => setC('fitnessTestPassingScore', e.target.value)} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <Button className="w-full" onClick={isEditingCamp ? handleUpdateCamp : handleCreateCamp} disabled={isCreatingCamp}>
-                    {isCreatingCamp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trophy className="mr-2 h-4 w-4" />}
-                    {isEditingCamp ? 'Save Changes' : 'Create Camp'}
-                  </Button>
-                </CardContent>
-              </Card>
+            <div className="text-center py-10 space-y-3">
+              <Trophy className="h-10 w-10 mx-auto text-muted-foreground/30" />
+              <p className="text-muted-foreground">No selection camp created for this series yet.</p>
+              {canManage && (
+                <Button asChild>
+                  <Link href={`/camps/new?seriesId=${seriesId}`}>
+                    <Trophy className="mr-2 h-4 w-4" /> Create Camp
+                  </Link>
+                </Button>
+              )}
             </div>
           )}
         </TabsContent>
