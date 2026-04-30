@@ -215,6 +215,10 @@ export default function CampsListPage() {
                       <Target className="h-3 w-3" /> {camp.selectionTarget} to select
                     </span>
                   </div>
+                  <Button size="sm" className="w-full mt-auto"
+                    onClick={e => { e.stopPropagation(); router.push(`/camps/${camp.id}`); }}>
+                    Open Camp →
+                  </Button>
                 </CardContent>
               </Card>
             ))}
