@@ -21,7 +21,8 @@ import type { SelectionCamp, CampPlayer, CampAssessment } from '@/types';
 import { EFFECTIVE_SKILLS, BOWLING_STYLES, BATTING_ORDERS } from '@/lib/constants';
 import {
   Loader2, ArrowLeft, Star, Lock, Unlock,
-  ChevronLeft, ChevronRight, ShieldAlert, Trophy, Check, Search
+  ChevronLeft, ChevronRight, ShieldAlert, Trophy, Check, Search,
+  ClipboardList, Users
 } from 'lucide-react';
 
 const RATING_LABELS = ['', 'Poor', 'Below Average', 'Average', 'Good', 'Excellent'];
@@ -57,12 +58,7 @@ const emptyForm = (): AssessmentForm => ({
 export default function CampAssessPage() {
   const params = useParams<{ id: string; campId: string }>();
   const { id: seriesId, campId } = params;
-  const { currentUser, userProfile, effectivePermissions } = useAuth();
-  // Admins/Series Admins can see names in the list for management purposes
-  // Pure selectors/coaches are bib-blind throughout
-  const canSeeNames = userProfile?.roles?.includes('admin') ||
-    userProfile?.roles?.includes('Organization Admin') ||
-    userProfile?.roles?.includes('Series Admin');
+  const { currentUser, userProfile } = useAuth();
   const { toast } = useToast();
 
   const [camp, setCamp] = useState<SelectionCamp | null>(null);
@@ -78,6 +74,17 @@ export default function CampAssessPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [step, setStep] = useState<'bib' | 'assess'>('bib');
+  const [mode, setMode] = useState<'bib' | 'scratchpad'>('bib');
+  const [scratchpad, setScratchpad] = useState('');
+  const [scratchpadParsed, setScratchpadParsed] = useState<Map<number, string>>(new Map());
+  const [isApplyingScratchpad, setIsApplyingScratchpad] = useState(false);
+
+  useEffect(() => {
+    if (campId) {
+      const saved = localStorage.getItem(`scratchpad_${campId}`);
+      if (saved) setScratchpad(saved);
+    }
+  }, [campId]);
 
   useEffect(() => {
     if (!campId || !currentUser) return;
@@ -96,6 +103,87 @@ export default function CampAssessPage() {
       setIsLoading(false);
     });
   }, [campId, currentUser]);
+
+  // Parse scratchpad text into per-bib notes
+  const parseScratchpad = (text: string) => {
+    const map = new Map<number, string>();
+    // Split on #N patterns
+    const parts = text.split(/(#\d+)/g);
+    let currentBib: number | null = null;
+    let currentText = '';
+    parts.forEach(part => {
+      const bibMatch = part.match(/^#(\d+)$/);
+      if (bibMatch) {
+        if (currentBib !== null && currentText.trim()) {
+          const existing = map.get(currentBib) || '';
+          map.set(currentBib, existing ? `${existing} / ${currentText.trim()}` : currentText.trim());
+        }
+        currentBib = parseInt(bibMatch[1]);
+        currentText = '';
+      } else if (currentBib !== null) {
+        currentText += part;
+      }
+    });
+    // Flush last bib
+    if (currentBib !== null && currentText.trim()) {
+      const existing = map.get(currentBib) || '';
+      map.set(currentBib, existing ? `${existing} / ${currentText.trim()}` : currentText.trim());
+    }
+    return map;
+  };
+
+  const handleScratchpadChange = (text: string) => {
+    setScratchpad(text);
+    localStorage.setItem(`scratchpad_${campId}`, text);
+    setScratchpadParsed(parseScratchpad(text));
+  };
+
+  const handleApplyScratchpad = async () => {
+    if (!campId || !currentUser || !camp || !userProfile) return;
+    if (scratchpadParsed.size === 0) {
+      toast({ title: 'No bib mentions found', description: 'Use #N to mention a bib number e.g. #7 great batting', variant: 'destructive' });
+      return;
+    }
+    setIsApplyingScratchpad(true);
+    let applied = 0;
+    for (const [bib, notes] of Array.from(scratchpadParsed.entries())) {
+      const player = campPlayers.find(p => p.bibNumber === bib);
+      if (!player) continue;
+      const existing = myAssessments.get(bib);
+      if (existing) {
+        // Append to existing notes
+        const updatedNotes = existing.notes ? `${existing.notes}
+${notes}` : notes;
+        await updateCampAssessmentAction(existing.id, currentUser.uid, { notes: updatedNotes });
+      } else {
+        // Create draft assessment with notes only, ratings = 0
+        await submitCampAssessmentAction({
+          campId,
+          organizationId: camp.organizationId,
+          bibNumber: bib,
+          assessedByUid: currentUser.uid,
+          assessedByName: userProfile.displayName || userProfile.email || 'Coach',
+          batting: 0, bowling: 0, fielding: 0, fitness: 0, attitude: 0, overall: 0,
+          notes,
+          isLocked: false,
+        });
+      }
+      applied++;
+    }
+    // Refresh assessments
+    const refreshed = await getMyCampAssessmentsAction(campId, currentUser.uid);
+    if (refreshed.success) {
+      const map = new Map<number, CampAssessment>();
+      refreshed.assessments?.forEach(a => map.set(a.bibNumber, a));
+      setMyAssessments(map);
+    }
+    setScratchpad('');
+    setScratchpadParsed(new Map());
+    localStorage.removeItem(`scratchpad_${campId}`);
+    toast({ title: `Notes applied to ${applied} player${applied > 1 ? 's' : ''} ✓`, description: 'Switch to By Bib mode to add ratings.' });
+    setIsApplyingScratchpad(false);
+    setMode('bib');
+  };
 
   const handleBibSubmit = () => {
     const bib = parseInt(bibInput);
@@ -226,8 +314,8 @@ export default function CampAssessPage() {
     setForm(prev => ({ ...prev, [key]: value }));
 
   if (isLoading) return (
-    <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+    <div className="flex justify-center items-center min-h-[60vh]">
+      <Loader2 className="h-10 w-10 animate-spin text-primary" />
     </div>
   );
 
@@ -245,7 +333,7 @@ export default function CampAssessPage() {
   const totalPlayers = campPlayers.length;
 
   return (
-    <div className="max-w-lg mx-auto space-y-6 pb-10">
+    <div className="max-w-lg mx-auto space-y-4 pb-10">
       {/* Header */}
       <div className="flex items-center gap-3">
         {step === 'assess' ? (
@@ -260,7 +348,7 @@ export default function CampAssessPage() {
           </Button>
         )}
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-headline font-bold text-primary truncate">{camp.name}</h1>
+          <h1 className="text-lg font-semibold truncate">{camp.name}</h1>
           <p className="text-xs text-muted-foreground">
             {assessedCount}/{totalPlayers} assessed
           </p>
@@ -288,8 +376,72 @@ export default function CampAssessPage() {
         </Card>
       )}
 
-      {/* BIB ENTRY STEP — searchable list + manual bib entry */}
+      {/* Mode toggle */}
       {step === 'bib' && (
+        <div className="flex rounded-lg border overflow-hidden">
+          <button onClick={() => setMode('bib')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${mode === 'bib' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}>
+            <Users className="h-4 w-4" /> By Bib
+          </button>
+          <button onClick={() => setMode('scratchpad')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors border-l ${mode === 'scratchpad' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}>
+            <ClipboardList className="h-4 w-4" /> Scratchpad
+          </button>
+        </div>
+      )}
+
+      {/* SCRATCHPAD MODE */}
+      {step === 'bib' && mode === 'scratchpad' && (
+        <div className="space-y-3">
+          <Card>
+            <CardContent className="p-3 space-y-2">
+              <p className="text-xs text-muted-foreground">Use <span className="font-mono font-bold text-primary">#N</span> to tag a bib number. e.g. <span className="italic">#7 great footwork, #12 needs to call louder</span></p>
+              <Textarea
+                placeholder="#2 excellent running between wickets&#10;#7 nervous but settled well after first over&#10;#12 good footwork, needs to work on calling"
+                value={scratchpad}
+                onChange={e => handleScratchpadChange(e.target.value)}
+                rows={8}
+                className="font-mono text-sm resize-none"
+                autoFocus
+              />
+            </CardContent>
+          </Card>
+
+          {/* Preview */}
+          {scratchpadParsed.size > 0 && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-3 space-y-2">
+                <p className="text-xs font-medium text-primary">Detected {scratchpadParsed.size} bib{scratchpadParsed.size > 1 ? 's' : ''}:</p>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {Array.from(scratchpadParsed.entries()).sort((a, b) => a[0] - b[0]).map(([bib, note]) => {
+                    const player = campPlayers.find(p => p.bibNumber === bib);
+                    const hasExisting = myAssessments.has(bib);
+                    return (
+                      <div key={bib} className="text-xs">
+                        <span className="font-bold text-primary">#{bib}</span>
+                        {player ? <span className="text-muted-foreground ml-1">({player.playerPrimarySkill})</span> : <span className="text-destructive ml-1">(not in camp)</span>}
+                        {hasExisting && <span className="text-amber-600 ml-1">· will append</span>}
+                        <span className="text-foreground ml-1">— {note}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <Button className="w-full" onClick={handleApplyScratchpad} disabled={isApplyingScratchpad}>
+                  {isApplyingScratchpad ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                  Apply to Assessments
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {scratchpad.length > 0 && scratchpadParsed.size === 0 && (
+            <p className="text-xs text-muted-foreground text-center">No bib mentions yet. Type <span className="font-mono font-bold">#</span> followed by a number.</p>
+          )}
+        </div>
+      )}
+
+      {/* BIB ENTRY STEP — searchable list + manual bib entry */}
+      {step === 'bib' && mode === 'bib' && (
         <div className="space-y-3">
           {/* Search / manual bib input */}
           <Card>
@@ -298,7 +450,7 @@ export default function CampAssessPage() {
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   className="pl-9"
-                  placeholder={canSeeNames ? "Search by name or type bib #..." : "Type bib # to find player..."}
+                  placeholder="Search by name or type bib #..."
                   value={bibInput}
                   onChange={e => setBibInput(e.target.value)}
                   onKeyDown={e => {
@@ -326,9 +478,7 @@ export default function CampAssessPage() {
                       if (!bibInput) return true;
                       const asNum = parseInt(bibInput);
                       if (!isNaN(asNum)) return p.bibNumber === asNum;
-                      // Only search by name if user can see names, otherwise bib-only
-                      if (canSeeNames) return p.playerName.toLowerCase().includes(bibInput.toLowerCase());
-                      return false;
+                      return p.playerName.toLowerCase().includes(bibInput.toLowerCase());
                     })
                     .sort((a, b) => a.bibNumber - b.bibNumber)
                     .map(p => {
@@ -367,9 +517,7 @@ export default function CampAssessPage() {
 
                           {/* Player info — skill only, no name in assessment mode */}
                           <div className="flex-1 min-w-0">
-                            {canSeeNames && (
                             <p className="text-sm font-medium truncate">{p.playerName}</p>
-                          )}
                             <p className="text-xs text-muted-foreground">{p.playerPrimarySkill}
                               {p.playerBowlingStyle ? ` · ${p.playerBowlingStyle}` : ''}
                               {p.playerBattingOrder ? ` · ${p.playerBattingOrder}` : ''}
@@ -399,6 +547,8 @@ export default function CampAssessPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
       )}
 
       {/* ASSESSMENT STEP */}
