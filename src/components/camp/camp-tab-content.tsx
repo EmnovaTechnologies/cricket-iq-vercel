@@ -416,17 +416,18 @@ export function CampTabContent({
           </CardContent>
         </Card>
 
-        <Button asChild variant="outline" size="sm" className="w-full">
-          <Link href={`/series/${seriesId}/camp/${camp.id}/assess`}>
-            <Star className="mr-2 h-3.5 w-3.5" /> Open Coach Assessment (mobile) <ArrowRight className="ml-2 h-3.5 w-3.5" />
-          </Link>
-        </Button>
+
       </TabsContent>
 
       {/* ── ASSESSMENT TAB ── */}
       <TabsContent value="assessment" className="space-y-4 mt-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-sm text-muted-foreground">{assessments.length} assessments from {new Set(assessments.map(a => a.assessedByUid)).size} coaches</p>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/series/${seriesId}/camp/${camp.id}/assess`}>
+              <Star className="mr-2 h-3.5 w-3.5" /> Mobile Assessment View
+            </Link>
+          </Button>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Sort:</span>
             {(['avgOverall', 'bibNumber'] as const).map(key => (
