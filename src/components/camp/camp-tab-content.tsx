@@ -377,7 +377,7 @@ export function CampTabContent({
               <p className="text-xs text-destructive">Bib #{bibInput} already assigned</p>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         <Card>
           <CardContent className="p-0">
@@ -409,10 +409,10 @@ export function CampTabContent({
                       {canSeeNames && <p className="text-sm font-medium truncate">{cp.playerName}</p>}
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs">{cp.playerPrimarySkill}</Badge>
-                        {cp.playerBowlingStyle && <span className="text-xs text-muted-foreground">{cp.playerBowlingStyle}</span>}
+                        {canSeeNames && cp.playerBowlingStyle && <span className="text-xs text-muted-foreground">{cp.playerBowlingStyle}</span>}
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-xs capitalize shrink-0">{cp.status}</Badge>
+                    {canSeeNames && <Badge variant="outline" className="text-xs capitalize shrink-0">{cp.status}</Badge>}
                     {canManage && (
                       <button onClick={() => handleRemovePlayer(cp.id, cp.playerName)}
                         disabled={removingId === cp.id}
