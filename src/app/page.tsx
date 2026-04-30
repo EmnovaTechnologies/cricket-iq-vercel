@@ -11,12 +11,13 @@ import {
   Hourglass, FileText, ClipboardCheck, AlertCircle, CheckCircle,
   PlusCircle, Upload, Building, UserCog, BarChart3, ArrowRight,
   CalendarDays, Table, RefreshCw,
-} from 'lucide-react';
+, Trophy } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAllOrganizationsFromDB, getAllUsersFromDB, getUsersForOrgAdminViewFromDB as getUsersForOrgFromDB, getAllPlayersFromDB, getPlayersWithDetailsFromDB, getAllTeamsFromDB, getAllSeriesFromDB, getAllGamesFromDB, getGamesCountForSeriesIdsFromDB, getPlayersCountForSeriesIdsFromDB, getSeriesCountForAdminUidFromDB, getSeriesCountForTeamIdsFromDB, getGamesCountForTeamIdsFromDB, getPlayersCountForTeamIdsFromDB } from '@/lib/db';
 import { getScorecardsForOrgAction, getScorecardsForSelectorAction } from '@/lib/actions/scorecard-actions';
+import { getCampsForOrgAction, getCampPlayersAction, getCampAssessmentsAction } from '@/lib/actions/camp-actions';
 import { getGamesForUserViewAction } from '@/lib/actions/game-actions';
 import { format } from 'date-fns';
 
@@ -119,6 +120,9 @@ interface Counts {
   series: number | null;
   games: number | null;
   scorecards: number | null;
+  camps: number | null;
+  campsNeedingPlayers: number | null;
+  campsAwaitingMyAssessment: number | null;
 }
 
 function useRoleDashboard(counts: Counts) {
@@ -147,6 +151,7 @@ function useRoleDashboard(counts: Counts) {
         { label: 'Teams', value: counts.teams === null ? '…' : counts.teams.toString(), icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
         { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
         { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
+        { label: 'Active Camps', value: counts.camps === null ? '…' : counts.camps.toString(), icon: <Trophy className="h-3.5 w-3.5" />, href: '/camps' },
       ] as StatCard[],
       pendingActions: [
         { label: 'Review users without assigned roles', href: '/admin/users?role=unassigned', variant: 'warning' as const },
@@ -181,6 +186,7 @@ function useRoleDashboard(counts: Counts) {
         { label: 'Teams', value: counts.teams === null ? '…' : counts.teams.toString(), icon: <Shield className="h-3.5 w-3.5" />, href: '/teams' },
         { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
         { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
+        { label: 'Active Camps', value: counts.camps === null ? '…' : counts.camps.toString(), icon: <Trophy className="h-3.5 w-3.5" />, href: '/camps' },
         { label: 'Users', value: counts.users === null ? '…' : counts.users.toString(), icon: <UserCog className="h-3.5 w-3.5" />, href: '/admin/users' },
       ] as StatCard[],
       pendingActions: [
@@ -212,12 +218,14 @@ function useRoleDashboard(counts: Counts) {
         { label: 'Assigned series', value: counts.series === null ? '…' : counts.series.toString(), icon: <Layers className="h-3.5 w-3.5" />, href: '/series?year=all' },
         { label: 'Games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
         { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
+        { label: 'Active Camps', value: counts.camps === null ? '…' : counts.camps.toString(), icon: <Trophy className="h-3.5 w-3.5" />, href: '/camps' },
         { label: 'Players', value: counts.players === null ? '…' : counts.players.toString(), icon: <Users className="h-3.5 w-3.5" />, href: '/players' },
       ] as StatCard[],
       pendingActions: [
         { label: 'Games pending selector certification', href: '/games', variant: 'warning' as const },
         { label: 'Missing scorecards for your series', href: '/scorecards?tab=missing', variant: 'warning' as const },
         { label: 'Games ready to finalize', href: '/games', variant: 'info' as const },
+        ...(counts.campsAwaitingMyAssessment !== null && counts.campsAwaitingMyAssessment > 0 ? [{ label: `${counts.campsAwaitingMyAssessment} camp${counts.campsAwaitingMyAssessment > 1 ? 's' : ''} awaiting your assessment`, href: '/camps', variant: 'warning' as const }] : []),
       ],
       quickLinks: [
         { href: '/scorecards/import', label: 'Import scorecard', icon: <Upload className="h-4 w-4" /> },
@@ -268,6 +276,7 @@ function useRoleDashboard(counts: Counts) {
       stats: [
         { label: 'Assigned games', value: counts.games === null ? '…' : counts.games.toString(), icon: <Gamepad2 className="h-3.5 w-3.5" />, href: '/games?year=all' },
         { label: 'Scorecards', value: counts.scorecards === null ? '…' : counts.scorecards.toString(), icon: <Table className="h-3.5 w-3.5" />, href: '/scorecards' },
+        { label: 'Active Camps', value: counts.camps === null ? '…' : counts.camps.toString(), icon: <Trophy className="h-3.5 w-3.5" />, href: '/camps' },
         { label: 'Selection model', value: selectionModel || '—', icon: <BarChart3 className="h-3.5 w-3.5" /> },
       ] as StatCard[],
       pendingActions: [
@@ -336,6 +345,7 @@ export default function DashboardPage() {
   const [counts, setCounts] = useState<Counts>({
     orgs: null, users: null, players: null,
     teams: null, series: null, games: null, scorecards: null,
+    camps: null, campsNeedingPlayers: null, campsAwaitingMyAssessment: null,
   });
   const [countsLoading, setCountsLoading] = useState(false);
 
@@ -464,6 +474,56 @@ export default function DashboardPage() {
     } catch (e) {
       console.error('[Dashboard] counts fetch failed:', e);
     }
+    // Camp counts (all roles with camp access)
+    try {
+      if (activeOrganizationDetails?.id) {
+        const campsRes = await getCampsForOrgAction(activeOrganizationDetails.id);
+        if (campsRes.success && campsRes.camps) {
+          const activeCamps = campsRes.camps.filter(c => c.status === 'active');
+          let assignedActiveCamps = activeCamps;
+          // For selectors, filter to assigned camps only
+          if (!roles.includes('admin') && !roles.includes('Organization Admin') && !roles.includes('Series Admin')) {
+            assignedActiveCamps = activeCamps.filter(c =>
+              (c.assignedSelectors || []).some((s: any) => s.uid === currentUser?.uid)
+            );
+          }
+          setCounts(prev => ({ ...prev, camps: assignedActiveCamps.length }));
+
+          // Check camps needing players (admin/series admin only)
+          if (roles.includes('admin') || roles.includes('Organization Admin') || roles.includes('Series Admin')) {
+            let needingPlayers = 0;
+            await Promise.all(activeCamps.slice(0, 10).map(async c => {
+              try {
+                const pr = await getCampPlayersAction(c.id);
+                if (pr.success && (pr.players || []).filter(p => p.status !== 'withdrawn').length === 0) {
+                  needingPlayers++;
+                }
+              } catch {}
+            }));
+            setCounts(prev => ({ ...prev, campsNeedingPlayers: needingPlayers }));
+          }
+
+          // Check camps awaiting my assessment (selector/coach)
+          if (roles.includes('selector') && currentUser?.uid) {
+            let awaitingAssessment = 0;
+            await Promise.all(assignedActiveCamps.slice(0, 10).map(async c => {
+              try {
+                const [pr, ar] = await Promise.all([
+                  getCampPlayersAction(c.id),
+                  getCampAssessmentsAction(c.id),
+                ]);
+                const players = (pr.players || []).filter(p => p.status !== 'withdrawn');
+                const myAssessments = (ar.assessments || []).filter(a => a.assessedByUid === currentUser.uid);
+                if (players.length > 0 && myAssessments.length < players.length) {
+                  awaitingAssessment++;
+                }
+              } catch {}
+            }));
+            setCounts(prev => ({ ...prev, campsAwaitingMyAssessment: awaitingAssessment }));
+          }
+        }
+      }
+    } catch (e) { console.warn('[Dashboard] Camp counts error:', e); }
     setCountsLoading(false);
   }, [activeOrganizationDetails, userProfile, currentUser]);
 

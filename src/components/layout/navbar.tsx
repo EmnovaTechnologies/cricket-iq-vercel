@@ -95,10 +95,10 @@ const Navbar = () => {
     { href: '/teams', label: 'Teams', icon: <Users className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAMS_LIST },
     { href: '/players', label: 'Players', icon: <Users className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_PLAYERS_LIST },
     { href: '/venues', label: 'Venues', icon: <MapPinned className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_VENUES_LIST },
-    { href: '/team-composition', label: 'Team AI', icon: <Target className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAM_COMPOSITION, selectionModels: ['rating', 'hybrid'] },
-    { href: '/export', label: 'Export', icon: <Download className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_EXPORT },
-    { href: '/scorecards', label: 'Scorecards', icon: <Table className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SCORECARDS, selectionModels: ['performance', 'hybrid'] },
     { href: '/camps', label: 'Camps', icon: <Trophy className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SERIES_DETAILS },
+    { href: '/export', label: 'Export', icon: <Download className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_EXPORT },
+    { href: '/team-composition', label: 'AI Selector', icon: <Target className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAM_COMPOSITION, selectionModels: ['rating', 'hybrid'] },
+    { href: '/scorecards', label: 'Scorecards', icon: <Table className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SCORECARDS, selectionModels: ['performance', 'hybrid'] },
     { href: '/scorecard-selection', label: 'XI Selector', icon: <ClipboardCheck className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_XI_SELECTOR, selectionModels: ['performance', 'hybrid'] },
   ];
 
@@ -136,10 +136,6 @@ const Navbar = () => {
   
   const isEffectivelyUnassigned = userProfile && userProfile.roles.length === 1 && userProfile.roles[0] === 'unassigned';
 
-  // Camps link — shown to selectors and series admins always
-  const selectorCampLink = (userProfile?.roles?.includes('selector') || userProfile?.roles?.includes('Series Admin'))
-    ? { href: '/camps', label: 'Camps', icon: <Trophy className="h-5 w-5" /> }
-    : null;
 
   let mobileLinks: Array<{ href: string; label: string; icon: JSX.Element; roles?: string[]; permission?: PermissionKey }> = [];
   if (currentUser && !isAuthLoading) {
@@ -150,7 +146,6 @@ const Navbar = () => {
     if (!isEffectivelyUnassigned) {
         mobileLinks = [
             ...visibleMainNavLinks,
-            ...(selectorCampLink ? [selectorCampLink] : []),
             ...loggedInUserLinks.filter(link => hasAnyRole(userProfile?.roles, link.roles || [])),
             ...superAdminLinks.filter(link => hasAnyRole(userProfile?.roles, link.roles || [])),
         ];
@@ -201,14 +196,6 @@ const Navbar = () => {
             }
             return null;
           })}
-          {currentUser && !isAuthLoading && !isEffectivelyUnassigned && selectorCampLink && (
-            <Button variant="ghost" asChild className="text-foreground hover:bg-primary/10 hover:text-primary text-sm px-3">
-              <Link href={selectorCampLink.href} className="flex items-center gap-2">
-                {selectorCampLink.icon}
-                {selectorCampLink.label}
-              </Link>
-            </Button>
-          )}
           {currentUser && !isAuthLoading && isEffectivelyUnassigned && mainNavLinks.filter(link => link.href === '/').map((link) => {
              const canViewLink = userProfile?.roles?.includes('admin') || (link.permission && effectivePermissions[link.permission]);
              if (canViewLink) {
