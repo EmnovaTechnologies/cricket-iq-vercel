@@ -16,7 +16,7 @@ import { AuthProviderClientComponent } from '@/components/auth-provider-client-c
 import type { SelectionCamp } from '@/types';
 import {
   Loader2, ShieldAlert, PlusCircle, Trophy,
-  Users, Target, CalendarDays, MapPin, Layers
+  Users, Target, CalendarDays, MapPin, Layers, LayoutGrid, List
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -37,6 +37,7 @@ export default function CampsListPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterYear, setFilterYear] = useState('all');
   const [filterSeries, setFilterSeries] = useState('all');
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
   const canManage = effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
@@ -99,41 +100,53 @@ export default function CampsListPage() {
           )}
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-3 flex-wrap">
-          <Select value={filterYear} onValueChange={setFilterYear}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="All Years" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Years</SelectItem>
-              {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={filterSeries} onValueChange={setFilterSeries}>
-            <SelectTrigger className="w-56">
-              <SelectValue placeholder="All Series" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Series</SelectItem>
-              {camps.map(c => c.seriesId).filter((id, i, arr) => arr.indexOf(id) === i).map(sid => (
-                <SelectItem key={sid} value={sid}>
-                  {seriesNames.get(sid) || sid}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="All Statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="upcoming">Upcoming</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* Filters — matches series page style */}
+        <div className="flex flex-col sm:flex-row gap-4 p-4 border rounded-lg bg-card shadow">
+          <div className="flex-1 min-w-[130px]">
+            <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Year</label>
+            <Select value={filterYear} onValueChange={setFilterYear}>
+              <SelectTrigger><SelectValue placeholder="All Years" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Years</SelectItem>
+                {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 min-w-[180px]">
+            <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Series</label>
+            <Select value={filterSeries} onValueChange={setFilterSeries}>
+              <SelectTrigger><SelectValue placeholder="All Series" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Series</SelectItem>
+                {camps.map(c => c.seriesId).filter((id, i, arr) => arr.indexOf(id) === i).map(sid => (
+                  <SelectItem key={sid} value={sid}>{seriesNames.get(sid) || sid}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Status</label>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="upcoming">Upcoming</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col items-end gap-1 justify-end">
+            <span className="text-xs text-muted-foreground">{filtered.length} {filtered.length === 1 ? 'camp' : 'camps'}</span>
+            <div className="flex rounded-md border border-input overflow-hidden">
+              <button onClick={() => setViewMode('cards')}
+                className={`flex items-center px-3 py-2 text-sm transition-colors ${viewMode === 'cards' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                title="Card view"><LayoutGrid className="h-4 w-4" /></button>
+              <button onClick={() => setViewMode('list')}
+                className={`flex items-center px-3 py-2 text-sm transition-colors border-l border-input ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                title="List view"><List className="h-4 w-4" /></button>
+            </div>
+          </div>
         </div>
 
         {/* Content */}
@@ -160,54 +173,92 @@ export default function CampsListPage() {
               </Button>
             )}
           </div>
-        ) : (
-          <div className="space-y-3">
+        ) : viewMode === 'cards' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map(camp => (
               <Card key={camp.id}
-                className="hover:shadow-md transition-shadow cursor-pointer"
+                className="hover:shadow-md transition-shadow cursor-pointer flex flex-col"
                 onClick={() => router.push(`/camps/${camp.id}`)}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="text-base font-semibold text-primary">{camp.name}</h3>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs border capitalize ${statusColors[camp.status]}`}>
-                          {camp.status}
-                        </span>
-                      </div>
-                      {seriesNames.get(camp.seriesId) && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
-                          <Layers className="h-3 w-3" /> {seriesNames.get(camp.seriesId)}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-4 flex-wrap">
-                        {camp.startDate && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <CalendarDays className="h-3 w-3" />
-                            {format(parseISO(camp.startDate), 'PP')}
-                            {camp.endDate !== camp.startDate && ` → ${format(parseISO(camp.endDate), 'PP')}`}
-                          </span>
-                        )}
-                        {camp.venue && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> {camp.venue}
-                          </span>
-                        )}
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Users className="h-3 w-3" /> {camp.quota} invited
-                        </span>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Target className="h-3 w-3" /> {camp.selectionTarget} to select
-                        </span>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm" className="shrink-0"
-                      onClick={e => { e.stopPropagation(); router.push(`/camps/${camp.id}`); }}>
-                      Open →
-                    </Button>
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-base font-semibold leading-tight">{camp.name}</CardTitle>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs border capitalize shrink-0 ${statusColors[camp.status]}`}>
+                      {camp.status}
+                    </span>
+                  </div>
+                  {seriesNames.get(camp.seriesId) && (
+                    <CardDescription className="flex items-center gap-1 text-xs">
+                      <Layers className="h-3 w-3" /> {seriesNames.get(camp.seriesId)}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent className="pt-0 flex-1 flex flex-col gap-2">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {camp.startDate && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CalendarDays className="h-3 w-3" />
+                        {format(parseISO(camp.startDate), 'PP')}
+                        {camp.endDate !== camp.startDate && ` → ${format(parseISO(camp.endDate), 'PP')}`}
+                      </span>
+                    )}
+                    {camp.venue && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-3 w-3" /> {camp.venue}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-4">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Users className="h-3 w-3" /> {camp.quota} invited
+                    </span>
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Target className="h-3 w-3" /> {camp.selectionTarget} to select
+                    </span>
                   </div>
                 </CardContent>
               </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="border rounded-lg overflow-hidden bg-card">
+            {filtered.map((camp, idx) => (
+              <div key={camp.id}
+                className={`flex items-center gap-4 px-4 py-3 hover:bg-muted/40 transition-colors cursor-pointer ${idx !== filtered.length - 1 ? 'border-b' : ''}`}
+                onClick={() => router.push(`/camps/${camp.id}`)}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-primary">{camp.name}</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs border capitalize ${statusColors[camp.status]}`}>
+                      {camp.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                    {seriesNames.get(camp.seriesId) && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Layers className="h-3 w-3" /> {seriesNames.get(camp.seriesId)}
+                      </span>
+                    )}
+                    {camp.startDate && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CalendarDays className="h-3 w-3" />
+                        {format(parseISO(camp.startDate), 'PP')}
+                      </span>
+                    )}
+                    {camp.venue && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-3 w-3" /> {camp.venue}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Users className="h-3 w-3" /> {camp.quota} invited · <Target className="h-3 w-3 ml-1" /> {camp.selectionTarget} to select
+                    </span>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" className="shrink-0"
+                  onClick={e => { e.stopPropagation(); router.push(`/camps/${camp.id}`); }}>
+                  Open →
+                </Button>
+              </div>
             ))}
           </div>
         )}
