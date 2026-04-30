@@ -80,6 +80,10 @@ export function CampTabContent({
   const canManage = !!(effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY]);
+  const canSeeNames = !!(userProfile?.roles?.includes('admin') ||
+    userProfile?.roles?.includes('Organization Admin') ||
+    userProfile?.roles?.includes('Series Admin') ||
+    userProfile?.roles?.includes('Team Manager'));
   const { toast } = useToast();
   const router = useRouter();
 
