@@ -549,8 +549,6 @@ ${notes}` : notes;
         </div>
       )}
 
-      )}
-
       {/* ASSESSMENT STEP */}
       {step === 'assess' && currentBib && currentPlayer && (
         <div className="space-y-4">
