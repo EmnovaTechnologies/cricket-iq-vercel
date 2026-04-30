@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
+import { PERMISSIONS } from '@/lib/permissions-master-list';
 import {
   getCampPlayersAction, invitePlayerToCampAction, removeCampPlayerAction,
   updateCampPlayerAction, getCampAssessmentsAction, getCampFitnessResultsAction,
@@ -75,7 +76,10 @@ export function CampTabContent({
   initialAssessments = [],
   initialFitness = [],
 }: CampTabContentProps) {
-  const { currentUser, userProfile, activeOrganizationId } = useAuth();
+  const { currentUser, userProfile, activeOrganizationId, effectivePermissions } = useAuth();
+  const canManage = !!(effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] ||
+    effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
+    effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY]);
   const { toast } = useToast();
   const router = useRouter();
 
