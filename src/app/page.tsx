@@ -11,7 +11,7 @@ import {
   Hourglass, FileText, ClipboardCheck, AlertCircle, CheckCircle,
   PlusCircle, Upload, Building, UserCog, BarChart3, ArrowRight,
   CalendarDays, Table, RefreshCw,
-, Trophy } from 'lucide-react';
+  Trophy } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 import React, { useState, useEffect, useCallback } from 'react';
