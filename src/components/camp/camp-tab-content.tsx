@@ -402,7 +402,7 @@ export function CampTabContent({
                       </span>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{cp.playerName}</p>
+                      {canSeeNames && <p className="text-sm font-medium truncate">{cp.playerName}</p>}
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs">{cp.playerPrimarySkill}</Badge>
                         {cp.playerBowlingStyle && <span className="text-xs text-muted-foreground">{cp.playerBowlingStyle}</span>}
