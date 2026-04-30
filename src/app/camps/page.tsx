@@ -36,6 +36,7 @@ export default function CampsListPage() {
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterYear, setFilterYear] = useState('all');
+  const [filterSeries, setFilterSeries] = useState('all');
 
   const canManage = effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
@@ -68,6 +69,7 @@ export default function CampsListPage() {
   const filtered = camps.filter(c => {
     if (filterStatus !== 'all' && c.status !== filterStatus) return false;
     if (filterYear !== 'all' && c.year?.toString() !== filterYear) return false;
+    if (filterSeries !== 'all' && c.seriesId !== filterSeries) return false;
     return true;
   });
 
@@ -106,6 +108,19 @@ export default function CampsListPage() {
             <SelectContent>
               <SelectItem value="all">All Years</SelectItem>
               {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterSeries} onValueChange={setFilterSeries}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="All Series" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Series</SelectItem>
+              {camps.map(c => c.seriesId).filter((id, i, arr) => arr.indexOf(id) === i).map(sid => (
+                <SelectItem key={sid} value={sid}>
+                  {seriesNames.get(sid) || sid}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
