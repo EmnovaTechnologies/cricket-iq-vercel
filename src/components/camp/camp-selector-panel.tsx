@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, UserPlus, X, Users, ChevronDown, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -89,15 +90,15 @@ export function CampSelectorPanel({
   };
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <Card className="shadow-sm">
       {/* Header toggle */}
       <button
         onClick={() => setIsExpanded(v => !v)}
-        className="w-full flex items-center justify-between px-3 py-2.5 bg-muted/30 hover:bg-muted/50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 border-b hover:bg-muted/20 transition-colors bg-card"
       >
         <div className="flex items-center gap-2">
           <Users className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs font-medium">Coaches / Selectors</span>
+          <span className="text-sm font-semibold text-muted-foreground">Coaches / Selectors</span>
           {assignments.length > 0 && (
             <Badge variant="secondary" className="text-xs h-4 px-1.5">
               {assignments.length}
@@ -110,7 +111,7 @@ export function CampSelectorPanel({
       </button>
 
       {isExpanded && (
-        <div className="px-3 py-3 space-y-3">
+        <CardContent className="pt-4 space-y-3">
           {/* Current assignments */}
           {assignments.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-1">
@@ -193,8 +194,8 @@ export function CampSelectorPanel({
               All available selectors are assigned.
             </p>
           )}
-        </div>
+        </CardContent>
       )}
-    </div>
+    </Card>
   );
 }
