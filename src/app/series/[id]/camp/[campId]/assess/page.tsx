@@ -78,6 +78,8 @@ export default function CampAssessPage() {
   const [scratchpad, setScratchpad] = useState('');
   const [scratchpadParsed, setScratchpadParsed] = useState<Map<number, string>>(new Map());
   const [isApplyingScratchpad, setIsApplyingScratchpad] = useState(false);
+  const [showBibSuggestions, setShowBibSuggestions] = useState(false);
+  const [bibSuggestionFilter, setBibSuggestionFilter] = useState('');
 
   useEffect(() => {
     if (campId) {
@@ -136,6 +138,34 @@ export default function CampAssessPage() {
     setScratchpad(text);
     localStorage.setItem(`scratchpad_${campId}`, text);
     setScratchpadParsed(parseScratchpad(text));
+    // Detect if user just typed # — show bib suggestions
+    const lastChar = text[text.length - 1];
+    const lastTwo = text.slice(-2);
+    if (lastChar === '#') {
+      setShowBibSuggestions(true);
+      setBibSuggestionFilter('');
+    } else if (showBibSuggestions) {
+      // Keep open while typing digits after #
+      const afterHash = text.split('#').pop() || '';
+      const digits = afterHash.match(/^\d*$/);
+      if (digits) {
+        setBibSuggestionFilter(afterHash);
+      } else {
+        setShowBibSuggestions(false);
+        setBibSuggestionFilter('');
+      }
+    }
+  };
+
+  const insertBibSuggestion = (bib: number) => {
+    // Replace the last # and any partial digits with the full #N
+    const lastHashIdx = scratchpad.lastIndexOf('#');
+    const newText = scratchpad.slice(0, lastHashIdx) + `#${bib} `;
+    setScratchpad(newText);
+    localStorage.setItem(`scratchpad_${campId}`, newText);
+    setScratchpadParsed(parseScratchpad(newText));
+    setShowBibSuggestions(false);
+    setBibSuggestionFilter('');
   };
 
   const handleApplyScratchpad = async () => {
@@ -396,14 +426,50 @@ ${notes}` : notes;
           <Card>
             <CardContent className="p-3 space-y-2">
               <p className="text-xs text-muted-foreground">Use <span className="font-mono font-bold text-primary">#N</span> to tag a bib number. e.g. <span className="italic">#7 great footwork, #12 needs to call louder</span></p>
-              <Textarea
-                placeholder="#2 excellent running between wickets&#10;#7 nervous but settled well after first over&#10;#12 good footwork, needs to work on calling"
-                value={scratchpad}
-                onChange={e => handleScratchpadChange(e.target.value)}
-                rows={8}
-                className="font-mono text-sm resize-none"
-                autoFocus
-              />
+              <div className="relative">
+                <Textarea
+                  placeholder="#2 excellent running between wickets&#10;#7 nervous but settled well after first over&#10;#12 good footwork, needs to work on calling"
+                  value={scratchpad}
+                  onChange={e => handleScratchpadChange(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') { setShowBibSuggestions(false); }
+                  }}
+                  rows={8}
+                  className="font-mono text-sm resize-none"
+                  autoFocus
+                />
+                {showBibSuggestions && campPlayers.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-popover border rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                    <div className="px-3 py-1.5 text-xs text-muted-foreground border-b bg-muted/50">
+                      Select a bib number
+                    </div>
+                    {campPlayers
+                      .filter(p => bibSuggestionFilter === '' || p.bibNumber.toString().startsWith(bibSuggestionFilter))
+                      .sort((a, b) => a.bibNumber - b.bibNumber)
+                      .map(p => {
+                        const hasAssessment = myAssessments.has(p.bibNumber);
+                        return (
+                          <button
+                            key={p.bibNumber}
+                            type="button"
+                            onMouseDown={e => { e.preventDefault(); insertBibSuggestion(p.bibNumber); }}
+                            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted transition-colors text-left">
+                            <span className="font-bold text-primary w-8">#{p.bibNumber}</span>
+                            <span className="text-xs text-muted-foreground">{p.playerPrimarySkill}</span>
+                            {hasAssessment && (
+                              <span className="ml-auto text-xs text-amber-600 flex items-center gap-1">
+                                <Star className="h-3 w-3" /> assessed
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    {campPlayers.filter(p => bibSuggestionFilter === '' || p.bibNumber.toString().startsWith(bibSuggestionFilter)).length === 0 && (
+                      <p className="px-3 py-2 text-xs text-muted-foreground">No bib #{bibSuggestionFilter} found</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
