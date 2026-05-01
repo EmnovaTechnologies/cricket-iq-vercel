@@ -187,6 +187,7 @@ export default function CampAssessPage() {
       const player = campPlayers.find(p => p.bibNumber === bib);
       if (!player) continue;
       const existing = myAssessments.get(bib);
+      if (existing?.isLocked) continue; // Skip locked assessments silently
       if (existing) {
         // Append to existing notes
         const updatedNotes = existing.notes ? `${existing.notes}
@@ -489,13 +490,19 @@ ${notes}` : notes;
                 <div className="space-y-1.5 max-h-40 overflow-y-auto">
                   {Array.from(scratchpadParsed.entries()).sort((a, b) => a[0] - b[0]).map(([bib, note]) => {
                     const player = campPlayers.find(p => p.bibNumber === bib);
-                    const hasExisting = myAssessments.has(bib);
+                    const existingAssessment = myAssessments.get(bib);
+                    const hasExisting = !!existingAssessment;
+                    const isAssessmentLocked = existingAssessment?.isLocked === true;
                     return (
                       <div key={bib} className="text-xs">
                         <span className="font-bold text-primary">#{bib}</span>
                         {player ? <span className="text-muted-foreground ml-1">({player.playerPrimarySkill})</span> : <span className="text-destructive ml-1">(not in camp)</span>}
-                        {hasExisting && <span className="text-amber-600 ml-1">· will append</span>}
-                        <span className="text-foreground ml-1">— {note}</span>
+                        {isAssessmentLocked
+                          ? <span className="text-destructive ml-1 font-medium">🔒 Locked — unlock first to append notes</span>
+                          : hasExisting
+                            ? <span className="text-amber-600 ml-1">· will append</span>
+                            : null}
+                        {!isAssessmentLocked && <span className="text-foreground ml-1">— {note}</span>}
                       </div>
                     );
                   })}
