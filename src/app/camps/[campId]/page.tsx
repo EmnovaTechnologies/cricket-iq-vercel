@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -36,10 +36,19 @@ const statusColors: Record<SelectionCamp['status'], string> = {
   completed: 'bg-muted text-muted-foreground border',
 };
 
-export default function CampDetailPage() {
+function CampDetailInner() {
   const params = useParams<{ campId: string }>();
   const { campId } = params;
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromSeries = searchParams.get('from') === 'series';
+  const fromSeriesId = searchParams.get('seriesId') || '';
+  const backHref = fromSeries && fromSeriesId
+    ? `/series/${fromSeriesId}/details?tab=camp`
+    : '/camps';
+  const backLabel = fromSeries ? 'Back to Series' : 'Back to Camps';
+  // Pass navigation context to sub-pages
+  const navParam = fromSeries ? `?from=series&seriesId=${fromSeriesId}` : '?from=camps';
   const { currentUser, userProfile, activeOrganizationId, effectivePermissions } = useAuth();
   const { toast } = useToast();
 
@@ -148,71 +157,80 @@ export default function CampDetailPage() {
 
   return (
     <div className="space-y-8">
-      {/* Top nav bar */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/camps"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Camps</Link>
-        </Button>
-        <div className="flex items-center gap-2">
-          {canManage && (
-            <Select value={camp.status} onValueChange={async v => {
-              const res = await updateCampAction(camp.id, { status: v as SelectionCamp['status'] });
-              if (res.success) setCamp(prev => prev ? { ...prev, status: v as SelectionCamp['status'] } : prev);
-            }}>
-              <SelectTrigger className="w-36 h-8"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="upcoming">Upcoming</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-          {canManage && (
-            <Button size="sm" variant="outline" onClick={() => setIsEditingCamp(v => !v)}>
-              <Edit3 className="h-3.5 w-3.5 mr-1" /> {isEditingCamp ? 'Cancel' : 'Edit'}
+      {/* Header card — matches game detail style */}
+      <Card className="shadow-lg">
+        <CardHeader>
+          <div className="flex justify-between items-start mb-2">
+            <CardTitle className="text-3xl font-headline text-primary flex items-center gap-2">
+              <Trophy className="h-8 w-8" /> {camp.name}
+            </CardTitle>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={backHref}><ArrowLeft className="mr-2 h-4 w-4" /> {backLabel}</Link>
             </Button>
-          )}
-          {canManage && campPlayers.length === 0 && (
-            <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive/10"
-              onClick={handleDelete} disabled={isDeletingCamp}>
-              {isDeletingCamp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Page title */}
-      <div>
-        <h1 className="text-3xl font-headline font-bold text-primary flex items-center gap-2">
-          <Trophy className="h-8 w-8" /> {camp.name}
-        </h1>
-        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+          </div>
+          <CardDescription>
+            {camp.status.charAt(0).toUpperCase() + camp.status.slice(1)} selection camp
+            {camp.startDate && ` · ${format(parseISO(camp.startDate), 'MMMM do, yyyy')}`}
+            {camp.endDate && camp.endDate !== camp.startDate && ` → ${format(parseISO(camp.endDate), 'MMMM do, yyyy')}`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
           {seriesName && (
-            <Link href={`/series/${camp.seriesId}/details`}
-              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-              onClick={e => e.stopPropagation()}>
-              <Layers className="h-3.5 w-3.5" /> {seriesName} →
-            </Link>
-          )}
-          {camp.startDate && (
-            <span className="text-sm text-muted-foreground flex items-center gap-1">
-              <CalendarDays className="h-3.5 w-3.5" />
-              {format(parseISO(camp.startDate), 'PP')}
-              {camp.endDate !== camp.startDate && ` → ${format(parseISO(camp.endDate), 'PP')}`}
-            </span>
+            <div className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-muted-foreground" />
+              <span>Series: <Link href={`/series/${camp.seriesId}/details`} className="underline text-primary hover:text-primary/80">{seriesName}</Link></span>
+            </div>
           )}
           {camp.venue && (
-            <span className="text-sm text-muted-foreground flex items-center gap-1">
-              <MapPin className="h-3.5 w-3.5" /> {camp.venue}
-            </span>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-muted-foreground" />
+              <span>Venue: {camp.venue}</span>
+            </div>
           )}
           {camp.fitnessTestType && (
-            <span className="text-sm text-muted-foreground flex items-center gap-1">
-              <Activity className="h-3.5 w-3.5" /> {camp.fitnessTestType} · pass ≥ {camp.fitnessTestPassingScore}
-            </span>
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-muted-foreground" />
+              <span>Fitness: {camp.fitnessTestType} · passing score ≥ {camp.fitnessTestPassingScore}</span>
+            </div>
           )}
-        </div>
-      </div>
+          <div className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-muted-foreground" />
+            <span>Quota: {camp.quota} players · Target: {camp.selectionTarget} to select</span>
+          </div>
+          {/* Action buttons */}
+          <div className="flex items-center justify-between pt-2 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              {canManage && (
+                <Select value={camp.status} onValueChange={async v => {
+                  const res = await updateCampAction(camp.id, { status: v as SelectionCamp['status'] });
+                  if (res.success) setCamp(prev => prev ? { ...prev, status: v as SelectionCamp['status'] } : prev);
+                }}>
+                  <SelectTrigger className="w-36 h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="upcoming">Upcoming</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {canManage && (
+                <Button size="sm" variant="outline" onClick={() => setIsEditingCamp(v => !v)}>
+                  <Edit3 className="h-3.5 w-3.5 mr-1" /> {isEditingCamp ? 'Cancel' : 'Edit Camp'}
+                </Button>
+              )}
+              {canManage && campPlayers.length === 0 && (
+                <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive/10"
+                  onClick={handleDelete} disabled={isDeletingCamp}>
+                  {isDeletingCamp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1" />}
+                  {!isDeletingCamp && 'Delete'}
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Edit form */}
       {isEditingCamp && (
@@ -304,10 +322,19 @@ export default function CampDetailPage() {
       <CampTabContent
         camp={camp}
         seriesId={camp.seriesId}
+        navParam={navParam}
         initialPlayers={campPlayers}
         initialAssessments={campAssessments}
         initialFitness={campFitness}
       />
     </div>
+  );
+}
+
+export default function CampDetailPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+      <CampDetailInner />
+    </Suspense>
   );
 }
