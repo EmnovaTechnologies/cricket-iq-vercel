@@ -220,6 +220,8 @@ export function CampTabContent({
       playerName: player.name, playerPrimarySkill: player.primarySkill || '',
       playerBowlingStyle: (player as any).bowlingStyle,
       playerBattingOrder: (player as any).battingOrder,
+      playerDominantHandBatting: (player as any).dominantHandBatting,
+      playerDominantHandBowling: (player as any).dominantHandBowling,
       status: 'invited', invitedBy: currentUser.uid,
     });
     if (res.success) {
@@ -337,11 +339,11 @@ export function CampTabContent({
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
     <Tabs defaultValue="players" className="mt-2">
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className={`grid w-full ${canManage ? 'grid-cols-4' : 'grid-cols-3'}`}>
         <TabsTrigger value="players"><Users className="h-3.5 w-3.5 mr-1.5" />Players</TabsTrigger>
         <TabsTrigger value="assessment"><Star className="h-3.5 w-3.5 mr-1.5" />Assessment</TabsTrigger>
         <TabsTrigger value="fitness"><Activity className="h-3.5 w-3.5 mr-1.5" />Fitness</TabsTrigger>
-        <TabsTrigger value="results"><Brain className="h-3.5 w-3.5 mr-1.5" />Results & AI</TabsTrigger>
+        {canManage && <TabsTrigger value="results"><Brain className="h-3.5 w-3.5 mr-1.5" />Results & AI</TabsTrigger>}
       </TabsList>
 
       {/* ── PLAYERS TAB ── */}
@@ -409,9 +411,22 @@ export function CampTabContent({
                     )}
                     <div className="flex-1 min-w-0">
                       {canSeeNames && <p className="text-sm font-medium truncate">{cp.playerName}</p>}
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">{cp.playerPrimarySkill}</Badge>
-                        {canSeeNames && cp.playerBowlingStyle && <span className="text-xs text-muted-foreground">{cp.playerBowlingStyle}</span>}
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                        <span className="text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">{cp.playerPrimarySkill}</span>
+                        </span>
+                        {canSeeNames && cp.playerBattingOrder && (
+                          <span className="text-xs text-muted-foreground">Bat order: <span className="text-foreground">{cp.playerBattingOrder}</span></span>
+                        )}
+                        {canSeeNames && cp.playerDominantHandBatting && (
+                          <span className="text-xs text-muted-foreground">Bat hand: <span className="text-foreground">{cp.playerDominantHandBatting}</span></span>
+                        )}
+                        {cp.playerBowlingStyle && (
+                          <span className="text-xs text-muted-foreground">Bowl style: <span className="text-foreground">{cp.playerBowlingStyle}</span></span>
+                        )}
+                        {canSeeNames && cp.playerDominantHandBowling && (
+                          <span className="text-xs text-muted-foreground">Bowl hand: <span className="text-foreground">{cp.playerDominantHandBowling}</span></span>
+                        )}
                       </div>
                     </div>
                     {canSeeNames && <Badge variant="outline" className="text-xs capitalize shrink-0">{cp.status}</Badge>}
@@ -465,7 +480,7 @@ export function CampTabContent({
                   <div key={r.campPlayer.id} className="px-4 py-3">
                     <div className="flex items-center gap-2 flex-wrap mb-2">
                       <span className="text-base font-bold text-primary">#{r.campPlayer.bibNumber}</span>
-                      <span className="text-sm font-medium">{r.campPlayer.playerName}</span>
+                      {canSeeNames && <span className="text-sm font-medium">{r.campPlayer.playerName}</span>}
                       <Badge variant="outline" className="text-xs">{r.resolvedSkill}</Badge>
                       {r.campPlayer.playerPrimarySkill !== r.resolvedSkill && (
                         <Badge variant="outline" className="text-xs border-amber-300 text-amber-600">
@@ -529,7 +544,7 @@ export function CampTabContent({
                         <div key={cp.id} className="flex items-center gap-3 px-4 py-3">
                           <span className="text-base font-bold text-primary w-10 shrink-0">#{cp.bibNumber}</span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{cp.playerName}</p>
+                            {canSeeNames && <p className="text-sm font-medium truncate">{cp.playerName}</p>}
                             <p className="text-xs text-muted-foreground">{cp.playerPrimarySkill}</p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
@@ -566,7 +581,8 @@ export function CampTabContent({
         )}
       </TabsContent>
 
-      {/* ── RESULTS & AI TAB ── */}
+      {/* ── RESULTS & AI TAB — admin only ── */}
+      {canManage && (
       <TabsContent value="results" className="space-y-4 mt-4">
         {/* Selection summary */}
         <div className="flex items-center gap-3 flex-wrap">
@@ -709,6 +725,7 @@ export function CampTabContent({
           </CardContent>
         </Card>
       </TabsContent>
+      )}
     </Tabs>
   );
 }

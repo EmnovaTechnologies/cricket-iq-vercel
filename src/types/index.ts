@@ -721,6 +721,8 @@ export interface CampPlayer {
   playerPrimarySkill: string; // copied from player profile
   playerBowlingStyle?: string;
   playerBattingOrder?: string;
+  playerDominantHandBatting?: string;
+  playerDominantHandBowling?: string;
   status: CampPlayerStatus;
   // Final selection
   selectionStatus?: CampSelectionStatus;
