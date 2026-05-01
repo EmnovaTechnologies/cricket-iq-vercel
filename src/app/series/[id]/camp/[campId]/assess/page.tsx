@@ -92,7 +92,10 @@ export default function CampAssessPage() {
   useEffect(() => {
     if (campId) {
       const saved = localStorage.getItem(`scratchpad_${campId}`);
-      if (saved) setScratchpad(saved);
+      if (saved) {
+        setScratchpad(saved);
+        setScratchpadParsed(parseScratchpad(saved));
+      }
     }
   }, [campId]);
 
@@ -541,28 +544,40 @@ ${notes}` : notes;
                         {!isAssessmentLocked && (
                           <p className="text-xs text-muted-foreground italic">"{note}"</p>
                         )}
-                        {/* Inline star ratings */}
-                        {!isAssessmentLocked && (
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                            {ratingKeys.map(({ key, label }) => (
-                              <div key={key} className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground w-14 shrink-0">{label}</span>
-                                <div className="flex gap-0.5">
-                                  {[1,2,3,4,5].map(n => (
-                                    <button key={n} type="button"
-                                      onClick={() => setScratchpadRating(bib, key, n)}
-                                      className="transition-transform hover:scale-110">
-                                      <Star className={`h-5 w-5 ${n <= ((bibRatings[key] as number) || 0) ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'}`} />
-                                    </button>
-                                  ))}
-                                </div>
-                                {(bibRatings[key] as number) > 0 && (
-                                  <span className="text-xs text-muted-foreground">{bibRatings[key]}</span>
-                                )}
+                        {/* Inline star ratings — collapsed by default, tap to expand */}
+                        {!isAssessmentLocked && (() => {
+                          const hasAnyRating = ratingKeys.some(({ key }) => (bibRatings[key] as number) > 0);
+                          const ratedCount = ratingKeys.filter(({ key }) => (bibRatings[key] as number) > 0).length;
+                          return (
+                            <details open={hasAnyRating} className="group">
+                              <summary className="text-xs text-primary cursor-pointer list-none flex items-center gap-1 select-none">
+                                <span className="group-open:hidden">
+                                  {hasAnyRating ? `★ ${ratedCount}/6 rated — tap to edit` : '+ Add ratings (optional)'}
+                                </span>
+                                <span className="hidden group-open:inline">− Hide ratings</span>
+                              </summary>
+                              <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
+                                {ratingKeys.map(({ key, label }) => (
+                                  <div key={key} className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground w-14 shrink-0">{label}</span>
+                                    <div className="flex gap-0.5">
+                                      {[1,2,3,4,5].map(n => (
+                                        <button key={n} type="button"
+                                          onClick={() => setScratchpadRating(bib, key, n)}
+                                          className="transition-transform active:scale-95">
+                                          <Star className={`h-6 w-6 ${n <= ((bibRatings[key] as number) || 0) ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'}`} />
+                                        </button>
+                                      ))}
+                                    </div>
+                                    {(bibRatings[key] as number) > 0 && (
+                                      <span className="text-xs text-muted-foreground">{bibRatings[key]}</span>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        )}
+                            </details>
+                          );
+                        })()}
                       </div>
                     );
                   })}
