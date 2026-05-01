@@ -85,6 +85,7 @@ export default function CampAssessPage() {
   const [scratchpad, setScratchpad] = useState('');
   const [scratchpadParsed, setScratchpadParsed] = useState<Map<number, string>>(new Map());
   const [isApplyingScratchpad, setIsApplyingScratchpad] = useState(false);
+  const [scratchpadRatings, setScratchpadRatings] = useState<Map<number, Partial<AssessmentForm>>>(new Map());
   const [showBibSuggestions, setShowBibSuggestions] = useState(false);
   const [bibSuggestionFilter, setBibSuggestionFilter] = useState('');
 
@@ -164,6 +165,15 @@ export default function CampAssessPage() {
     }
   };
 
+  const setScratchpadRating = (bib: number, key: keyof AssessmentForm, val: number) => {
+    setScratchpadRatings(prev => {
+      const next = new Map(prev);
+      const existing = next.get(bib) || {};
+      next.set(bib, { ...existing, [key]: val });
+      return next;
+    });
+  };
+
   const insertBibSuggestion = (bib: number) => {
     // Replace the last # and any partial digits with the full #N
     const lastHashIdx = scratchpad.lastIndexOf('#');
@@ -192,16 +202,26 @@ export default function CampAssessPage() {
         // Append to existing notes
         const updatedNotes = existing.notes ? `${existing.notes}
 ${notes}` : notes;
-        await updateCampAssessmentAction(existing.id, currentUser.uid, { notes: updatedNotes });
+        const bibRatings = scratchpadRatings.get(bib) || {};
+        const ratingUpdates = Object.fromEntries(
+          Object.entries(bibRatings).filter(([, v]) => typeof v === 'number' && (v as number) > 0)
+        );
+        await updateCampAssessmentAction(existing.id, currentUser.uid, { notes: updatedNotes, ...ratingUpdates });
       } else {
-        // Create draft assessment with notes only, ratings = 0
+        // Create draft assessment with notes + any ratings entered in scratchpad
+        const bibRatings = scratchpadRatings.get(bib) || {};
         await submitCampAssessmentAction({
           campId,
           organizationId: camp.organizationId,
           bibNumber: bib,
           assessedByUid: currentUser.uid,
           assessedByName: userProfile.displayName || userProfile.email || 'Coach',
-          batting: 0, bowling: 0, fielding: 0, fitness: 0, attitude: 0, overall: 0,
+          batting: bibRatings.batting || 0,
+          bowling: bibRatings.bowling || 0,
+          fielding: bibRatings.fielding || 0,
+          fitness: bibRatings.fitness || 0,
+          attitude: bibRatings.attitude || 0,
+          overall: bibRatings.overall || 0,
           notes,
           isLocked: false,
         });
@@ -217,6 +237,7 @@ ${notes}` : notes;
     }
     setScratchpad('');
     setScratchpadParsed(new Map());
+    setScratchpadRatings(new Map());
     localStorage.removeItem(`scratchpad_${campId}`);
     toast({ title: `Notes applied to ${applied} player${applied > 1 ? 's' : ''} ✓`, description: 'Switch to By Bib mode to add ratings.' });
     setIsApplyingScratchpad(false);
@@ -487,22 +508,61 @@ ${notes}` : notes;
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="p-3 space-y-2">
                 <p className="text-xs font-medium text-primary">Detected {scratchpadParsed.size} bib{scratchpadParsed.size > 1 ? 's' : ''}:</p>
-                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                <div className="space-y-3 max-h-96 overflow-y-auto">
                   {Array.from(scratchpadParsed.entries()).sort((a, b) => a[0] - b[0]).map(([bib, note]) => {
                     const player = campPlayers.find(p => p.bibNumber === bib);
                     const existingAssessment = myAssessments.get(bib);
                     const hasExisting = !!existingAssessment;
                     const isAssessmentLocked = existingAssessment?.isLocked === true;
+                    const bibRatings = scratchpadRatings.get(bib) || {};
+                    const ratingKeys: {key: keyof AssessmentForm; label: string}[] = [
+                      { key: 'batting', label: 'Batting' },
+                      { key: 'bowling', label: 'Bowling' },
+                      { key: 'fielding', label: 'Fielding' },
+                      { key: 'fitness', label: 'Fitness' },
+                      { key: 'attitude', label: 'Attitude' },
+                      { key: 'overall', label: 'Overall' },
+                    ];
                     return (
-                      <div key={bib} className="text-xs">
-                        <span className="font-bold text-primary">#{bib}</span>
-                        {player ? <span className="text-muted-foreground ml-1">({player.playerPrimarySkill})</span> : <span className="text-destructive ml-1">(not in camp)</span>}
-                        {isAssessmentLocked
-                          ? <span className="text-destructive ml-1 font-medium">🔒 Locked — unlock first to append notes</span>
-                          : hasExisting
-                            ? <span className="text-amber-600 ml-1">· will append</span>
-                            : null}
-                        {!isAssessmentLocked && <span className="text-foreground ml-1">— {note}</span>}
+                      <div key={bib} className={`border rounded-lg p-3 space-y-2 ${isAssessmentLocked ? 'opacity-60 bg-muted/30' : 'bg-background'}`}>
+                        {/* Bib header */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-primary text-sm">#{bib}</span>
+                          {player
+                            ? <span className="text-xs text-muted-foreground">({player.playerPrimarySkill})</span>
+                            : <span className="text-xs text-destructive">(not in camp — will skip)</span>}
+                          {isAssessmentLocked
+                            ? <span className="text-xs text-destructive font-medium">🔒 Locked — unlock first</span>
+                            : hasExisting
+                              ? <span className="text-xs text-amber-600">· will append</span>
+                              : <span className="text-xs text-green-600">· new assessment</span>}
+                        </div>
+                        {/* Note */}
+                        {!isAssessmentLocked && (
+                          <p className="text-xs text-muted-foreground italic">"{note}"</p>
+                        )}
+                        {/* Inline star ratings */}
+                        {!isAssessmentLocked && (
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                            {ratingKeys.map(({ key, label }) => (
+                              <div key={key} className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground w-14 shrink-0">{label}</span>
+                                <div className="flex gap-0.5">
+                                  {[1,2,3,4,5].map(n => (
+                                    <button key={n} type="button"
+                                      onClick={() => setScratchpadRating(bib, key, n)}
+                                      className="transition-transform hover:scale-110">
+                                      <Star className={`h-5 w-5 ${n <= ((bibRatings[key] as number) || 0) ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'}`} />
+                                    </button>
+                                  ))}
+                                </div>
+                                {(bibRatings[key] as number) > 0 && (
+                                  <span className="text-xs text-muted-foreground">{bibRatings[key]}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
