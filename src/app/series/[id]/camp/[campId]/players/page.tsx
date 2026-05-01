@@ -15,6 +15,7 @@ import {
 } from '@/lib/actions/camp-actions';
 import { getPlayersWithDetailsFromDB, getTeamByIdFromDB, getSeriesByIdFromDB } from '@/lib/db';
 import { useAuth } from '@/contexts/auth-context';
+import { PERMISSIONS } from '@/lib/permissions-master-list';
 import { useToast } from '@/hooks/use-toast';
 import type { SelectionCamp, CampPlayer, PlayerWithRatings } from '@/types';
 import { Loader2, ArrowLeft, UserPlus, X, Hash, Search, Users, ShieldAlert } from 'lucide-react';
@@ -22,7 +23,10 @@ import { Loader2, ArrowLeft, UserPlus, X, Hash, Search, Users, ShieldAlert } fro
 export default function CampPlayersPage() {
   const params = useParams<{ id: string; campId: string }>();
   const { id: seriesId, campId } = params;
-  const { currentUser, userProfile, activeOrganizationId } = useAuth();
+  const { currentUser, userProfile, activeOrganizationId, effectivePermissions } = useAuth();
+  const canManage = !!(effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] ||
+    effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
+    effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY]);
   const { toast } = useToast();
 
   const [camp, setCamp] = useState<SelectionCamp | null>(null);
