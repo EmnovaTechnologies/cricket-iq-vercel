@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, Suspense, useEffect, useMemo } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,13 @@ import { Loader2, ArrowLeft, UserPlus, X, Hash, Search, Users, ShieldAlert } fro
 export default function CampPlayersPage() {
   const params = useParams<{ id: string; campId: string }>();
   const { id: seriesId, campId } = params;
+  const searchParams = useSearchParams();
+  const fromSeries = searchParams.get('from') === 'series';
+  const fromSeriesId = searchParams.get('seriesId') || seriesId;
+  const backHref = fromSeries
+    ? `/camps/${campId}?from=series&seriesId=${fromSeriesId}`
+    : `/camps/${campId}?from=camps`;
+  const backLabel = fromSeries ? 'Back to Camp (via Series)' : 'Back to Camp';
   const { currentUser, userProfile, activeOrganizationId, effectivePermissions } = useAuth();
   const canManage = !!(effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
@@ -180,8 +187,8 @@ export default function CampPlayersPage() {
     <div className="space-y-8">
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/series/${seriesId}/camp/${campId}`}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Camp
+          <Link href={backHref}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> {backLabel}
           </Link>
         </Button>
       </div>

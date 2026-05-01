@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, Suspense, useEffect } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,13 @@ import { Loader2, ArrowLeft, Activity, CheckCircle, XCircle, ShieldAlert } from 
 export default function CampFitnessPage() {
   const params = useParams<{ id: string; campId: string }>();
   const { id: seriesId, campId } = params;
+  const searchParams = useSearchParams();
+  const fromSeries = searchParams.get('from') === 'series';
+  const fromSeriesId = searchParams.get('seriesId') || seriesId;
+  const backHref = fromSeries
+    ? `/camps/${campId}?from=series&seriesId=${fromSeriesId}`
+    : `/camps/${campId}?from=camps`;
+  const backLabel = fromSeries ? 'Back to Camp (via Series)' : 'Back to Camp';
   const { currentUser, userProfile, activeOrganizationId } = useAuth();
   const { toast } = useToast();
 
@@ -113,8 +120,8 @@ export default function CampFitnessPage() {
     <div className="space-y-8">
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/series/${seriesId}/camp/${campId}`}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Camp
+          <Link href={backHref}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> {backLabel}
           </Link>
         </Button>
       </div>

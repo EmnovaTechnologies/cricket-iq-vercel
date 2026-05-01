@@ -64,6 +64,7 @@ function ScoreBar({ value }: { value: number }) {
 interface CampTabContentProps {
   camp: SelectionCamp;
   seriesId: string;
+  navParam?: string;  // e.g. '?from=series&seriesId=xxx' or '?from=camps'
   initialPlayers?: CampPlayer[];
   initialAssessments?: CampAssessment[];
   initialFitness?: CampFitnessResult[];
@@ -72,6 +73,7 @@ interface CampTabContentProps {
 export function CampTabContent({
   camp,
   seriesId,
+  navParam = '',
   initialPlayers = [],
   initialAssessments = [],
   initialFitness = [],
@@ -453,7 +455,7 @@ export function CampTabContent({
         <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-sm text-muted-foreground">{assessments.length} assessments from {new Set(assessments.map(a => a.assessedByUid)).size} coaches</p>
           <Button asChild variant="outline" size="sm">
-            <Link href={`/series/${seriesId}/camp/${camp.id}/assess`}>
+            <Link href={`/series/${seriesId}/camp/${camp.id}/assess${navParam}`}>
               <Star className="mr-2 h-3.5 w-3.5" /> Mobile Assessment View
             </Link>
           </Button>

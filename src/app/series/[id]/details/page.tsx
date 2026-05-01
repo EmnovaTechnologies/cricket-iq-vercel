@@ -1212,7 +1212,7 @@ export default function SeriesDetailsPage() {
                     'bg-muted text-muted-foreground border'
                   }`}>{camp.status}</span>
                   <Button asChild size="sm">
-                    <Link href={`/camps/${camp.id}`}>Open Camp →</Link>
+                    <Link href={`/camps/${camp.id}?from=series&seriesId=${seriesId}`}>Open Camp →</Link>
                   </Button>
                 </div>
               </div>
