@@ -110,7 +110,7 @@ export default function CampFitnessPage() {
   const passed = Array.from(fitnessResults.values()).filter(f => f.passed).length;
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-8">
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm" asChild>
           <Link href={`/series/${seriesId}/camp/${campId}`}>
@@ -125,61 +125,72 @@ export default function CampFitnessPage() {
         <p className="text-sm text-muted-foreground mt-1">{camp.fitnessTestType} · Passing score: {camp.fitnessTestPassingScore} · {recorded}/{sortedPlayers.length} recorded · {passed} passed</p>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Record Scores</CardTitle>
-          <CardDescription>Enter each player's test score. Pass/fail is automatically calculated.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="divide-y">
-            {sortedPlayers.map(cp => {
-              const result = fitnessResults.get(cp.playerId);
-              const scoreVal = scores.get(cp.playerId) || '';
-              const passing = camp.fitnessTestPassingScore || 0;
-              const previewPass = scoreVal !== '' && !isNaN(parseFloat(scoreVal))
-                ? parseFloat(scoreVal) >= passing
-                : null;
+      <div className="border rounded-lg overflow-hidden bg-card shadow">
+        {/* Column headers */}
+        <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <div className="col-span-1">Bib</div>
+          <div className="col-span-4">Name</div>
+          <div className="col-span-2">Skill</div>
+          <div className="col-span-2">Score (pass ≥ {camp.fitnessTestPassingScore})</div>
+          <div className="col-span-2">Result</div>
+          <div className="col-span-1"></div>
+        </div>
+        <div className="divide-y">
+          {sortedPlayers.map(cp => {
+            const result = fitnessResults.get(cp.playerId);
+            const scoreVal = scores.get(cp.playerId) || '';
+            const passing = camp.fitnessTestPassingScore || 0;
+            const previewPass = scoreVal !== '' && !isNaN(parseFloat(scoreVal))
+              ? parseFloat(scoreVal) >= passing
+              : null;
 
-              return (
-                <div key={cp.id} className="flex items-center gap-3 px-4 py-3">
-                  <span className="text-base font-bold text-primary w-10 shrink-0">#{cp.bibNumber}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{cp.playerName}</p>
-                    <p className="text-xs text-muted-foreground">{cp.playerPrimarySkill}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Input
-                      type="number"
-                      step="0.1"
-                      placeholder={`Score (pass ≥ ${passing})`}
-                      value={scoreVal}
-                      onChange={e => setScores(prev => new Map(prev).set(cp.playerId, e.target.value))}
-                      className="w-28 h-8 text-sm"
-                    />
-                    {previewPass !== null && (
-                      previewPass
-                        ? <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
-                        : <XCircle className="h-4 w-4 text-red-500 shrink-0" />
-                    )}
-                    {result && (
-                      <Badge className={`text-xs shrink-0 ${result.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {result.passed ? 'Pass' : 'Fail'} ({result.score})
-                      </Badge>
-                    )}
-                    <Button size="sm" className="h-8 px-3 shrink-0"
-                      disabled={!scoreVal || savingId === cp.playerId}
-                      onClick={() => handleSave(cp)}>
-                      {savingId === cp.playerId
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        : result ? 'Update' : 'Save'}
-                    </Button>
-                  </div>
+            return (
+              <div key={cp.id} className="grid grid-cols-12 gap-4 items-center px-6 py-4 hover:bg-muted/20 transition-colors">
+                <div className="col-span-1">
+                  <span className="text-lg font-bold text-primary">#{cp.bibNumber}</span>
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                <div className="col-span-4">
+                  <p className="text-sm font-medium truncate">{cp.playerName}</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-sm text-muted-foreground">{cp.playerPrimarySkill}</span>
+                </div>
+                <div className="col-span-2">
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="Score..."
+                    value={scoreVal}
+                    onChange={e => setScores(prev => new Map(prev).set(cp.playerId, e.target.value))}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="col-span-2 flex items-center gap-2">
+                  {previewPass !== null && (
+                    previewPass
+                      ? <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                      : <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+                  )}
+                  {result && (
+                    <Badge className={`text-xs ${result.passed ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
+                      {result.passed ? 'Pass' : 'Fail'} ({result.score})
+                    </Badge>
+                  )}
+                </div>
+                <div className="col-span-1 flex justify-end">
+                  <Button size="sm" className="h-8"
+                    disabled={!scoreVal || savingId === cp.playerId}
+                    onClick={() => handleSave(cp)}>
+                    {savingId === cp.playerId
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : result ? 'Update' : 'Save'}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

@@ -383,66 +383,67 @@ export function CampTabContent({
         </Card>
         )}
 
-        <Card>
-          <CardContent className="p-0">
-            {sortedPlayers.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" />
-                <p className="text-sm text-muted-foreground">No players invited yet</p>
-              </div>
-            ) : (
-              <div className="divide-y">
-                {sortedPlayers.map(cp => (
-                  <div key={cp.id} className="flex items-center gap-3 px-4 py-3">
-                    {editingBibId === cp.id ? (
-                      <div className="flex items-center gap-1">
-                        <Input type="number" className="w-16 h-7 text-sm" value={editBibValue}
+        <div className="border rounded-lg overflow-hidden bg-card">
+          <div className="grid grid-cols-12 gap-4 px-4 py-2.5 border-b bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <div className="col-span-1">Bib</div>
+            <div className="col-span-3">{canSeeNames ? 'Name' : ''}</div>
+            <div className="col-span-2">Skill</div>
+            <div className="col-span-2">Bat Order</div>
+            <div className="col-span-2">Bowl Style</div>
+            <div className="col-span-2 text-right">Actions</div>
+          </div>
+          {sortedPlayers.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" />
+              <p className="text-sm text-muted-foreground">No players invited yet</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {sortedPlayers.map(cp => (
+                <div key={cp.id} className="grid grid-cols-12 gap-4 items-center px-4 py-3 hover:bg-muted/20 transition-colors">
+                  <div className="col-span-1">
+                    {canManage && editingBibId === cp.id ? (
+                      <div className="flex items-center gap-0.5">
+                        <Input type="number" className="w-12 h-7 text-xs px-1" value={editBibValue}
                           onChange={e => setEditBibValue(e.target.value)}
                           onKeyDown={e => e.key === 'Enter' && handleBibEdit(cp.id)} />
-                        <Button size="sm" className="h-7 px-2 text-xs" onClick={() => handleBibEdit(cp.id)}>✓</Button>
-                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingBibId(null)}>✕</Button>
+                        <Button size="sm" className="h-7 px-1.5 text-xs" onClick={() => handleBibEdit(cp.id)}>✓</Button>
+                        <Button size="sm" variant="ghost" className="h-7 px-1.5" onClick={() => setEditingBibId(null)}>✕</Button>
                       </div>
                     ) : (
-                      <span
-                        onClick={() => canManage && (setEditingBibId(cp.id), setEditBibValue(cp.bibNumber.toString()))}
-                        className={`text-xl font-bold text-primary w-12 text-center shrink-0 ${canManage ? 'hover:underline cursor-pointer' : ''}`}>
+                      <span onClick={() => canManage && (setEditingBibId(cp.id), setEditBibValue(cp.bibNumber.toString()))}
+                        className={`text-base font-bold text-primary ${canManage ? 'hover:underline cursor-pointer' : ''}`}>
                         #{cp.bibNumber}
                       </span>
                     )}
-                    <div className="flex-1 min-w-0">
-                      {canSeeNames && <p className="text-sm font-medium truncate">{cp.playerName}</p>}
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                        <span className="text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground">{cp.playerPrimarySkill}</span>
-                        </span>
-                        {canSeeNames && cp.playerBattingOrder && (
-                          <span className="text-xs text-muted-foreground">Bat order: <span className="text-foreground">{cp.playerBattingOrder}</span></span>
-                        )}
-                        {canSeeNames && cp.playerDominantHandBatting && (
-                          <span className="text-xs text-muted-foreground">Bat hand: <span className="text-foreground">{cp.playerDominantHandBatting}</span></span>
-                        )}
-                        {cp.playerBowlingStyle && (
-                          <span className="text-xs text-muted-foreground">Bowl style: <span className="text-foreground">{cp.playerBowlingStyle}</span></span>
-                        )}
-                        {canSeeNames && cp.playerDominantHandBowling && (
-                          <span className="text-xs text-muted-foreground">Bowl hand: <span className="text-foreground">{cp.playerDominantHandBowling}</span></span>
-                        )}
-                      </div>
-                    </div>
-                    {canSeeNames && <Badge variant="outline" className="text-xs capitalize shrink-0">{cp.status}</Badge>}
+                  </div>
+                  <div className="col-span-3">
+                    {canSeeNames && <p className="text-sm font-medium truncate">{cp.playerName}</p>}
+                    {canSeeNames && <Badge variant="outline" className="text-xs capitalize mt-0.5">{cp.status}</Badge>}
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-sm">{cp.playerPrimarySkill || '—'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-sm text-muted-foreground">{cp.playerBattingOrder || '—'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-sm text-muted-foreground">{cp.playerBowlingStyle || '—'}</span>
+                  </div>
+                  <div className="col-span-2 flex justify-end">
                     {canManage && (
                       <button onClick={() => handleRemovePlayer(cp.id, cp.playerName)}
                         disabled={removingId === cp.id}
-                        className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
+                        className="text-muted-foreground hover:text-destructive transition-colors">
                         {removingId === cp.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
                       </button>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
 
       </TabsContent>
