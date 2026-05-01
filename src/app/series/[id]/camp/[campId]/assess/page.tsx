@@ -261,9 +261,10 @@ ${notes}` : notes;
 
   const handleSave = async (lock = false) => {
     if (!currentBib || !currentUser || !userProfile || !camp) return;
-    if (form.batting === 0 || form.bowling === 0 || form.fielding === 0 ||
-      form.fitness === 0 || form.attitude === 0 || form.overall === 0) {
-      toast({ title: 'Please rate all 6 dimensions before saving', variant: 'destructive' });
+    // Only enforce all ratings when locking — drafts can be partial
+    if (lock && (form.batting === 0 || form.bowling === 0 || form.fielding === 0 ||
+      form.fitness === 0 || form.attitude === 0 || form.overall === 0)) {
+      toast({ title: 'Please rate all 6 dimensions before locking', variant: 'destructive' });
       return;
     }
 
