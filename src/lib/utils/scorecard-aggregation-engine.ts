@@ -136,8 +136,9 @@ export function aggregatePlayerStats(
           p.totalBowlingScore = Math.round(p.totalBowlingScore * scale * 10) / 10;
           p.totalFieldingScore = Math.round(p.totalFieldingScore * scale * 10) / 10;
         }
-        // Update gamesPlayed to reflect bestN context
-        p.gamesPlayed = bestNGames;
+        // Keep original gamesPlayed, add bestNGamesUsed for display
+        (p as any).actualGamesPlayed = p.gamesPlayed;
+        // Don't overwrite gamesPlayed — keep actual for display
       }
     }
   }

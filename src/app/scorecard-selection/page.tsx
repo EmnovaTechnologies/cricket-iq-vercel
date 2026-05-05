@@ -310,8 +310,8 @@ export default function ScorecardSelectionPage() {
   const [config, setConfig] = useState<ScorecardScoringConfig | null>(null);
   const [aggregated, setAggregated] = useState<ReturnType<typeof classifyPlayers>>([]);
   const [formWindow, setFormWindow] = useState(3);
-  const [minGamesPlayed, setMinGamesPlayed] = useState(0);
-  const [bestNGames, setBestNGames] = useState(0); // last N games
+  const [minGamesPlayed, setMinGamesPlayed] = useState(4);
+  const [bestNGames, setBestNGames] = useState(4); // last N games
   const [formWeight, setFormWeight] = useState(30); // % weight for form
   const [includeForm, setIncludeForm] = useState(false);
   const [hideUnlinked, setHideUnlinked] = useState(true);
@@ -326,6 +326,7 @@ export default function ScorecardSelectionPage() {
   const [isLoadingSeries, setIsLoadingSeries] = useState(true);
   const [isLoadingScorecards, setIsLoadingScorecards] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('players');
 
   // Load series
   useEffect(() => {
@@ -384,7 +385,7 @@ export default function ScorecardSelectionPage() {
               nameResolutionMap.set(sp.name.toLowerCase().trim(), canonical);
             }
           }
-          console.log('[XI Selector] Name resolution map:', nameResolutionMap.size, 'entries');
+    
       // Debug Aarush specifically
       for (const [k, v] of nameResolutionMap.entries()) {
         if (k.includes('aarush') || k.includes('arush')) console.log('[XI Selector] Aarush entry:', JSON.stringify(k), '->', JSON.stringify(v));
@@ -394,10 +395,48 @@ export default function ScorecardSelectionPage() {
 
       // Track which canonical names are linked
       const linkedCanonicalNames = new Set<string>(nameResolutionMap.values());
-      console.log('[XI Selector] Linked canonical names sample:', Array.from(linkedCanonicalNames).slice(0, 5));
-      setLinkedNames(linkedCanonicalNames);
 
       const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports, minGamesPlayed, bestNGames, nameResolutionMap);
+
+      // Second-pass: merge abbreviated fielder names into canonical linked names
+      // Catches cases where dismissal text uses "Sri Akshaj D" but full name is "Sri Akshaj Dumpala"
+      const mergedMap = new Map<string, typeof stats[0]>();
+      for (const p of stats) {
+        const pLower = p.name.toLowerCase().trim();
+        const pParts = pLower.split(' ');
+        let canonicalMatch: string | null = null;
+        // Only try to match if this looks like an abbreviation (last part is 1-2 chars or ends with .)
+        const lastPart = pParts[pParts.length - 1].replace('.', '');
+        if (pParts.length >= 2 && lastPart.length <= 2) {
+          for (const canonical of linkedCanonicalNames) {
+            const cParts = canonical.toLowerCase().trim().split(' ');
+            if (cParts[0] !== pParts[0]) continue;
+            // Check if ANY word in canonical name starts with the initial
+            // Handles "Vishruth Y" → "Vishruth Yadhava Krishnan" (Y matches Yadhava)
+            // Handles "Aarush R" → "Aarush Reddy Mothey" (R matches Reddy)
+            const anyWordMatches = cParts.slice(1).some(part => part.startsWith(lastPart));
+            if (anyWordMatches) {
+              canonicalMatch = canonical;
+              break;
+            }
+          }
+        }
+        const key = canonicalMatch || p.name;
+        if (mergedMap.has(key)) {
+          const ex = mergedMap.get(key)!;
+          ex.totalScore = Math.round((ex.totalScore + p.totalScore) * 10) / 10;
+          ex.totalBattingScore = Math.round((ex.totalBattingScore + p.totalBattingScore) * 10) / 10;
+          ex.totalBowlingScore = Math.round((ex.totalBowlingScore + p.totalBowlingScore) * 10) / 10;
+          ex.totalFieldingScore = Math.round((ex.totalFieldingScore + p.totalFieldingScore) * 10) / 10;
+          ex.totalRuns += p.totalRuns; ex.totalWickets += p.totalWickets;
+          ex.totalCatches += p.totalCatches; ex.totalOvers += p.totalOvers;
+          ex.gamesPlayed = Math.max(ex.gamesPlayed, p.gamesPlayed);
+        } else {
+          mergedMap.set(key, { ...p, name: key });
+        }
+      }
+      const finalStats = Array.from(mergedMap.values()).sort((a, b) => b.totalScore - a.totalScore);
+      setLinkedNames(linkedCanonicalNames);
 
       // Load accepted match report deltas for this series
       const gameIds = res.scorecards.map((s: any) => s.gameId).filter(Boolean);
@@ -405,7 +444,7 @@ export default function ScorecardSelectionPage() {
         const deltasRes = await getAcceptedDeltasForSeriesAction(activeOrganizationId, gameIds);
         if (deltasRes.success) setAcceptedDeltas(deltasRes.deltas || []);
       }
-      setAggregated(classifyPlayers(stats, constraints.minBowlerOversPerGame, res.scorecards));
+      setAggregated(classifyPlayers(finalStats, constraints.minBowlerOversPerGame, res.scorecards));
     } else {
       setScorecards([]);
       setAggregated([]);
@@ -445,6 +484,7 @@ export default function ScorecardSelectionPage() {
     const res = await suggestXIFromScorecardAction(eligiblePlayers, constraints, selectedSeries.name);
     if (res.success && res.result) {
       setSelectionResult(res.result);
+      setActiveTab('xi');
     } else {
       toast({ title: 'Generation failed', description: res.error, variant: 'destructive' });
     }
@@ -637,7 +677,7 @@ export default function ScorecardSelectionPage() {
             )}
 
             {!isLoadingScorecards && aggregated.length > 0 && (
-              <Tabs defaultValue={(selectionResult || savedXI) ? 'xi' : 'players'}>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList>
                   <TabsTrigger value="players">
                     <Users className="mr-2 h-4 w-4" /> Player Rankings ({aggregated.length})
@@ -651,7 +691,13 @@ export default function ScorecardSelectionPage() {
                 </TabsList>
 
                 <TabsContent value="players" className="mt-4">
-                  <Card>
+                  <Card className="relative">
+                    {isGenerating && (
+                      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center gap-3 rounded-lg">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <p className="text-sm font-medium text-muted-foreground">Generating XI selection...</p>
+                      </div>
+                    )}
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm text-muted-foreground">
                         Series aggregate — {scorecards.length} game(s) · {aggregated.length} eligible players
@@ -711,9 +757,9 @@ export default function ScorecardSelectionPage() {
                                   .map((s: any) => s.gameId)
                                   .filter(Boolean)
                               )];
-                              const displayPlayers = hideUnlinked && linkedNames.size > 0
-                                ? aggregated.filter(p => linkedNames.has(p.name))
-                                : aggregated;
+                              const displayPlayers = aggregated
+                                .filter(p => hideUnlinked && linkedNames.size > 0 ? linkedNames.has(p.name) : true)
+                                .filter(p => minGamesPlayed === 0 || p.gamesPlayed >= minGamesPlayed);
                               return displayPlayers
                                 .map(p => {
                                   const form = includeForm && acceptedDeltas.length > 0

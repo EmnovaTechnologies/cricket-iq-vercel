@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { getAllSeriesFromDB } from '@/lib/db';
-import { getScorecardsBySeriesAction } from '@/lib/actions/scorecard-actions';
+import { getScorecardsBySeriesAction, getScorecardPlayersAction } from '@/lib/actions/scorecard-actions';
 import { saveScorecardXIAction, clearScorecardXIAction } from '@/lib/actions/series-actions';
 import { getMatchReportsForSeriesAction } from '@/lib/actions/match-report-actions';
+import { getAcceptedDeltasForSeriesAction, type MatchReportDelta } from '@/lib/actions/match-report-ai-action';
 import { getScoringConfigAction } from '@/lib/actions/scoring-config-actions';
 import { suggestXIFromScorecardAction, type SelectionResult } from '@/lib/actions/scorecard-selection-action';
 import { aggregatePlayerStats, classifyPlayers } from '@/lib/utils/scorecard-aggregation-engine';
@@ -32,6 +33,43 @@ import { cn } from '@/lib/utils';
 
 // ─── Player Stats Row ────────────────────────────────────────────────────────
 
+// Compute weighted form delta for a player across last N games
+function computeFormDelta(
+  playerName: string,
+  deltas: (MatchReportDelta & { gameId: string })[],
+  gameIds: string[], // ordered most recent first
+  windowSize: number,
+  weight: number // 0-100
+): { net: number; gameResults: ('up' | 'down' | 'none')[] } {
+  const window = gameIds.slice(0, windowSize);
+  const weights = [0.5, 0.3, 0.2, 0.15, 0.1].slice(0, windowSize);
+  const total = weights.slice(0, window.length).reduce((a, b) => a + b, 0);
+  const normalised = weights.map(w => w / total);
+
+  const gameResults: ('up' | 'down' | 'none')[] = window.map(gid => {
+    const gameDeltaSum = deltas
+      .filter(d => d.gameId === gid && d.playerName === playerName && d.dimension !== 'attitude')
+      .reduce((sum, d) => sum + d.delta, 0);
+    return gameDeltaSum > 0 ? 'up' : gameDeltaSum < 0 ? 'down' : 'none';
+  });
+
+  // Attitude: cumulative across all series games not just window
+  const attitudeDelta = deltas
+    .filter(d => d.playerName === playerName && d.dimension === 'attitude')
+    .reduce((sum, d) => sum + d.delta, 0);
+
+  // Skill deltas: weighted by recency within window
+  const skillNet = window.reduce((sum, gid, idx) => {
+    const gameDelta = deltas
+      .filter(d => d.gameId === gid && d.playerName === playerName && d.dimension !== 'attitude')
+      .reduce((s, d) => s + d.delta, 0);
+    return sum + gameDelta * normalised[idx];
+  }, 0);
+
+  const net = parseFloat(((skillNet + attitudeDelta * 0.3) * (weight / 100)).toFixed(2));
+  return { net, gameResults };
+}
+
 function PlayerStatsRow({ player, rank }: { player: ReturnType<typeof classifyPlayers>[0]; rank: number }) {
   return (
     <tr className={rank % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
@@ -40,7 +78,8 @@ function PlayerStatsRow({ player, rank }: { player: ReturnType<typeof classifyPl
           <span className="text-xs text-muted-foreground w-5 text-right">{rank + 1}</span>
           <div>
             <div className="flex items-center gap-1.5">
-              <p className="font-medium text-sm">{player.name}</p>
+              <p className={`font-medium text-sm ${!isLinked ? 'text-muted-foreground' : ''}`}>{player.name}</p>
+              {!isLinked && <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 rounded px-1 py-0.5">⚠ Unlinked</span>}
               {player.coachMentions > 0 && (
                 <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded px-1 py-0.5 font-medium"
                   title={`Mentioned by opposing coaches ${player.coachMentions} time${player.coachMentions > 1 ? 's' : ''}`}>
@@ -63,6 +102,93 @@ function PlayerStatsRow({ player, rank }: { player: ReturnType<typeof classifyPl
       <td className="p-2.5 text-right text-yellow-600 text-sm font-medium">
         {player.totalCoachTopRatingScore > 0 ? `+${player.totalCoachTopRatingScore}` : '-'}
       </td>
+      <td className="p-2.5 text-center">
+        <div className="flex gap-1 justify-center flex-wrap">
+          {player.isKeeper && <Badge variant="outline" className="text-xs px-1 py-0 border-amber-400 text-amber-700">WK</Badge>}
+          {player.isAllRounder && <Badge variant="outline" className="text-xs px-1 py-0 border-purple-400 text-purple-700">AR</Badge>}
+          {!player.isAllRounder && player.isBatter && <Badge variant="outline" className="text-xs px-1 py-0 border-blue-400 text-blue-700">BAT</Badge>}
+          {!player.isAllRounder && player.isBowler && <Badge variant="outline" className="text-xs px-1 py-0 border-green-400 text-green-700">BOWL</Badge>}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ─── Player Stats Row V2 — with form delta column ────────────────────────────
+
+interface FormResult {
+  net: number;
+  gameResults: ('up' | 'down' | 'none')[];
+}
+
+function PlayerStatsRowV2({
+  player, rank, form, showForm, formWindow, isLinked = true,
+}: {
+  player: ReturnType<typeof classifyPlayers>[0];
+  rank: number;
+  form: FormResult | null;
+  showForm: boolean;
+  formWindow: number;
+  isLinked?: boolean;
+}) {
+  const adjScore = form ? parseFloat((player.totalScore + form.net).toFixed(1)) : player.totalScore;
+  const dotColor = (r: 'up' | 'down' | 'none') =>
+    r === 'up' ? 'bg-green-500' : r === 'down' ? 'bg-red-500' : 'bg-muted-foreground/30';
+
+  return (
+    <tr className={rank % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
+      <td className="p-2.5">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground w-5 text-right">{rank + 1}</span>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className={`font-medium text-sm ${!isLinked ? 'text-muted-foreground' : ''}`}>{player.name}</p>
+              {!isLinked && <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 rounded px-1 py-0.5">⚠ Unlinked</span>}
+              {player.coachMentions > 0 && (
+                <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded px-1 py-0.5 font-medium"
+                  title={`Mentioned ${player.coachMentions} time(s)`}>
+                  ×{player.coachMentions}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">{player.team}</p>
+          </div>
+        </div>
+      </td>
+      <td className="p-2.5 text-center text-xs text-muted-foreground">{player.gamesPlayed}</td>
+      <td className="p-2.5 text-right font-bold text-primary">{player.totalScore}</td>
+      <td className="p-2.5 text-right text-sm">{player.avgScorePerGame}</td>
+      <td className="p-2.5 text-right text-blue-600 text-sm">{player.totalRuns || '-'}</td>
+      <td className="p-2.5 text-right text-green-600 text-sm">{player.totalWickets || '-'}</td>
+      <td className="p-2.5 text-right text-purple-600 text-sm">
+        {(player.totalCatches + player.totalRunOuts + player.totalStumpings + player.totalKeeperCatches) || '-'}
+      </td>
+      <td className="p-2.5 text-right text-yellow-600 text-sm font-medium">
+        {player.totalCoachTopRatingScore > 0 ? `+${player.totalCoachTopRatingScore}` : '-'}
+      </td>
+      {showForm && form !== null && (
+        <>
+          <td className="p-2.5 text-right text-sm">
+            <div className={`font-medium ${form.net > 0 ? 'text-green-600' : form.net < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+              {form.net > 0 ? '+' : ''}{form.net !== 0 ? form.net.toFixed(1) : '—'}
+            </div>
+            <div className="flex gap-0.5 justify-end mt-0.5">
+              {form.gameResults.map((r, i) => (
+                <div key={i} className={`w-2 h-2 rounded-full ${dotColor(r)}`} title={r} />
+              ))}
+            </div>
+          </td>
+          <td className="p-2.5 text-right font-bold text-sm text-primary">
+            {adjScore}
+          </td>
+        </>
+      )}
+      {showForm && form === null && (
+        <>
+          <td className="p-2.5 text-right text-muted-foreground text-xs">—</td>
+          <td className="p-2.5 text-right font-bold text-sm text-primary">{player.totalScore}</td>
+        </>
+      )}
       <td className="p-2.5 text-center">
         <div className="flex gap-1 justify-center flex-wrap">
           {player.isKeeper && <Badge variant="outline" className="text-xs px-1 py-0 border-amber-400 text-amber-700">WK</Badge>}
@@ -183,6 +309,14 @@ export default function ScorecardSelectionPage() {
   const [scorecards, setScorecards] = useState<MatchScorecard[]>([]);
   const [config, setConfig] = useState<ScorecardScoringConfig | null>(null);
   const [aggregated, setAggregated] = useState<ReturnType<typeof classifyPlayers>>([]);
+  const [formWindow, setFormWindow] = useState(3);
+  const [minGamesPlayed, setMinGamesPlayed] = useState(4);
+  const [bestNGames, setBestNGames] = useState(4); // last N games
+  const [formWeight, setFormWeight] = useState(30); // % weight for form
+  const [includeForm, setIncludeForm] = useState(false);
+  const [hideUnlinked, setHideUnlinked] = useState(true);
+  const [acceptedDeltas, setAcceptedDeltas] = useState<(MatchReportDelta & { id: string; gameId: string })[]>([]);
+  const [linkedNames, setLinkedNames] = useState<Set<string>>(new Set());
 
   const [constraints, setConstraints] = useState<ScorecardSelectionConstraints>(DEFAULT_SELECTION_CONSTRAINTS);
   const [selectionResult, setSelectionResult] = useState<SelectionResult | null>(null);
@@ -239,8 +373,77 @@ export default function ScorecardSelectionPage() {
       // Fetch match reports for coach top rating scores
       const reportsRes = await getMatchReportsForSeriesAction(seriesId, activeOrganizationId);
       const matchReports = reportsRes.success ? (reportsRes.reports || []) : [];
-      const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports);
-      setAggregated(classifyPlayers(stats, constraints.minBowlerOversPerGame, res.scorecards));
+      // Build name resolution map from player links (scorecardName → canonical profile name)
+      const nameResolutionMap = new Map<string, string>();
+      try {
+        if (activeOrganizationId) {
+          const scPlayers = await getScorecardPlayersAction(activeOrganizationId);
+          for (const sp of scPlayers) {
+            const canonical = (sp as any).linkedPlayerName;
+            if (canonical && sp.name) {
+              nameResolutionMap.set(sp.name.toLowerCase().trim(), canonical);
+            }
+          }
+          console.log('[XI Selector] Name resolution map:', nameResolutionMap.size, 'entries');
+      // Debug Aarush specifically
+      for (const [k, v] of nameResolutionMap.entries()) {
+        if (k.includes('aarush') || k.includes('arush')) console.log('[XI Selector] Aarush entry:', JSON.stringify(k), '->', JSON.stringify(v));
+      }
+        }
+      } catch (e) { console.warn('Could not load player links:', e); }
+
+      // Track which canonical names are linked
+      const linkedCanonicalNames = new Set<string>(nameResolutionMap.values());
+
+      const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports, minGamesPlayed, bestNGames, nameResolutionMap);
+
+      // Second-pass: merge abbreviated fielder names into canonical linked names
+      // Catches cases where dismissal text uses "Sri Akshaj D" but full name is "Sri Akshaj Dumpala"
+      const mergedMap = new Map<string, typeof stats[0]>();
+      for (const p of stats) {
+        const pLower = p.name.toLowerCase().trim();
+        const pParts = pLower.split(' ');
+        let canonicalMatch: string | null = null;
+        // Only try to match if this looks like an abbreviation (last part is 1-2 chars or ends with .)
+        const lastPart = pParts[pParts.length - 1].replace('.', '');
+        if (pParts.length >= 2 && lastPart.length <= 2) {
+          for (const canonical of linkedCanonicalNames) {
+            const cParts = canonical.toLowerCase().trim().split(' ');
+            if (cParts[0] !== pParts[0]) continue;
+            // Check if ANY word in canonical name starts with the initial
+            // Handles "Vishruth Y" → "Vishruth Yadhava Krishnan" (Y matches Yadhava)
+            // Handles "Aarush R" → "Aarush Reddy Mothey" (R matches Reddy)
+            const anyWordMatches = cParts.slice(1).some(part => part.startsWith(lastPart));
+            if (anyWordMatches) {
+              canonicalMatch = canonical;
+              break;
+            }
+          }
+        }
+        const key = canonicalMatch || p.name;
+        if (mergedMap.has(key)) {
+          const ex = mergedMap.get(key)!;
+          ex.totalScore = Math.round((ex.totalScore + p.totalScore) * 10) / 10;
+          ex.totalBattingScore = Math.round((ex.totalBattingScore + p.totalBattingScore) * 10) / 10;
+          ex.totalBowlingScore = Math.round((ex.totalBowlingScore + p.totalBowlingScore) * 10) / 10;
+          ex.totalFieldingScore = Math.round((ex.totalFieldingScore + p.totalFieldingScore) * 10) / 10;
+          ex.totalRuns += p.totalRuns; ex.totalWickets += p.totalWickets;
+          ex.totalCatches += p.totalCatches; ex.totalOvers += p.totalOvers;
+          ex.gamesPlayed = Math.max(ex.gamesPlayed, p.gamesPlayed);
+        } else {
+          mergedMap.set(key, { ...p, name: key });
+        }
+      }
+      const finalStats = Array.from(mergedMap.values()).sort((a, b) => b.totalScore - a.totalScore);
+      setLinkedNames(linkedCanonicalNames);
+
+      // Load accepted match report deltas for this series
+      const gameIds = res.scorecards.map((s: any) => s.gameId).filter(Boolean);
+      if (gameIds.length && activeOrganizationId) {
+        const deltasRes = await getAcceptedDeltasForSeriesAction(activeOrganizationId, gameIds);
+        if (deltasRes.success) setAcceptedDeltas(deltasRes.deltas || []);
+      }
+      setAggregated(classifyPlayers(finalStats, constraints.minBowlerOversPerGame, res.scorecards));
     } else {
       setScorecards([]);
       setAggregated([]);
@@ -273,7 +476,11 @@ export default function ScorecardSelectionPage() {
     if (!aggregated.length || !selectedSeries) return;
     setIsGenerating(true);
     setSelectionResult(null);
-    const res = await suggestXIFromScorecardAction(aggregated, constraints, selectedSeries.name);
+    // Only pass linked players to AI — unlinked are temp/filler
+    const eligiblePlayers = linkedNames.size > 0
+      ? aggregated.filter(p => linkedNames.has(p.name))
+      : aggregated;
+    const res = await suggestXIFromScorecardAction(eligiblePlayers, constraints, selectedSeries.name);
     if (res.success && res.result) {
       setSelectionResult(res.result);
     } else {
@@ -379,6 +586,58 @@ export default function ScorecardSelectionPage() {
                   </div>
                 ))}
 
+                {/* Unlinked player filter */}
+                <div className="border-t pt-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        Hide unlinked players
+                        {linkedNames.size > 0 && aggregated.filter(p => !linkedNames.has(p.name)).length > 0 && (
+                          <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded px-1.5 py-0.5">
+                            {aggregated.filter(p => !linkedNames.has(p.name)).length} unlinked
+                          </span>
+                        )}
+                      </Label>
+                      <p className="text-xs text-muted-foreground/60">Unlinked players excluded from AI selection</p>
+                    </div>
+                    <input type="checkbox" checked={hideUnlinked}
+                      onChange={e => setHideUnlinked(e.target.checked)}
+                      className="h-4 w-4" />
+                  </div>
+                </div>
+
+                {/* Min games played + best N — separate controls */}
+                <div className="border-t pt-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Min Games Played</Label>
+                      <p className="text-xs text-muted-foreground/60">0 = include all players</p>
+                    </div>
+                    <Input type="number" min={0} max={50}
+                      className="h-7 w-16 text-sm text-right"
+                      value={minGamesPlayed}
+                      onChange={e => setMinGamesPlayed(parseInt(e.target.value) || 0)} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Use Best N Games</Label>
+                      <p className="text-xs text-muted-foreground/60">0 = use all games played</p>
+                    </div>
+                    <Input type="number" min={0} max={50}
+                      className="h-7 w-16 text-sm text-right"
+                      value={bestNGames}
+                      onChange={e => setBestNGames(parseInt(e.target.value) || 0)} />
+                  </div>
+                  {bestNGames > 0 && minGamesPlayed > 0 && bestNGames > minGamesPlayed && (
+                    <p className="text-xs text-destructive">Best N should be ≤ Min Games Played</p>
+                  )}
+                  {bestNGames > 0 && (
+                    <p className="text-xs text-muted-foreground bg-muted/30 rounded px-2 py-1.5">
+                      Scores recalculated using each player top {bestNGames} game{bestNGames > 1 ? 's' : ''} only — levels the field for players with different game counts.
+                    </p>
+                  )}
+                </div>
+
                 <Button
                   onClick={handleGenerateXI}
                   disabled={!aggregated.length || isGenerating || isLoadingScorecards || !!savedXI}
@@ -433,7 +692,36 @@ export default function ScorecardSelectionPage() {
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm text-muted-foreground">
-                        Series aggregate — {scorecards.length} game(s) · sorted by total points
+                        Series aggregate — {scorecards.length} game(s) · {aggregated.length} eligible players
+                        {minGamesPlayed > 0 && ` · min ${minGamesPlayed} games played`}
+                        {bestNGames > 0 && ` · best ${bestNGames} games scored`}
+                        {' · '}sorted by {includeForm ? 'adjusted score (base + form)' : 'total points'}
+
+                        {/* Form controls */}
+                        <div className="flex flex-wrap items-center gap-4 mt-3 p-3 bg-muted/30 rounded-lg border text-sm">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={includeForm} onChange={e => setIncludeForm(e.target.checked)} className="h-4 w-4" />
+                            <span className="font-medium">Include Recent Match Form</span>
+                          </label>
+                          {includeForm && (
+                            <>
+                              <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground text-xs">Form window:</span>
+                                <input type="range" min={1} max={10} step={1} value={formWindow}
+                                  onChange={e => setFormWindow(Number(e.target.value))}
+                                  className="w-20" />
+                                <span className="text-xs font-medium w-16">Last {formWindow} game{formWindow > 1 ? 's' : ''}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground text-xs">Form weight:</span>
+                                <input type="range" min={0} max={50} step={5} value={formWeight}
+                                  onChange={e => setFormWeight(Number(e.target.value))}
+                                  className="w-20" />
+                                <span className="text-xs font-medium w-16">{formWeight}% form / {100 - formWeight}% base</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -453,7 +741,40 @@ export default function ScorecardSelectionPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {aggregated.map((p, i) => <PlayerStatsRow key={p.name} player={p} rank={i} />)}
+                            {(() => {
+                              // Get ordered game IDs most recent first
+                              const orderedGameIds = [...new Set(
+                                scorecards
+                                  .sort((a: any, b: any) => (b.gameDate || '').localeCompare(a.gameDate || ''))
+                                  .map((s: any) => s.gameId)
+                                  .filter(Boolean)
+                              )];
+                              const displayPlayers = aggregated
+                                .filter(p => hideUnlinked && linkedNames.size > 0 ? linkedNames.has(p.name) : true)
+                                .filter(p => minGamesPlayed === 0 || p.gamesPlayed >= minGamesPlayed);
+                              return displayPlayers
+                                .map(p => {
+                                  const form = includeForm && acceptedDeltas.length > 0
+                                    ? computeFormDelta(p.name, acceptedDeltas, orderedGameIds, formWindow, formWeight)
+                                    : null;
+                                  return { p, form };
+                                })
+                                .sort((a, b) => {
+                                  if (!includeForm || !acceptedDeltas.length) return 0;
+                                  const aAdj = a.p.totalScore + (a.form?.net || 0);
+                                  const bAdj = b.p.totalScore + (b.form?.net || 0);
+                                  return bAdj - aAdj;
+                                })
+                                .map(({ p, form }, i) => (
+                                  <PlayerStatsRowV2
+                                    key={p.name} player={p} rank={i}
+                                    form={form}
+                                    showForm={includeForm && acceptedDeltas.length > 0}
+                                    formWindow={formWindow}
+                                    isLinked={linkedNames.size === 0 || linkedNames.has(p.name)}
+                                  />
+                                ));
+                            })()}
                           </tbody>
                         </table>
                       </div>

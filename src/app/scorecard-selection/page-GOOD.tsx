@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { getAllSeriesFromDB } from '@/lib/db';
-import { getScorecardsBySeriesAction } from '@/lib/actions/scorecard-actions';
+import { getScorecardsBySeriesAction, getScorecardPlayersAction } from '@/lib/actions/scorecard-actions';
 import { saveScorecardXIAction, clearScorecardXIAction } from '@/lib/actions/series-actions';
 import { getMatchReportsForSeriesAction } from '@/lib/actions/match-report-actions';
 import { getAcceptedDeltasForSeriesAction, type MatchReportDelta } from '@/lib/actions/match-report-ai-action';
@@ -310,7 +310,7 @@ export default function ScorecardSelectionPage() {
   const [minGamesPlayed, setMinGamesPlayed] = useState(0);
   const [bestNGames, setBestNGames] = useState(0); // last N games
   const [formWeight, setFormWeight] = useState(30); // % weight for form
-  const [includeForm, setIncludeForm] = useState(true);
+  const [includeForm, setIncludeForm] = useState(false);
   const [acceptedDeltas, setAcceptedDeltas] = useState<(MatchReportDelta & { id: string; gameId: string })[]>([]);
 
   const [constraints, setConstraints] = useState<ScorecardSelectionConstraints>(DEFAULT_SELECTION_CONSTRAINTS);
@@ -368,7 +368,23 @@ export default function ScorecardSelectionPage() {
       // Fetch match reports for coach top rating scores
       const reportsRes = await getMatchReportsForSeriesAction(seriesId, activeOrganizationId);
       const matchReports = reportsRes.success ? (reportsRes.reports || []) : [];
-      const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports, minGamesPlayed, bestNGames);
+      // Build name resolution map from player links (scorecardName → canonical profile name)
+      const nameResolutionMap = new Map<string, string>();
+      try {
+        if (activeOrganizationId) {
+          const scPlayers = await getScorecardPlayersAction(activeOrganizationId);
+          for (const sp of scPlayers) {
+            const canonical = (sp as any).linkedPlayerName;
+            if (canonical && sp.name) {
+              nameResolutionMap.set(sp.name.toLowerCase().trim(), canonical);
+            }
+          }
+          console.log('[XI Selector] Name resolution map:', nameResolutionMap.size, 'entries');
+        }
+      } catch (e) { console.warn('Could not load player links:', e); }
+
+      const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports, minGamesPlayed, bestNGames, nameResolutionMap);
+
       // Load accepted match report deltas for this series
       const gameIds = res.scorecards.map((s: any) => s.gameId).filter(Boolean);
       if (gameIds.length && activeOrganizationId) {
@@ -609,7 +625,7 @@ export default function ScorecardSelectionPage() {
                         <div className="flex flex-wrap items-center gap-4 mt-3 p-3 bg-muted/30 rounded-lg border text-sm">
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" checked={includeForm} onChange={e => setIncludeForm(e.target.checked)} className="h-4 w-4" />
-                            <span className="font-medium">Include match form</span>
+                            <span className="font-medium">Include Recent Match Form</span>
                           </label>
                           {includeForm && (
                             <>
