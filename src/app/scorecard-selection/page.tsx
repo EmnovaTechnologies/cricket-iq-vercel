@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { getAllSeriesFromDB } from '@/lib/db';
-import { getScorecardsBySeriesAction } from '@/lib/actions/scorecard-actions';
+import { getAllSeriesFromDB, getPlayerByIdFromDB } from '@/lib/db';
+import { getScorecardsBySeriesAction, getScorecardPlayersAction } from '@/lib/actions/scorecard-actions';
 import { saveScorecardXIAction, clearScorecardXIAction } from '@/lib/actions/series-actions';
 import { getMatchReportsForSeriesAction } from '@/lib/actions/match-report-actions';
 import { getAcceptedDeltasForSeriesAction, type MatchReportDelta } from '@/lib/actions/match-report-ai-action';
@@ -368,7 +368,26 @@ export default function ScorecardSelectionPage() {
       // Fetch match reports for coach top rating scores
       const reportsRes = await getMatchReportsForSeriesAction(seriesId, activeOrganizationId);
       const matchReports = reportsRes.success ? (reportsRes.reports || []) : [];
-      const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports, minGamesPlayed, bestNGames);
+      // Build name resolution map from player links (scorecardName → canonical profile name)
+      const nameResolutionMap = new Map<string, string>();
+      try {
+        if (activeOrganizationId) {
+          const scPlayers = await getScorecardPlayersAction(activeOrganizationId);
+          // Only process linked players
+          const linked = scPlayers.filter(sp => sp.linkedPlayerId && sp.name);
+          // Batch fetch player profiles for canonical names
+          const profileNames = await Promise.all(
+            linked.map(sp => getPlayerByIdFromDB(sp.linkedPlayerId!).catch(() => null))
+          );
+          linked.forEach((sp, i) => {
+            const profile = profileNames[i];
+            const canonical = profile?.name || sp.name;
+            nameResolutionMap.set(sp.name.toLowerCase().trim(), canonical);
+          });
+        }
+      } catch (e) { console.warn('Could not load player links:', e); }
+
+      const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports, minGamesPlayed, bestNGames, nameResolutionMap);
       // Load accepted match report deltas for this series
       const gameIds = res.scorecards.map((s: any) => s.gameId).filter(Boolean);
       if (gameIds.length && activeOrganizationId) {

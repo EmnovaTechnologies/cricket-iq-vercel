@@ -34,7 +34,9 @@ export function aggregatePlayerStats(
   config: ScorecardScoringConfig | typeof DEFAULT_SCORING_CONFIG,
   matchReports: MatchReport[] = [],
   minGamesPlayed: number = 0,
-  bestNGames: number = 0
+  bestNGames: number = 0,
+  /** Map of scorecardPlayerName (lowercase) → canonical player profile name */
+  nameResolutionMap: Map<string, string> = new Map()
 ): AggregatedPlayerStats[] {
   const playerMap = new Map<string, AggregatedPlayerStats>();
   // Track per-game scores for bestNGames feature
@@ -46,14 +48,16 @@ export function aggregatePlayerStats(
     const scores = calculatePlayerScores(sc.innings, config, sc.team1, sc.team2);
 
     for (const s of scores) {
-      const existing = playerMap.get(s.name);
+      // Resolve to canonical name if a player link exists
+      const resolvedName = nameResolutionMap.get(s.name.toLowerCase().trim()) || s.name;
+      const existing = playerMap.get(resolvedName);
 
       if (!existing) {
         // Track per-game score
-        if (!perGameScores.has(s.name)) perGameScores.set(s.name, []);
-        perGameScores.get(s.name)!.push(s.totalScore);
-        playerMap.set(s.name, {
-          name: s.name,
+        if (!perGameScores.has(resolvedName)) perGameScores.set(resolvedName, []);
+        perGameScores.get(resolvedName)!.push(s.totalScore);
+        playerMap.set(resolvedName, {
+          name: resolvedName,
           team: s.team,
           gamesPlayed: 1,
           // Batting
@@ -86,7 +90,7 @@ export function aggregatePlayerStats(
       } else {
         // Accumulate
         existing.gamesPlayed++;
-        perGameScores.get(s.name)!.push(s.totalScore);
+        perGameScores.get(resolvedName)!.push(s.totalScore);
         existing.totalRuns += s.batting?.runs || 0;
         existing.totalBalls += s.batting?.balls || 0;
         existing.totalFours += s.batting?.fours || 0;
