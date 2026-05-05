@@ -32,9 +32,13 @@ function countCoachMentions(playerName: string, reports: MatchReport[]): number 
 export function aggregatePlayerStats(
   scorecards: MatchScorecard[],
   config: ScorecardScoringConfig | typeof DEFAULT_SCORING_CONFIG,
-  matchReports: MatchReport[] = []
+  matchReports: MatchReport[] = [],
+  minGamesPlayed: number = 0,
+  bestNGames: number = 0
 ): AggregatedPlayerStats[] {
   const playerMap = new Map<string, AggregatedPlayerStats>();
+  // Track per-game scores for bestNGames feature
+  const perGameScores = new Map<string, number[]>();
 
   for (const sc of scorecards) {
     if (!sc.innings?.length) continue;
@@ -45,6 +49,9 @@ export function aggregatePlayerStats(
       const existing = playerMap.get(s.name);
 
       if (!existing) {
+        // Track per-game score
+        if (!perGameScores.has(s.name)) perGameScores.set(s.name, []);
+        perGameScores.get(s.name)!.push(s.totalScore);
         playerMap.set(s.name, {
           name: s.name,
           team: s.team,
@@ -79,6 +86,7 @@ export function aggregatePlayerStats(
       } else {
         // Accumulate
         existing.gamesPlayed++;
+        perGameScores.get(s.name)!.push(s.totalScore);
         existing.totalRuns += s.batting?.runs || 0;
         existing.totalBalls += s.batting?.balls || 0;
         existing.totalFours += s.batting?.fours || 0;
@@ -96,6 +104,36 @@ export function aggregatePlayerStats(
         existing.totalBowlingScore += s.bowlingScore;
         existing.totalFieldingScore += s.fieldingScore;
         existing.totalScore += s.totalScore;
+      }
+    }
+  }
+
+  // Apply minGamesPlayed filter
+  if (minGamesPlayed > 0) {
+    for (const [name, p] of playerMap.entries()) {
+      if (p.gamesPlayed < minGamesPlayed) playerMap.delete(name);
+    }
+  }
+
+  // Apply bestNGames — recalculate totalScore using only top N game scores
+  if (bestNGames > 0) {
+    for (const [name, p] of playerMap.entries()) {
+      const games = perGameScores.get(name) || [];
+      if (games.length > bestNGames) {
+        // Sort descending, take top N
+        const topN = [...games].sort((a, b) => b - a).slice(0, bestNGames);
+        const topNTotal = topN.reduce((s, v) => s + v, 0);
+        // Scale factor to adjust totalScore proportionally
+        const originalTotal = games.reduce((s, v) => s + v, 0);
+        if (originalTotal > 0) {
+          const scale = topNTotal / originalTotal;
+          p.totalScore = Math.round(p.totalScore * scale * 10) / 10;
+          p.totalBattingScore = Math.round(p.totalBattingScore * scale * 10) / 10;
+          p.totalBowlingScore = Math.round(p.totalBowlingScore * scale * 10) / 10;
+          p.totalFieldingScore = Math.round(p.totalFieldingScore * scale * 10) / 10;
+        }
+        // Update gamesPlayed to reflect bestN context
+        p.gamesPlayed = bestNGames;
       }
     }
   }
