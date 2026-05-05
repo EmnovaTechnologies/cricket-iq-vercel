@@ -65,19 +65,20 @@ ${input.sections.sportsmanship || '(empty)'}
 
 RULES:
 1. Section headers are HINTS ONLY — analyse actual text sentiment regardless of section
-2. IGNORE any phrases containing: "negated by umpire", "given not out", "umpire decision", "umpire call" — these are external factors
-3. "Uncharacteristically" reduces weight of negative observation by ~50%
-4. Same player mentioned multiple times → aggregate per dimension (do not double count)
-5. Only suggest deltas for players in the roster above
-6. Dimension mapping:
+2. Determine positive/negative intent from MEANING not notation — some coaches use +ve/-ve markers, others write plain text. Judge the actual sentiment regardless
+3. IGNORE any phrases containing: "negated by umpire", "given not out", "umpire decision", "umpire call" — these are external factors
+4. "Uncharacteristically" reduces weight of negative observation by ~50%
+5. Same player mentioned multiple times → aggregate per dimension (do not double count)
+6. Only suggest deltas for players in the roster above
+7. Dimension mapping:
    - batting: runs, shot selection, timing, boundaries
    - bowling: wickets, economy, line/length, variations  
    - fielding: catches, run outs, ground fielding, throwing
    - keeping: wicket keeping catches, stumpings, handling wides/byes
    - attitude: conduct, arguing, sportsmanship, effort, teamwork
-7. Delta scale: +2 (exceptional), +1 (good), +0.5 (minor positive), -0.5 (minor negative), -1 (poor), -2 (very poor)
-8. Confidence: high (explicit clear mention), medium (implied), low (vague or context unclear)
-9. If a player has both positive and negative mentions for same dimension, create separate entries
+8. Delta scale: +2 (exceptional), +1 (good), +0.5 (minor positive), -0.5 (minor negative), -1 (poor), -2 (very poor)
+9. Confidence: high (explicit clear mention), medium (implied), low (vague or context unclear)
+10. If a player has both positive and negative mentions for same dimension, create separate entries
 
 Respond ONLY with a JSON array. No markdown, no explanation. Example format:
 [
