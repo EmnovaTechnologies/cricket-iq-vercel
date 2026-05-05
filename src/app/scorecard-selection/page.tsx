@@ -357,8 +357,9 @@ export default function ScorecardSelectionPage() {
   // Load scorecards when series selected
   // Re-aggregate when min games or best N changes (without re-fetching from Firestore)
   useEffect(() => {
-    if (!loadedScorecards.length || !effectiveConfig) return;
-    const stats = aggregatePlayerStats(loadedScorecards, effectiveConfig, loadedMatchReports, minGamesPlayed, bestNGames, loadedNameResolutionMap);
+    const cfg = config || DEFAULT_SCORING_CONFIG;
+    if (!loadedScorecards.length) return;
+    const stats = aggregatePlayerStats(loadedScorecards, cfg, loadedMatchReports, minGamesPlayed, bestNGames, loadedNameResolutionMap);
     const mergedMap = new Map<string, typeof stats[0]>();
     for (const p of stats) {
       const pLower = p.name.toLowerCase().trim();
