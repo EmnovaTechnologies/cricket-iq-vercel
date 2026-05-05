@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { getAllSeriesFromDB, getPlayerByIdFromDB } from '@/lib/db';
+import { getAllSeriesFromDB } from '@/lib/db';
 import { getScorecardsBySeriesAction, getScorecardPlayersAction } from '@/lib/actions/scorecard-actions';
 import { saveScorecardXIAction, clearScorecardXIAction } from '@/lib/actions/series-actions';
 import { getMatchReportsForSeriesAction } from '@/lib/actions/match-report-actions';
@@ -369,21 +369,18 @@ export default function ScorecardSelectionPage() {
       const reportsRes = await getMatchReportsForSeriesAction(seriesId, activeOrganizationId);
       const matchReports = reportsRes.success ? (reportsRes.reports || []) : [];
       // Build name resolution map from player links (scorecardName → canonical profile name)
+      // linkedPlayerName is stored directly on ScorecardPlayer when linked
       const nameResolutionMap = new Map<string, string>();
       try {
         if (activeOrganizationId) {
           const scPlayers = await getScorecardPlayersAction(activeOrganizationId);
-          // Only process linked players
-          const linked = scPlayers.filter(sp => sp.linkedPlayerId && sp.name);
-          // Batch fetch player profiles for canonical names
-          const profileNames = await Promise.all(
-            linked.map(sp => getPlayerByIdFromDB(sp.linkedPlayerId!).catch(() => null))
-          );
-          linked.forEach((sp, i) => {
-            const profile = profileNames[i];
-            const canonical = profile?.name || sp.name;
-            nameResolutionMap.set(sp.name.toLowerCase().trim(), canonical);
-          });
+          for (const sp of scPlayers) {
+            const canonical = (sp as any).linkedPlayerName;
+            if (canonical && sp.name) {
+              nameResolutionMap.set(sp.name.toLowerCase().trim(), canonical);
+            }
+          }
+          console.log('[XI Selector] Name resolution map:', nameResolutionMap.size, 'entries');
         }
       } catch (e) { console.warn('Could not load player links:', e); }
 
