@@ -23,13 +23,17 @@ import { Separator } from '@/components/ui/separator';
 import {
   Loader2, Send, ShieldCheck, Trophy, AlertTriangle,
   Star, Heart, FileText, CheckCircle2, Clock, Lock, LockOpen
-, Pencil, Save , Sparkles } from 'lucide-react';
+, Pencil, Save , Sparkles , Upload, FileText, ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { MentionTextarea, MentionText } from '@/components/ui/mention-textarea';
 import {
   analyseMatchReportAction, saveMatchReportDeltasAction,
   type MatchReportDelta,
 } from '@/lib/actions/match-report-ai-action';
+import {
+  parseMatchReportImageAction, parseMatchReportDocxAction,
+  type ParsedMatchReport,
+} from '@/lib/actions/match-report-import-action';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 
 interface MatchReportTabProps {
@@ -76,6 +80,9 @@ export function MatchReportTab({
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAnalysing, setIsAnalysing] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importPreview, setImportPreview] = useState<ParsedMatchReport | null>(null);
   const [analysisDeltas, setAnalysisDeltas] = useState<(MatchReportDelta & { id?: string })[]>([]);
   const [deltaAccepted, setDeltaAccepted] = useState<Map<number, boolean | null>>(new Map());
   const [isSavingDeltas, setIsSavingDeltas] = useState(false);
@@ -456,6 +463,153 @@ export function MatchReportTab({
             </div>
 
             <Separator />
+
+            {/* Import from image/doc */}
+            <div className="border rounded-lg overflow-hidden mb-2">
+              <button
+                type="button"
+                onClick={() => setShowImport(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-muted/30 transition-colors">
+                <span className="flex items-center gap-2">
+                  <Upload className="h-4 w-4 text-primary" />
+                  Import from photo or Word doc
+                </span>
+                {showImport ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              </button>
+
+              {showImport && (
+                <div className="border-t px-4 py-3 space-y-3 bg-muted/10">
+                  <p className="text-xs text-muted-foreground">
+                    Upload a photo of a handwritten report or a Word document (.docx). 
+                    Content will be automatically sorted into the correct fields — you can review and edit before submitting.
+                  </p>
+                  <div className="flex gap-3 flex-wrap">
+                    {/* Image upload */}
+                    <label className="flex items-center gap-2 px-3 py-2 border rounded-md text-sm cursor-pointer hover:bg-muted/30 transition-colors">
+                      <ImageIcon className="h-4 w-4 text-primary" />
+                      Upload photo (JPG/PNG)
+                      <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                        onChange={async e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setIsImporting(true);
+                          setImportPreview(null);
+                          const reader = new FileReader();
+                          reader.onload = async ev => {
+                            const dataUrl = ev.target?.result as string;
+                            const base64 = dataUrl.split(',')[1];
+                            const mediaType = file.type as 'image/jpeg' | 'image/png' | 'image/webp';
+                            const res = await parseMatchReportImageAction(
+                              base64, mediaType,
+                              allPlayers.map(p => p.name)
+                            );
+                            if (res.success && res.parsed) {
+                              setImportPreview(res.parsed);
+                            } else {
+                              toast({ title: 'Import failed', description: res.error, variant: 'destructive' });
+                            }
+                            setIsImporting(false);
+                          };
+                          reader.readAsDataURL(file);
+                          e.target.value = '';
+                        }} />
+                    </label>
+
+                    {/* Docx upload */}
+                    <label className="flex items-center gap-2 px-3 py-2 border rounded-md text-sm cursor-pointer hover:bg-muted/30 transition-colors">
+                      <FileText className="h-4 w-4 text-primary" />
+                      Upload Word doc (.docx)
+                      <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden"
+                        onChange={async e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setIsImporting(true);
+                          setImportPreview(null);
+                          // Read docx as ArrayBuffer and extract text client-side via mammoth
+                          const reader = new FileReader();
+                          reader.onload = async ev => {
+                            try {
+                              const mammoth = await import('mammoth');
+                              const result = await mammoth.extractRawText({ arrayBuffer: ev.target?.result as ArrayBuffer });
+                              const res = await parseMatchReportDocxAction(
+                                result.value,
+                                allPlayers.map(p => p.name)
+                              );
+                              if (res.success && res.parsed) {
+                                setImportPreview(res.parsed);
+                              } else {
+                                toast({ title: 'Import failed', description: res.error, variant: 'destructive' });
+                              }
+                            } catch (err: any) {
+                              toast({ title: 'Could not read docx', description: err.message, variant: 'destructive' });
+                            }
+                            setIsImporting(false);
+                          };
+                          reader.readAsArrayBuffer(file);
+                          e.target.value = '';
+                        }} />
+                    </label>
+
+                    {isImporting && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Scanning report...
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Preview panel */}
+                  {importPreview && (
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="bg-green-50 dark:bg-green-950 px-4 py-2.5 flex items-center justify-between">
+                        <span className="text-sm font-medium text-green-700 dark:text-green-300 flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4" /> Report scanned — review and apply
+                        </span>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" className="h-7 text-xs"
+                            onClick={() => setImportPreview(null)}>
+                            Discard
+                          </Button>
+                          <Button size="sm" className="h-7 text-xs bg-green-700 hover:bg-green-800"
+                            onClick={() => {
+                              if (!importPreview) return;
+                              if (importPreview.highlights) setHighlights(importPreview.highlights);
+                              if (importPreview.missedCatches) setMissedCatches(importPreview.missedCatches);
+                              if (importPreview.missedRunOuts) setMissedRunOuts(importPreview.missedRunOuts);
+                              if (importPreview.greatCatchesRunOuts) setGreatCatchesRunOuts(importPreview.greatCatchesRunOuts);
+                              if (importPreview.sportsmanship) setSportsmanship(importPreview.sportsmanship);
+                              setImportPreview(null);
+                              setShowImport(false);
+                              toast({ title: 'Report imported ✓', description: 'Review the fields below and submit when ready.' });
+                            }}>
+                            Apply to form
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="px-4 py-3 space-y-2.5 text-xs">
+                        {[
+                          { label: 'Highlights', value: importPreview.highlights },
+                          { label: 'Missed Catches', value: importPreview.missedCatches },
+                          { label: 'Missed Run-Outs', value: importPreview.missedRunOuts },
+                          { label: 'Great Catches/Run-Outs', value: importPreview.greatCatchesRunOuts },
+                          { label: 'Sportsmanship', value: importPreview.sportsmanship },
+                        ].filter(f => f.value).map(f => (
+                          <div key={f.label}>
+                            <p className="font-medium text-muted-foreground uppercase tracking-wide text-xs mb-0.5">{f.label}</p>
+                            <p className="text-foreground whitespace-pre-wrap leading-relaxed">{f.value}</p>
+                          </div>
+                        ))}
+                        {importPreview.top3?.length > 0 && (
+                          <div>
+                            <p className="font-medium text-muted-foreground uppercase tracking-wide text-xs mb-0.5">Top 3 Performers</p>
+                            <p>{importPreview.top3.join(', ')}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Highlights */}
             <div className="space-y-1.5">
