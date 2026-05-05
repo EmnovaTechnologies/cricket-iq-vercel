@@ -13,7 +13,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
   AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { CalendarFold, ArrowRight, Trash2, Loader2, FileText } from 'lucide-react';
+import { CalendarFold, ArrowRight, Trash2, Loader2, FileText, Upload } from 'lucide-react';
+import { useState } from 'react';
+import { ScorecardImportModal } from '@/components/scorecard-import-modal';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -25,12 +27,15 @@ interface ScorecardListRowProps {
   currentUser: { uid: string } | null;
   canImport: boolean;
   hasReports: boolean;
+  canImportReport?: boolean;
+  rosterPlayerNames?: string[];
   deletingId: string | null;
   onDelete: (sc: MatchScorecard) => void;
   isLast?: boolean;
 }
 
-export function ScorecardListRow({ sc, isMobile, isSelector, currentUser, canImport, hasReports, deletingId, onDelete, isLast }: ScorecardListRowProps) {
+export function ScorecardListRow({ sc, isMobile, isSelector, currentUser, canImport, hasReports, deletingId, onDelete, isLast, canImportReport, rosterPlayerNames = [] }: ScorecardListRowProps) {
+  const [showImportModal, setShowImportModal] = useState(false);
   return (
     <div className={cn('flex items-center gap-4 px-4 py-3', !isLast && 'border-b border-border')}>
       {/* Main info */}
@@ -105,7 +110,24 @@ export function ScorecardListRow({ sc, isMobile, isSelector, currentUser, canImp
             </AlertDialog>
           )
         )}
+        {canImportReport && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2.5 text-xs border-primary/40 text-primary hover:bg-primary/10"
+            onClick={() => setShowImportModal(true)}>
+            <Upload className="h-3 w-3 mr-1" /> Import
+          </Button>
+        )}
       </div>
+      {showImportModal && (
+        <ScorecardImportModal
+          sc={sc}
+          open={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          rosterPlayerNames={rosterPlayerNames}
+        />
+      )}
     </div>
   );
 }

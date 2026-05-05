@@ -97,6 +97,24 @@ export function MatchReportTab({
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAnalysing, setIsAnalysing] = useState(false);
+
+  // Read pre-filled import data from sessionStorage (set by scorecard card/list import)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = sessionStorage.getItem(`import_report_${scorecardId}`);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.highlights) setHighlights(parsed.highlights);
+        if (parsed.missedCatches) setMissedCatches(parsed.missedCatches);
+        if (parsed.missedRunOuts) setMissedRunOuts(parsed.missedRunOuts);
+        if (parsed.greatCatchesRunOuts) setGreatCatchesRunOuts(parsed.greatCatchesRunOuts);
+        if (parsed.sportsmanship) setSportsmanship(parsed.sportsmanship);
+        sessionStorage.removeItem(`import_report_${scorecardId}`);
+        toast({ title: 'Report imported ✓', description: 'Fields pre-filled — review and edit before submitting.' });
+      } catch {}
+    }
+  }, [scorecardId]);
   const [isImporting, setIsImporting] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importPreview, setImportPreview] = useState<ParsedMatchReport | null>(null);

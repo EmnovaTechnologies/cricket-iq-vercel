@@ -14,7 +14,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
   AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { CalendarFold, ArrowRight, Trash2, Loader2, FileText } from 'lucide-react';
+import { CalendarFold, ArrowRight, Trash2, Loader2, FileText, Upload } from 'lucide-react';
+import { useState } from 'react';
+import { ScorecardImportModal } from '@/components/scorecard-import-modal';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 
@@ -25,11 +27,14 @@ interface ScorecardCardProps {
   currentUser: { uid: string } | null;
   canImport: boolean;
   hasReports: boolean;
+  canImportReport?: boolean;
+  rosterPlayerNames?: string[];
   deletingId: string | null;
   onDelete: (sc: MatchScorecard) => void;
 }
 
-export function ScorecardCard({ sc, isMobile, isSelector, currentUser, canImport, hasReports, deletingId, onDelete }: ScorecardCardProps) {
+export function ScorecardCard({ sc, isMobile, isSelector, currentUser, canImport, hasReports, deletingId, onDelete, canImportReport, rosterPlayerNames = [] }: ScorecardCardProps) {
+  const [showImportModal, setShowImportModal] = useState(false);
   return (
     <Card className="flex flex-col h-full hover:shadow-lg transition-shadow duration-300">
       <CardHeader className="p-3 space-y-1">
@@ -102,7 +107,26 @@ export function ScorecardCard({ sc, isMobile, isSelector, currentUser, canImport
             </AlertDialogContent>
           </AlertDialog>
         )}
+      {canImportReport && (
+        <div className="px-2 pb-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-xs border-primary/40 text-primary hover:bg-primary/10"
+            onClick={() => setShowImportModal(true)}>
+            <Upload className="h-3.5 w-3.5 mr-1.5" /> Import Match Report
+          </Button>
+        </div>
+      )}
       </CardFooter>
+      {showImportModal && (
+        <ScorecardImportModal
+          sc={sc}
+          open={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          rosterPlayerNames={rosterPlayerNames}
+        />
+      )}
     </Card>
   );
 }
