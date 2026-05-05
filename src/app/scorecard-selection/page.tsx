@@ -381,10 +381,17 @@ export default function ScorecardSelectionPage() {
             }
           }
           console.log('[XI Selector] Name resolution map:', nameResolutionMap.size, 'entries');
+          console.log('[XI Selector] Sample entries:', Array.from(nameResolutionMap.entries()).slice(0, 5));
+          // Log any Atal entries specifically
+          for (const [k, v] of nameResolutionMap.entries()) {
+            if (k.includes('atal')) console.log('[XI Selector] Atal entry:', k, '->', v);
+          }
         }
       } catch (e) { console.warn('Could not load player links:', e); }
 
       const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports, minGamesPlayed, bestNGames, nameResolutionMap);
+      const atalPlayers = stats.filter(p => p.name.toLowerCase().includes('atal'));
+      if (atalPlayers.length > 0) console.log('[XI Selector] Atal players after aggregation:', atalPlayers.map(p => p.name + ' (' + p.gamesPlayed + 'g)'));
       // Load accepted match report deltas for this series
       const gameIds = res.scorecards.map((s: any) => s.gameId).filter(Boolean);
       if (gameIds.length && activeOrganizationId) {
