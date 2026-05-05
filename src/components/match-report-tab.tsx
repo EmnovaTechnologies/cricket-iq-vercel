@@ -711,19 +711,128 @@ export function MatchReportTab({
             </div>
 
             {/* AI Analysis — admin only, shown after at least one report exists */}
-            {canViewAdmin && reports.length > 0 && (
+            {canViewAdmin && (
               <div className="space-y-3 pt-1">
                 <Separator />
+                {/* Import section — always visible for admins */}
+                <div className="border rounded-lg overflow-hidden">
+                  <button type="button" onClick={() => setShowImport(v => !v)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-muted/30 transition-colors">
+                    <span className="flex items-center gap-2">
+                      <Upload className="h-4 w-4 text-primary" />
+                      Import match report from photo or Word doc
+                    </span>
+                    {showImport ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                  {showImport && (
+                    <div className="border-t px-4 py-3 space-y-3 bg-muted/10">
+                      <p className="text-xs text-muted-foreground">
+                        Upload a photo of a handwritten report or a Word doc (.docx). Content is automatically sorted into the correct fields.
+                      </p>
+                      <div className="flex gap-3 flex-wrap">
+                        <label className="flex items-center gap-2 px-3 py-2 border rounded-md text-sm cursor-pointer hover:bg-muted/30 transition-colors">
+                          <ImageIcon className="h-4 w-4 text-primary" />
+                          Upload photo (JPG/PNG)
+                          <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                            onChange={async e => {
+                              const file = e.target.files?.[0]; if (!file) return;
+                              setIsImporting(true); setImportPreview(null);
+                              const reader = new FileReader();
+                              reader.onload = async ev => {
+                                const base64 = (ev.target?.result as string).split(',')[1];
+                                const res = await parseMatchReportImageAction(base64, file.type as any, allPlayers.map(p => p.name));
+                                if (res.success && res.parsed) setImportPreview(res.parsed);
+                                else toast({ title: 'Import failed', description: res.error, variant: 'destructive' });
+                                setIsImporting(false);
+                              };
+                              reader.readAsDataURL(file); e.target.value = '';
+                            }} />
+                        </label>
+                        <label className="flex items-center gap-2 px-3 py-2 border rounded-md text-sm cursor-pointer hover:bg-muted/30 transition-colors">
+                          <FileText className="h-4 w-4 text-primary" />
+                          Upload Word doc (.docx)
+                          <input type="file" accept=".docx" className="hidden"
+                            onChange={async e => {
+                              const file = e.target.files?.[0]; if (!file) return;
+                              setIsImporting(true); setImportPreview(null);
+                              const reader = new FileReader();
+                              reader.onload = async ev => {
+                                try {
+                                  let mammoth: any;
+                                  try { mammoth = await import('mammoth'); }
+                                  catch {
+                                    await new Promise<void>((res, rej) => {
+                                      const s = document.createElement('script');
+                                      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+                                      s.onload = () => res(); s.onerror = rej;
+                                      document.head.appendChild(s);
+                                    });
+                                    mammoth = (window as any).mammoth;
+                                  }
+                                  const result = await mammoth.extractRawText({ arrayBuffer: ev.target?.result as ArrayBuffer });
+                                  const res = await parseMatchReportDocxAction(result.value, allPlayers.map(p => p.name));
+                                  if (res.success && res.parsed) setImportPreview(res.parsed);
+                                  else toast({ title: 'Import failed', description: res.error, variant: 'destructive' });
+                                } catch (err: any) {
+                                  toast({ title: 'Could not read docx', description: err.message, variant: 'destructive' });
+                                }
+                                setIsImporting(false);
+                              };
+                              reader.readAsArrayBuffer(file); e.target.value = '';
+                            }} />
+                        </label>
+                        {isImporting && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Scanning report...
+                          </div>
+                        )}
+                      </div>
+                      {importPreview && (
+                        <div className="border rounded-lg overflow-hidden">
+                          <div className="bg-green-50 dark:bg-green-950 px-4 py-2.5 flex items-center justify-between">
+                            <span className="text-sm font-medium text-green-700 dark:text-green-300 flex items-center gap-2">
+                              <CheckCircle2 className="h-4 w-4" /> Scanned — review below
+                            </span>
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setImportPreview(null)}>Discard</Button>
+                          </div>
+                          <div className="px-4 py-3 space-y-2.5 text-xs">
+                            {[
+                              { label: 'Highlights', value: importPreview.highlights },
+                              { label: 'Missed Catches', value: importPreview.missedCatches },
+                              { label: 'Missed Run-Outs', value: importPreview.missedRunOuts },
+                              { label: 'Great Catches/Run-Outs', value: importPreview.greatCatchesRunOuts },
+                              { label: 'Sportsmanship', value: importPreview.sportsmanship },
+                            ].filter(f => f.value).map(f => (
+                              <div key={f.label}>
+                                <p className="font-medium text-muted-foreground uppercase tracking-wide text-xs mb-0.5">{f.label}</p>
+                                <p className="text-foreground whitespace-pre-wrap leading-relaxed">{f.value}</p>
+                              </div>
+                            ))}
+                            {importPreview.top3?.length > 0 && (
+                              <div>
+                                <p className="font-medium text-muted-foreground uppercase tracking-wide text-xs mb-0.5">Top 3</p>
+                                <p>{importPreview.top3.join(', ')}</p>
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground italic pt-1">Preview only — use this as reference when filling reports or run AI analysis below.</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <p className="text-sm font-medium flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-primary" /> AI Match Report Analysis
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Analyses all sections together · suggests rating deltas per player · umpire negations excluded
+                      {reports.length > 0
+                        ? 'Analyses all sections together · suggests rating deltas per player · umpire negations excluded'
+                        : 'No reports submitted yet. Import a report above to get started.'}
                     </p>
                   </div>
-                  <Button variant="outline" size="sm" disabled={isAnalysing}
+                  <Button variant="outline" size="sm" disabled={isAnalysing || reports.length === 0}
                     onClick={async () => {
                       if (!gameId || !scorecardId || !allPlayers.length) return;
                       setIsAnalysing(true);
