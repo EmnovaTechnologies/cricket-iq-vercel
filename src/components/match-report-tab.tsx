@@ -21,9 +21,26 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
-  Loader2, Send, ShieldCheck, Trophy, AlertTriangle,
-  Star, Heart, FileText, CheckCircle2, Clock, Lock, LockOpen
-, Pencil, Save , Sparkles , Upload, FileText, ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
+  Loader2,
+  Send,
+  ShieldCheck,
+  Trophy,
+  AlertTriangle,
+  Star,
+  Heart,
+  FileText,
+  CheckCircle2,
+  Clock,
+  Lock,
+  LockOpen,
+  Pencil,
+  Save,
+  Sparkles,
+  Upload,
+  ImageIcon,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { MentionTextarea, MentionText } from '@/components/ui/mention-textarea';
 import {
@@ -529,7 +546,18 @@ export function MatchReportTab({
                           const reader = new FileReader();
                           reader.onload = async ev => {
                             try {
-                              const mammoth = await import('mammoth');
+                              // Load mammoth from CDN if not available as module
+                              let mammoth: any;
+                              try { mammoth = await import('mammoth'); }
+                              catch {
+                                await new Promise<void>((res, rej) => {
+                                  const s = document.createElement('script');
+                                  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+                                  s.onload = () => res(); s.onerror = rej;
+                                  document.head.appendChild(s);
+                                });
+                                mammoth = (window as any).mammoth;
+                              }
                               const result = await mammoth.extractRawText({ arrayBuffer: ev.target?.result as ArrayBuffer });
                               const res = await parseMatchReportDocxAction(
                                 result.value,
