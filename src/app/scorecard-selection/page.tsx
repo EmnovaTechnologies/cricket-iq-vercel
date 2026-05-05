@@ -78,7 +78,8 @@ function PlayerStatsRow({ player, rank }: { player: ReturnType<typeof classifyPl
           <span className="text-xs text-muted-foreground w-5 text-right">{rank + 1}</span>
           <div>
             <div className="flex items-center gap-1.5">
-              <p className="font-medium text-sm">{player.name}</p>
+              <p className={`font-medium text-sm ${!isLinked ? 'text-muted-foreground' : ''}`}>{player.name}</p>
+              {!isLinked && <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 rounded px-1 py-0.5">⚠ Unlinked</span>}
               {player.coachMentions > 0 && (
                 <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded px-1 py-0.5 font-medium"
                   title={`Mentioned by opposing coaches ${player.coachMentions} time${player.coachMentions > 1 ? 's' : ''}`}>
@@ -121,13 +122,14 @@ interface FormResult {
 }
 
 function PlayerStatsRowV2({
-  player, rank, form, showForm, formWindow,
+  player, rank, form, showForm, formWindow, isLinked = true,
 }: {
   player: ReturnType<typeof classifyPlayers>[0];
   rank: number;
   form: FormResult | null;
   showForm: boolean;
   formWindow: number;
+  isLinked?: boolean;
 }) {
   const adjScore = form ? parseFloat((player.totalScore + form.net).toFixed(1)) : player.totalScore;
   const dotColor = (r: 'up' | 'down' | 'none') =>
@@ -140,7 +142,8 @@ function PlayerStatsRowV2({
           <span className="text-xs text-muted-foreground w-5 text-right">{rank + 1}</span>
           <div>
             <div className="flex items-center gap-1.5">
-              <p className="font-medium text-sm">{player.name}</p>
+              <p className={`font-medium text-sm ${!isLinked ? 'text-muted-foreground' : ''}`}>{player.name}</p>
+              {!isLinked && <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 rounded px-1 py-0.5">⚠ Unlinked</span>}
               {player.coachMentions > 0 && (
                 <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded px-1 py-0.5 font-medium"
                   title={`Mentioned ${player.coachMentions} time(s)`}>
@@ -311,7 +314,9 @@ export default function ScorecardSelectionPage() {
   const [bestNGames, setBestNGames] = useState(0); // last N games
   const [formWeight, setFormWeight] = useState(30); // % weight for form
   const [includeForm, setIncludeForm] = useState(false);
+  const [hideUnlinked, setHideUnlinked] = useState(true);
   const [acceptedDeltas, setAcceptedDeltas] = useState<(MatchReportDelta & { id: string; gameId: string })[]>([]);
+  const [linkedNames, setLinkedNames] = useState<Set<string>>(new Set());
 
   const [constraints, setConstraints] = useState<ScorecardSelectionConstraints>(DEFAULT_SELECTION_CONSTRAINTS);
   const [selectionResult, setSelectionResult] = useState<SelectionResult | null>(null);
@@ -383,6 +388,10 @@ export default function ScorecardSelectionPage() {
         }
       } catch (e) { console.warn('Could not load player links:', e); }
 
+      // Track which canonical names are linked
+      const linkedCanonicalNames = new Set<string>(nameResolutionMap.values());
+      setLinkedNames(linkedCanonicalNames);
+
       const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports, minGamesPlayed, bestNGames, nameResolutionMap);
 
       // Load accepted match report deltas for this series
@@ -424,7 +433,11 @@ export default function ScorecardSelectionPage() {
     if (!aggregated.length || !selectedSeries) return;
     setIsGenerating(true);
     setSelectionResult(null);
-    const res = await suggestXIFromScorecardAction(aggregated, constraints, selectedSeries.name);
+    // Only pass linked players to AI — unlinked are temp/filler
+    const eligiblePlayers = linkedNames.size > 0
+      ? aggregated.filter(p => linkedNames.has(p.name))
+      : aggregated;
+    const res = await suggestXIFromScorecardAction(eligiblePlayers, constraints, selectedSeries.name);
     if (res.success && res.result) {
       setSelectionResult(res.result);
     } else {
@@ -529,6 +542,26 @@ export default function ScorecardSelectionPage() {
                     />
                   </div>
                 ))}
+
+                {/* Unlinked player filter */}
+                <div className="border-t pt-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        Hide unlinked players
+                        {linkedNames.size > 0 && aggregated.filter(p => !linkedNames.has(p.name)).length > 0 && (
+                          <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded px-1.5 py-0.5">
+                            {aggregated.filter(p => !linkedNames.has(p.name)).length} unlinked
+                          </span>
+                        )}
+                      </Label>
+                      <p className="text-xs text-muted-foreground/60">Unlinked players excluded from AI selection</p>
+                    </div>
+                    <input type="checkbox" checked={hideUnlinked}
+                      onChange={e => setHideUnlinked(e.target.checked)}
+                      className="h-4 w-4" />
+                  </div>
+                </div>
 
                 {/* Min games played + best N — separate controls */}
                 <div className="border-t pt-3 space-y-3">
@@ -673,7 +706,10 @@ export default function ScorecardSelectionPage() {
                                   .map((s: any) => s.gameId)
                                   .filter(Boolean)
                               )];
-                              return aggregated
+                              const displayPlayers = hideUnlinked && linkedNames.size > 0
+                                ? aggregated.filter(p => linkedNames.has(p.name))
+                                : aggregated;
+                              return displayPlayers
                                 .map(p => {
                                   const form = includeForm && acceptedDeltas.length > 0
                                     ? computeFormDelta(p.name, acceptedDeltas, orderedGameIds, formWindow, formWeight)
@@ -692,6 +728,7 @@ export default function ScorecardSelectionPage() {
                                     form={form}
                                     showForm={includeForm && acceptedDeltas.length > 0}
                                     formWindow={formWindow}
+                                    isLinked={linkedNames.size === 0 || linkedNames.has(p.name)}
                                   />
                                 ));
                             })()}
