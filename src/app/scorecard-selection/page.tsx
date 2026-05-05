@@ -310,7 +310,7 @@ export default function ScorecardSelectionPage() {
   const [minGamesPlayed, setMinGamesPlayed] = useState(0);
   const [bestNGames, setBestNGames] = useState(0); // last N games
   const [formWeight, setFormWeight] = useState(30); // % weight for form
-  const [includeForm, setIncludeForm] = useState(true);
+  const [includeForm, setIncludeForm] = useState(false);
   const [acceptedDeltas, setAcceptedDeltas] = useState<(MatchReportDelta & { id: string; gameId: string })[]>([]);
 
   const [constraints, setConstraints] = useState<ScorecardSelectionConstraints>(DEFAULT_SELECTION_CONSTRAINTS);
@@ -628,7 +628,7 @@ export default function ScorecardSelectionPage() {
                         <div className="flex flex-wrap items-center gap-4 mt-3 p-3 bg-muted/30 rounded-lg border text-sm">
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" checked={includeForm} onChange={e => setIncludeForm(e.target.checked)} className="h-4 w-4" />
-                            <span className="font-medium">Include match form</span>
+                            <span className="font-medium">Include Recent Match Form</span>
                           </label>
                           {includeForm && (
                             <>
