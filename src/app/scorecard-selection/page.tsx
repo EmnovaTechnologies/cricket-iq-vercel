@@ -386,11 +386,7 @@ export default function ScorecardSelectionPage() {
             }
           }
     
-      // Debug Aarush specifically
-      for (const [k, v] of nameResolutionMap.entries()) {
-        if (k.includes('aarush') || k.includes('arush')) console.log('[XI Selector] Aarush entry:', JSON.stringify(k), '->', JSON.stringify(v));
-      }
-        }
+      // Debug Aarush specifically        }
       } catch (e) { console.warn('Could not load player links:', e); }
 
       // Track which canonical names are linked
