@@ -386,7 +386,7 @@ export default function ScorecardSelectionPage() {
             }
           }
     
-      // Debug Aarush specifically        }
+        }
       } catch (e) { console.warn('Could not load player links:', e); }
 
       // Track which canonical names are linked
