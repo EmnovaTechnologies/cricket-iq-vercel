@@ -474,7 +474,7 @@ export function MatchReportTab({
                 <Upload className="h-5 w-5 text-primary" />
                 <div>
                   <p className="text-sm font-semibold text-primary">Import from photo or Word doc</p>
-                  <p className="text-xs text-muted-foreground">Upload a handwritten or typed report — we'll auto-fill the fields below</p>
+                  <p className="text-xs text-muted-foreground">Upload a handwritten or typed report — fields will be auto-filled below</p>
                 </div>
               </div>
               <div className="flex gap-3 flex-wrap">

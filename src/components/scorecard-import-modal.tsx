@@ -73,9 +73,9 @@ export function ScorecardImportModal({
     const reader = new FileReader();
     reader.onload = async ev => {
       try {
-        let mammoth: any;
-        try { mammoth = await import('mammoth'); }
-        catch {
+        // Load mammoth via CDN (not installed as npm package)
+        let mammoth: any = (window as any).mammoth;
+        if (!mammoth) {
           await new Promise<void>((res, rej) => {
             const s = document.createElement('script');
             s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
