@@ -183,11 +183,14 @@ export function classifyPlayers(
     for (const inn of (sc.innings || [])) {
       for (const b of (inn.batting || [])) {
         const d = b.dismissal || '';
-        // Match "c †Name b ..." or "st †?Name b ..."
-        const keeperMatch = d.match(/^(?:c|st)\s+[†+✝]([^b]+?)\s+b\s+/i);
-        if (keeperMatch) keeperNames.add(keeperMatch[1].trim().toLowerCase());
-        const stumpMatch = d.match(/^st\s+(?![†+✝])(.+?)\s+b\s+/i);
+        // Only stumpings guarantee the fielder is a keeper
+        // "st Name b Bowler" or "st †Name b Bowler"
+        const stumpMatch = d.match(/^st\s+[†+✝]?(.+?)\s+b\s+/i);
         if (stumpMatch) keeperNames.add(stumpMatch[1].trim().toLowerCase());
+        // Caught behind with dagger symbol "c †Name b Bowler" — dagger confirms keeper
+        const caughtBehindMatch = d.match(/^c\s+[†+✝]([^b]+?)\s+b\s+/i);
+        if (caughtBehindMatch) keeperNames.add(caughtBehindMatch[1].trim().toLowerCase());
+        // "c & b" dismissals are the bowler — ignore
       }
     }
   }
@@ -195,8 +198,24 @@ export function classifyPlayers(
   return players.map(p => {
     const avgOvers = p.totalOvers / p.gamesPlayed;
     const isKeeperByFielding = p.totalStumpings > 0 || p.totalKeeperCatches > 0;
-    const isKeeperByDismissal = keeperNames.has(p.name.toLowerCase()) ||
-      Array.from(keeperNames).some(k => p.name.toLowerCase().includes(k) || k.includes(p.name.toLowerCase().split(' ')[0]));
+    const playerNameLower = p.name.toLowerCase();
+    const playerFirstName = playerNameLower.split(' ')[0];
+    const playerLastName = playerNameLower.split(' ').slice(1).join(' ');
+    const isKeeperByDismissal = keeperNames.has(playerNameLower) ||
+      Array.from(keeperNames).some(k => {
+        const kParts = k.split(' ');
+        const kFirst = kParts[0];
+        const kLast = kParts.slice(1).join(' ');
+        // Must match on first name OR full name — surname alone is not enough
+        if (k === playerNameLower) return true;
+        // k contains full player name
+        if (k.includes(playerNameLower)) return true;
+        // player name contains full k (k is abbreviated)
+        if (playerNameLower.includes(k) && k.length > 4) return true;
+        // First names match AND last names share something (not just surname alone)
+        if (kFirst === playerFirstName && kLast && playerLastName && kLast === playerLastName) return true;
+        return false;
+      });
     const isKeeper = isKeeperByFielding || isKeeperByDismissal;
     const isBowler = avgOvers >= minBowlerOversPerGame;
     const isBatter = p.totalRuns > 0 || p.totalBalls > 0;
