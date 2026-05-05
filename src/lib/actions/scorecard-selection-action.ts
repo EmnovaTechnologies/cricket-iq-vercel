@@ -34,38 +34,38 @@ export async function suggestXIFromScorecardAction(
   seriesName: string
 ): Promise<{ success: boolean; result?: SelectionResult; error?: string }> {
   try {
-    const playerData = players.map(p => ({
-      name: p.name,
-      team: p.team,
-      gamesPlayed: p.gamesPlayed,
-      totalScore: p.totalScore,
-      avgScorePerGame: p.avgScorePerGame,
-      totalRuns: p.totalRuns,
-      totalBalls: p.totalBalls,
-      avgStrikeRate: p.avgStrikeRate,
-      totalWickets: p.totalWickets,
-      totalOvers: p.totalOvers,
-      avgOversPerGame: Math.round((p.totalOvers / p.gamesPlayed) * 10) / 10,
-      totalDots: p.totalDots,
-      totalCatches: p.totalCatches,
-      totalRunOuts: p.totalRunOuts,
-      totalStumpings: p.totalStumpings,
-      totalKeeperCatches: p.totalKeeperCatches,
-      coachMentions: p.coachMentions || 0,
-      coachTopRatingScore: p.totalCoachTopRatingScore || 0,
-      isBowler: (p.totalOvers / p.gamesPlayed) >= constraints.minBowlerOversPerGame,
-      isKeeper: p.totalStumpings > 0 || p.totalKeeperCatches > 0,
-    }));
+    // Slim player data to reduce token usage — keep only fields the AI needs
+    const playerData = players.map(p => {
+      const avgOvers = p.gamesPlayed > 0 ? Math.round((p.totalOvers / p.gamesPlayed) * 10) / 10 : 0;
+      return {
+        n: p.name,           // name
+        t: p.team,           // team
+        gp: p.gamesPlayed,   // gamesPlayed
+        sc: p.totalScore,    // totalScore
+        avg: p.avgScorePerGame, // avgScorePerGame
+        r: p.totalRuns || 0,   // runs
+        w: p.totalWickets || 0, // wickets
+        ov: avgOvers,           // avgOversPerGame
+        c: (p.totalCatches || 0) + (p.totalRunOuts || 0), // fielding
+        wk: (p.totalStumpings || 0) + (p.totalKeeperCatches || 0), // keeping
+        cm: p.coachMentions || 0, // coachMentions
+        cr: p.totalCoachTopRatingScore || 0, // coachRatingScore
+        bowl: avgOvers >= constraints.minBowlerOversPerGame,
+        keep: (p.totalStumpings || 0) > 0 || (p.totalKeeperCatches || 0) > 0,
+      };
+    });
 
     const response = await anthropic.messages.create({
       model: 'claude-opus-4-5',
-      max_tokens: 3000,
+      max_tokens: 8000,
       messages: [{
         role: 'user',
         content: `You are a cricket team selector. Based on scorecard performance points from the "${seriesName}" series, suggest the best XI players.
 
+FIELD KEY: n=name, t=team, gp=gamesPlayed, sc=totalScore, avg=avgScorePerGame, r=runs, w=wickets, ov=avgOversPerGame, c=catches+runouts, wk=stumpings+keeperCatches, cm=coachMentions, cr=coachRatingBonus, bowl=isBowler, keep=isKeeper
+
 PLAYER DATA (sorted by total score):
-${JSON.stringify(playerData, null, 2)}
+${JSON.stringify(playerData)}
 
 SELECTION CONSTRAINTS:
 - Team size: ${constraints.teamSize} players
@@ -115,8 +115,25 @@ Return ONLY valid JSON with no other text:
       .map((b: any) => b.text)
       .join('');
 
-    const clean = text.replace(/```json\n?|\n?```/g, '').trim();
-    const result = JSON.parse(clean) as SelectionResult;
+    let clean = text.replace(/```json\n?|\n?```/g, '').trim();
+    // Attempt to recover truncated JSON by finding last complete player entry
+    let result: SelectionResult;
+    try {
+      result = JSON.parse(clean) as SelectionResult;
+    } catch {
+      // Try to fix truncated JSON — close any open arrays/objects
+      const lastBrace = clean.lastIndexOf('}');
+      if (lastBrace > 0) {
+        let attempt = clean.substring(0, lastBrace + 1);
+        // Count open brackets to close
+        const opens = (attempt.match(/\[/g) || []).length - (attempt.match(/\]/g) || []).length;
+        const braces = (attempt.match(/\{/g) || []).length - (attempt.match(/\}/g) || []).length;
+        attempt += ']'.repeat(Math.max(0, opens)) + '}'.repeat(Math.max(0, braces));
+        result = JSON.parse(attempt) as SelectionResult;
+      } else {
+        throw new Error('Could not parse AI response — try reducing the number of players or series scope.');
+      }
+    }
 
     return { success: true, result };
   } catch (error: any) {
