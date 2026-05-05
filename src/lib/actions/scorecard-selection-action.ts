@@ -56,8 +56,8 @@ export async function suggestXIFromScorecardAction(
     });
 
     const response = await anthropic.messages.create({
-      model: 'claude-opus-4-5',
-      max_tokens: 8000,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4000,
       messages: [{
         role: 'user',
         content: `You are a cricket team selector. Based on scorecard performance points from the "${seriesName}" series, suggest the best XI players.
@@ -91,7 +91,7 @@ Return ONLY valid JSON with no other text:
       "name": "Player Name",
       "team": "Team Name",
       "role": "Opener|Middle Order|Lower Order|Wicket Keeper|Bowler|All-Rounder",
-      "reason": "Brief 1-sentence reason for selection based on their stats",
+      "reason": "One sentence, key stat only",
       "stats": {
         "gamesPlayed": 0,
         "totalScore": 0,
