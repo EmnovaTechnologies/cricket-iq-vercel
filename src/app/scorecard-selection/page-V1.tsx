@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { getAllSeriesFromDB } from '@/lib/db';
-import { getScorecardsBySeriesAction, getScorecardPlayersAction } from '@/lib/actions/scorecard-actions';
+import { getScorecardsBySeriesAction } from '@/lib/actions/scorecard-actions';
 import { saveScorecardXIAction, clearScorecardXIAction } from '@/lib/actions/series-actions';
 import { getMatchReportsForSeriesAction } from '@/lib/actions/match-report-actions';
 import { getAcceptedDeltasForSeriesAction, type MatchReportDelta } from '@/lib/actions/match-report-ai-action';
@@ -306,11 +306,9 @@ export default function ScorecardSelectionPage() {
   const [scorecards, setScorecards] = useState<MatchScorecard[]>([]);
   const [config, setConfig] = useState<ScorecardScoringConfig | null>(null);
   const [aggregated, setAggregated] = useState<ReturnType<typeof classifyPlayers>>([]);
-  const [formWindow, setFormWindow] = useState(3);
-  const [minGamesPlayed, setMinGamesPlayed] = useState(0);
-  const [bestNGames, setBestNGames] = useState(0); // last N games
+  const [formWindow, setFormWindow] = useState(3); // last N games
   const [formWeight, setFormWeight] = useState(30); // % weight for form
-  const [includeForm, setIncludeForm] = useState(false);
+  const [includeForm, setIncludeForm] = useState(true);
   const [acceptedDeltas, setAcceptedDeltas] = useState<(MatchReportDelta & { id: string; gameId: string })[]>([]);
 
   const [constraints, setConstraints] = useState<ScorecardSelectionConstraints>(DEFAULT_SELECTION_CONSTRAINTS);
@@ -368,23 +366,7 @@ export default function ScorecardSelectionPage() {
       // Fetch match reports for coach top rating scores
       const reportsRes = await getMatchReportsForSeriesAction(seriesId, activeOrganizationId);
       const matchReports = reportsRes.success ? (reportsRes.reports || []) : [];
-      // Build name resolution map from player links (scorecardName → canonical profile name)
-      const nameResolutionMap = new Map<string, string>();
-      try {
-        if (activeOrganizationId) {
-          const scPlayers = await getScorecardPlayersAction(activeOrganizationId);
-          for (const sp of scPlayers) {
-            const canonical = (sp as any).linkedPlayerName;
-            if (canonical && sp.name) {
-              nameResolutionMap.set(sp.name.toLowerCase().trim(), canonical);
-            }
-          }
-          console.log('[XI Selector] Name resolution map:', nameResolutionMap.size, 'entries');
-        }
-      } catch (e) { console.warn('Could not load player links:', e); }
-
-      const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports, minGamesPlayed, bestNGames, nameResolutionMap);
-
+      const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports);
       // Load accepted match report deltas for this series
       const gameIds = res.scorecards.map((s: any) => s.gameId).filter(Boolean);
       if (gameIds.length && activeOrganizationId) {
@@ -530,38 +512,6 @@ export default function ScorecardSelectionPage() {
                   </div>
                 ))}
 
-                {/* Min games played + best N — separate controls */}
-                <div className="border-t pt-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Min Games Played</Label>
-                      <p className="text-xs text-muted-foreground/60">0 = include all players</p>
-                    </div>
-                    <Input type="number" min={0} max={50}
-                      className="h-7 w-16 text-sm text-right"
-                      value={minGamesPlayed}
-                      onChange={e => setMinGamesPlayed(parseInt(e.target.value) || 0)} />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Use Best N Games</Label>
-                      <p className="text-xs text-muted-foreground/60">0 = use all games played</p>
-                    </div>
-                    <Input type="number" min={0} max={50}
-                      className="h-7 w-16 text-sm text-right"
-                      value={bestNGames}
-                      onChange={e => setBestNGames(parseInt(e.target.value) || 0)} />
-                  </div>
-                  {bestNGames > 0 && minGamesPlayed > 0 && bestNGames > minGamesPlayed && (
-                    <p className="text-xs text-destructive">Best N should be ≤ Min Games Played</p>
-                  )}
-                  {bestNGames > 0 && (
-                    <p className="text-xs text-muted-foreground bg-muted/30 rounded px-2 py-1.5">
-                      Scores recalculated using each player top {bestNGames} game{bestNGames > 1 ? 's' : ''} only — levels the field for players with different game counts.
-                    </p>
-                  )}
-                </div>
-
                 <Button
                   onClick={handleGenerateXI}
                   disabled={!aggregated.length || isGenerating || isLoadingScorecards || !!savedXI}
@@ -616,16 +566,13 @@ export default function ScorecardSelectionPage() {
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm text-muted-foreground">
-                        Series aggregate — {scorecards.length} game(s) · {aggregated.length} eligible players
-                        {minGamesPlayed > 0 && ` · min ${minGamesPlayed} games played`}
-                        {bestNGames > 0 && ` · best ${bestNGames} games scored`}
-                        {' · '}sorted by {includeForm ? 'adjusted score (base + form)' : 'total points'}
+                        Series aggregate — {scorecards.length} game(s) · sorted by {includeForm ? 'adjusted score (base + form)' : 'total points'}
 
                         {/* Form controls */}
                         <div className="flex flex-wrap items-center gap-4 mt-3 p-3 bg-muted/30 rounded-lg border text-sm">
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" checked={includeForm} onChange={e => setIncludeForm(e.target.checked)} className="h-4 w-4" />
-                            <span className="font-medium">Include Recent Match Form</span>
+                            <span className="font-medium">Include match form</span>
                           </label>
                           {includeForm && (
                             <>

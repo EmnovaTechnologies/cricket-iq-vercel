@@ -1,16 +1,44 @@
-import type { MatchScorecard, AggregatedPlayerStats, ScorecardScoringConfig } from '@/types';
+import type { MatchScorecard, AggregatedPlayerStats, ScorecardScoringConfig, MatchReport } from '@/types';
 import { DEFAULT_SCORING_CONFIG } from '@/types';
 import { calculatePlayerScores } from './scorecard-scoring-engine';
 
+/** Fuzzy name match — returns true if names are likely the same player */
+function namesMatch(a: string, b: string): boolean {
+  const norm = (s: string) => s.toLowerCase().trim();
+  const na = norm(a), nb = norm(b);
+  if (na === nb) return true;
+  // Check if first word matches (Aarush Datla vs Aarush D)
+  const firstA = na.split(' ')[0], firstB = nb.split(' ')[0];
+  if (firstA === firstB && (na.includes(nb) || nb.includes(na))) return true;
+  return false;
+}
+
+/** Count how many times a player appears in top3 across all reports */
+function countCoachMentions(playerName: string, reports: MatchReport[]): number {
+  let count = 0;
+  for (const report of reports) {
+    for (const mention of report.top3Players) {
+      if (namesMatch(playerName, mention)) { count++; break; } // max 1 per report
+    }
+  }
+  return count;
+}
+
 /**
  * Aggregates player performance across all scorecards in a series.
+ * Optionally applies coachTopRatingScore from match reports.
  * Returns sorted list by totalScore descending.
  */
 export function aggregatePlayerStats(
   scorecards: MatchScorecard[],
-  config: ScorecardScoringConfig | typeof DEFAULT_SCORING_CONFIG
+  config: ScorecardScoringConfig | typeof DEFAULT_SCORING_CONFIG,
+  matchReports: MatchReport[] = [],
+  minGamesPlayed: number = 0,
+  bestNGames: number = 0
 ): AggregatedPlayerStats[] {
   const playerMap = new Map<string, AggregatedPlayerStats>();
+  // Track per-game scores for bestNGames feature
+  const perGameScores = new Map<string, number[]>();
 
   for (const sc of scorecards) {
     if (!sc.innings?.length) continue;
@@ -21,6 +49,9 @@ export function aggregatePlayerStats(
       const existing = playerMap.get(s.name);
 
       if (!existing) {
+        // Track per-game score
+        if (!perGameScores.has(s.name)) perGameScores.set(s.name, []);
+        perGameScores.get(s.name)!.push(s.totalScore);
         playerMap.set(s.name, {
           name: s.name,
           team: s.team,
@@ -43,16 +74,19 @@ export function aggregatePlayerStats(
           totalRunOuts: s.fielding?.runOuts || 0,
           totalStumpings: s.fielding?.stumpings || 0,
           totalKeeperCatches: s.fielding?.keeperCatches || 0,
-          // Scores
+          // Scores (coach rating applied later)
           totalBattingScore: s.battingScore,
           totalBowlingScore: s.bowlingScore,
           totalFieldingScore: s.fieldingScore,
+          totalCoachTopRatingScore: 0,
+          coachMentions: 0,
           totalScore: s.totalScore,
           avgScorePerGame: s.totalScore,
         });
       } else {
         // Accumulate
         existing.gamesPlayed++;
+        perGameScores.get(s.name)!.push(s.totalScore);
         existing.totalRuns += s.batting?.runs || 0;
         existing.totalBalls += s.batting?.balls || 0;
         existing.totalFours += s.batting?.fours || 0;
@@ -72,6 +106,46 @@ export function aggregatePlayerStats(
         existing.totalScore += s.totalScore;
       }
     }
+  }
+
+  // Apply minGamesPlayed filter
+  if (minGamesPlayed > 0) {
+    for (const [name, p] of playerMap.entries()) {
+      if (p.gamesPlayed < minGamesPlayed) playerMap.delete(name);
+    }
+  }
+
+  // Apply bestNGames — recalculate totalScore using only top N game scores
+  if (bestNGames > 0) {
+    for (const [name, p] of playerMap.entries()) {
+      const games = perGameScores.get(name) || [];
+      if (games.length > bestNGames) {
+        // Sort descending, take top N
+        const topN = [...games].sort((a, b) => b - a).slice(0, bestNGames);
+        const topNTotal = topN.reduce((s, v) => s + v, 0);
+        // Scale factor to adjust totalScore proportionally
+        const originalTotal = games.reduce((s, v) => s + v, 0);
+        if (originalTotal > 0) {
+          const scale = topNTotal / originalTotal;
+          p.totalScore = Math.round(p.totalScore * scale * 10) / 10;
+          p.totalBattingScore = Math.round(p.totalBattingScore * scale * 10) / 10;
+          p.totalBowlingScore = Math.round(p.totalBowlingScore * scale * 10) / 10;
+          p.totalFieldingScore = Math.round(p.totalFieldingScore * scale * 10) / 10;
+        }
+        // Update gamesPlayed to reflect bestN context
+        p.gamesPlayed = bestNGames;
+      }
+    }
+  }
+
+  // Apply coach top rating scores from match reports
+  const perMention = (config as ScorecardScoringConfig).coachTopRatingPerMention ?? 15;
+  for (const p of playerMap.values()) {
+    const mentions = countCoachMentions(p.name, matchReports);
+    const cappedMentions = Math.min(mentions, 3);
+    p.coachMentions = mentions;
+    p.totalCoachTopRatingScore = Math.round(cappedMentions * perMention * 10) / 10;
+    p.totalScore += p.totalCoachTopRatingScore;
   }
 
   // Compute derived averages
@@ -109,11 +183,14 @@ export function classifyPlayers(
     for (const inn of (sc.innings || [])) {
       for (const b of (inn.batting || [])) {
         const d = b.dismissal || '';
-        // Match "c †Name b ..." or "st †?Name b ..."
-        const keeperMatch = d.match(/^(?:c|st)\s+[†+✝]([^b]+?)\s+b\s+/i);
-        if (keeperMatch) keeperNames.add(keeperMatch[1].trim().toLowerCase());
-        const stumpMatch = d.match(/^st\s+(?![†+✝])(.+?)\s+b\s+/i);
+        // Only stumpings guarantee the fielder is a keeper
+        // "st Name b Bowler" or "st †Name b Bowler"
+        const stumpMatch = d.match(/^st\s+[†+✝]?(.+?)\s+b\s+/i);
         if (stumpMatch) keeperNames.add(stumpMatch[1].trim().toLowerCase());
+        // Caught behind with dagger symbol "c †Name b Bowler" — dagger confirms keeper
+        const caughtBehindMatch = d.match(/^c\s+[†+✝]([^b]+?)\s+b\s+/i);
+        if (caughtBehindMatch) keeperNames.add(caughtBehindMatch[1].trim().toLowerCase());
+        // "c & b" dismissals are the bowler — ignore
       }
     }
   }
@@ -121,8 +198,24 @@ export function classifyPlayers(
   return players.map(p => {
     const avgOvers = p.totalOvers / p.gamesPlayed;
     const isKeeperByFielding = p.totalStumpings > 0 || p.totalKeeperCatches > 0;
-    const isKeeperByDismissal = keeperNames.has(p.name.toLowerCase()) ||
-      Array.from(keeperNames).some(k => p.name.toLowerCase().includes(k) || k.includes(p.name.toLowerCase().split(' ')[0]));
+    const playerNameLower = p.name.toLowerCase();
+    const playerFirstName = playerNameLower.split(' ')[0];
+    const playerLastName = playerNameLower.split(' ').slice(1).join(' ');
+    const isKeeperByDismissal = keeperNames.has(playerNameLower) ||
+      Array.from(keeperNames).some(k => {
+        const kParts = k.split(' ');
+        const kFirst = kParts[0];
+        const kLast = kParts.slice(1).join(' ');
+        // Must match on first name OR full name — surname alone is not enough
+        if (k === playerNameLower) return true;
+        // k contains full player name
+        if (k.includes(playerNameLower)) return true;
+        // player name contains full k (k is abbreviated)
+        if (playerNameLower.includes(k) && k.length > 4) return true;
+        // First names match AND last names share something (not just surname alone)
+        if (kFirst === playerFirstName && kLast && playerLastName && kLast === playerLastName) return true;
+        return false;
+      });
     const isKeeper = isKeeperByFielding || isKeeperByDismissal;
     const isBowler = avgOvers >= minBowlerOversPerGame;
     const isBatter = p.totalRuns > 0 || p.totalBalls > 0;

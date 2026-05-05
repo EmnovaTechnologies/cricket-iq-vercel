@@ -66,8 +66,8 @@ function resolveName(raw: string, nameMap: Map<string, string>): string {
   const parts = cleaned.split(/\s+/);
 
   // Fuzzy: first 3 chars of first name + last initial
-  if (parts.length >= 1 && parts[0].length >= 5) {
-    const prefix = parts[0].toLowerCase().slice(0, 5);
+  if (parts.length >= 1 && parts[0].length >= 3) {
+    const prefix = parts[0].toLowerCase().slice(0, 3);
     const lastInit = parts.length > 1 ? parts[parts.length - 1][0]?.toLowerCase() : null;
 
     for (const [mapKey, mapVal] of nameMap) {
@@ -173,11 +173,7 @@ export function buildPlayerPerformances(innings: import('@/types').ScorecardInni
       get(b.name).bowling = { overs: b.overs, wickets: b.wickets, runs: b.runs, economy: b.economy, dots: b.dots, wides: b.wides, noballs: b.noballs };
     }
 
-    // Build combined name list from ALL innings so opposing keeper names resolve correctly
-    const allBatting = innings.flatMap(i => i.batting);
-    const allBowling = innings.flatMap(i => i.bowling);
-    const allDidNotBat = innings.flatMap(i => i.didNotBat || []);
-    const fielding = deriveFieldingStats(allBatting, inn.extras?.byes || 0, allBowling, allDidNotBat);
+    const fielding = deriveFieldingStats(inn.batting, inn.extras?.byes || 0, inn.bowling, inn.didNotBat);
     for (const f of fielding) {
       const p = get(f.name);
       if (!p.fielding) p.fielding = { catches: 0, runOuts: 0, stumpings: 0, keeperCatches: 0 };

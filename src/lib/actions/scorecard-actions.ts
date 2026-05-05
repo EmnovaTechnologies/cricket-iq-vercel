@@ -215,8 +215,23 @@ export async function getScorecardPlayersAction(
       .orderBy('name')
       .get();
 
-    return snap.docs.map(d => ({ id: d.id, ...d.data() })) as ScorecardPlayer[];
-  } catch {
+    return snap.docs.map(d => {
+      const data = d.data();
+      // Serialize Firestore Timestamps to ISO strings
+      return {
+        id: d.id,
+        organizationId: data.organizationId,
+        name: data.name,
+        linkedPlayerId: data.linkedPlayerId || null,
+        linkedPlayerName: data.linkedPlayerName || null,
+        gamesAppeared: data.gamesAppeared || 0,
+        firstSeenAt: data.firstSeenAt?.toDate?.()?.toISOString() || null,
+        lastSeenAt: data.lastSeenAt?.toDate?.()?.toISOString() || null,
+        linkedAt: data.linkedAt?.toDate?.()?.toISOString() || null,
+      };
+    }) as ScorecardPlayer[];
+  } catch (e: any) {
+    console.error('[getScorecardPlayersAction] Error:', e.message);
     return [];
   }
 }
