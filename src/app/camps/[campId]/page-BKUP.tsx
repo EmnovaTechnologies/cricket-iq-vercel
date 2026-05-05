@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,19 +36,10 @@ const statusColors: Record<SelectionCamp['status'], string> = {
   completed: 'bg-muted text-muted-foreground border',
 };
 
-function CampDetailInner() {
+export default function CampDetailPage() {
   const params = useParams<{ campId: string }>();
   const { campId } = params;
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const fromSeries = searchParams.get('from') === 'series';
-  const fromSeriesId = searchParams.get('seriesId') || '';
-  const backHref = fromSeries && fromSeriesId
-    ? `/series/${fromSeriesId}/details?tab=camp`
-    : '/camps';
-  const backLabel = fromSeries ? 'Back to Series' : 'Back to Camps';
-  // Pass navigation context to sub-pages
-  const navParam = fromSeries ? `?from=series&seriesId=${fromSeriesId}` : '?from=camps';
   const { currentUser, userProfile, activeOrganizationId, effectivePermissions } = useAuth();
   const { toast } = useToast();
 
@@ -160,7 +151,7 @@ function CampDetailInner() {
       {/* Top nav bar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Button variant="outline" size="sm" asChild>
-          <Link href={backHref}><ArrowLeft className="mr-2 h-4 w-4" /> {backLabel}</Link>
+          <Link href="/camps"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Camps</Link>
         </Button>
         <div className="flex items-center gap-2">
           {canManage && (
@@ -313,19 +304,10 @@ function CampDetailInner() {
       <CampTabContent
         camp={camp}
         seriesId={camp.seriesId}
-        navParam={navParam}
         initialPlayers={campPlayers}
         initialAssessments={campAssessments}
         initialFitness={campFitness}
       />
     </div>
-  );
-}
-
-export default function CampDetailPage() {
-  return (
-    <Suspense fallback={<div className="flex justify-center items-center min-h-[calc(100vh-12rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
-      <CampDetailInner />
-    </Suspense>
   );
 }
