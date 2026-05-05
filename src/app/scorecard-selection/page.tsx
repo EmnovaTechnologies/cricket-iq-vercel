@@ -385,11 +385,16 @@ export default function ScorecardSelectionPage() {
             }
           }
           console.log('[XI Selector] Name resolution map:', nameResolutionMap.size, 'entries');
+      // Debug Aarush specifically
+      for (const [k, v] of nameResolutionMap.entries()) {
+        if (k.includes('aarush') || k.includes('arush')) console.log('[XI Selector] Aarush entry:', JSON.stringify(k), '->', JSON.stringify(v));
+      }
         }
       } catch (e) { console.warn('Could not load player links:', e); }
 
       // Track which canonical names are linked
       const linkedCanonicalNames = new Set<string>(nameResolutionMap.values());
+      console.log('[XI Selector] Linked canonical names sample:', Array.from(linkedCanonicalNames).slice(0, 5));
       setLinkedNames(linkedCanonicalNames);
 
       const stats = aggregatePlayerStats(res.scorecards, effectiveConfig, matchReports, minGamesPlayed, bestNGames, nameResolutionMap);
