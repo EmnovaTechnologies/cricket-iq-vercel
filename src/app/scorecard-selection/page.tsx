@@ -309,6 +309,9 @@ export default function ScorecardSelectionPage() {
   const [scorecards, setScorecards] = useState<MatchScorecard[]>([]);
   const [config, setConfig] = useState<ScorecardScoringConfig | null>(null);
   const [aggregated, setAggregated] = useState<ReturnType<typeof classifyPlayers>>([]);
+  const [loadedScorecards, setLoadedScorecards] = useState<any[]>([]);
+  const [loadedMatchReports, setLoadedMatchReports] = useState<any[]>([]);
+  const [loadedNameResolutionMap, setLoadedNameResolutionMap] = useState<Map<string, string>>(new Map());
   const [formWindow, setFormWindow] = useState(3);
   const [minGamesPlayed, setMinGamesPlayed] = useState(4);
   const [bestNGames, setBestNGames] = useState(4); // last N games
@@ -352,6 +355,38 @@ export default function ScorecardSelectionPage() {
   );
 
   // Load scorecards when series selected
+  // Re-aggregate when min games or best N changes (without re-fetching from Firestore)
+  useEffect(() => {
+    if (!loadedScorecards.length || !effectiveConfig) return;
+    const stats = aggregatePlayerStats(loadedScorecards, effectiveConfig, loadedMatchReports, minGamesPlayed, bestNGames, loadedNameResolutionMap);
+    const mergedMap = new Map<string, typeof stats[0]>();
+    for (const p of stats) {
+      const pLower = p.name.toLowerCase().trim();
+      const pParts = pLower.split(' ');
+      let canonicalMatch: string | null = null;
+      const lastPart = pParts[pParts.length - 1].replace('.', '');
+      if (pParts.length >= 2 && lastPart.length <= 2) {
+        for (const canonical of loadedNameResolutionMap.values()) {
+          const cParts = canonical.toLowerCase().trim().split(' ');
+          if (cParts[0] !== pParts[0]) continue;
+          const anyWordMatches = cParts.slice(1).some(part => part.startsWith(lastPart));
+          if (anyWordMatches) { canonicalMatch = canonical; break; }
+        }
+      }
+      const key = canonicalMatch || p.name;
+      if (mergedMap.has(key)) {
+        const ex = mergedMap.get(key)!;
+        ex.totalScore = Math.round((ex.totalScore + p.totalScore) * 10) / 10;
+        ex.totalFieldingScore = Math.round((ex.totalFieldingScore + p.totalFieldingScore) * 10) / 10;
+        ex.gamesPlayed = Math.max(ex.gamesPlayed, p.gamesPlayed);
+      } else {
+        mergedMap.set(key, { ...p, name: key });
+      }
+    }
+    const finalStats = Array.from(mergedMap.values()).sort((a, b) => b.totalScore - a.totalScore);
+    setAggregated(classifyPlayers(finalStats, constraints.minBowlerOversPerGame, loadedScorecards));
+  }, [minGamesPlayed, bestNGames]);
+
   const handleSeriesSelect = useCallback(async (seriesId: string) => {
     setSelectedSeriesId(seriesId);
     setSelectionResult(null);
@@ -440,6 +475,9 @@ export default function ScorecardSelectionPage() {
         const deltasRes = await getAcceptedDeltasForSeriesAction(activeOrganizationId, gameIds);
         if (deltasRes.success) setAcceptedDeltas(deltasRes.deltas || []);
       }
+      setLoadedScorecards(res.scorecards);
+      setLoadedMatchReports(matchReports);
+      setLoadedNameResolutionMap(nameResolutionMap);
       setAggregated(classifyPlayers(finalStats, constraints.minBowlerOversPerGame, res.scorecards));
     } else {
       setScorecards([]);
