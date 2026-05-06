@@ -429,8 +429,8 @@ export function MatchReportTab({
         </div>
       )}
 
-      {/* ── Submit/Edit form — shown when no report yet, OR when editing an unlocked report ── */}
-      {isSelector && (!myReport || (isEditing && !myReport.isSelectorCertified && !myReport.isCertified)) && (
+      {/* ── Submit/Edit form — shown when no report yet, OR when editing, OR when import pair active ── */}
+      {isSelector && (!myReport || (isEditing && !myReport.isSelectorCertified && !myReport.isCertified) || (importPair && submittedTeams.size < 2)) && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
