@@ -43,7 +43,7 @@ function NewCampForm() {
   useEffect(() => {
     if (!activeOrganizationId) return;
     Promise.all([
-      getAllSeriesFromDB(activeOrganizationId),
+      getAllSeriesFromDB('all', activeOrganizationId),
       getCampsForOrgAction(activeOrganizationId),
     ]).then(([series, campsRes]) => {
       setSeriesList((series || []).filter((s: Series) => s.status !== 'archived'));
