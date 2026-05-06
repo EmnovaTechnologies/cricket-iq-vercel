@@ -57,6 +57,7 @@ const Navbar = () => {
     userProfile,
     logout,
     isAuthLoading,
+    isPermissionsLoading,
     activeOrganizationId,
     setActiveOrganizationId,
     organizationsForSwitching,
@@ -90,7 +91,7 @@ const Navbar = () => {
 
   const mainNavLinks = [
     { href: '/', label: 'Dashboard', icon: <Leaf className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_DASHBOARD },
-    { href: '/my-stats', label: 'My Stats', icon: <BarChart3 className="h-5 w-5" />, permission: PERMISSIONS.PLAYER_VIEW_OWN_PROFILE },
+    { href: '/my-stats', label: 'My Stats', icon: <BarChart3 className="h-5 w-5" />, permission: PERMISSIONS.PLAYER_VIEW_OWN_PROFILE, roles: ['player'] },
     { href: '/series', label: 'Series', icon: <Layers className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SERIES_LIST },
     { href: '/games', label: 'Games', icon: <Gamepad2 className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_GAMES_LIST },
     { href: '/teams', label: 'Teams', icon: <Users className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAMS_LIST },
@@ -139,8 +140,12 @@ const Navbar = () => {
 
 
   let mobileLinks: Array<{ href: string; label: string; icon: JSX.Element; roles?: string[]; permission?: PermissionKey }> = [];
-  if (currentUser && !isAuthLoading) {
+  if (currentUser && !isAuthLoading && !isPermissionsLoading) {
     const visibleMainNavLinks = mainNavLinks.filter(link => {
+      // If link has explicit role restriction, check role first (regardless of permissions)
+      if (link.roles && link.roles.length > 0) {
+        return hasAnyRole(userProfile?.roles, link.roles);
+      }
       return userProfile?.roles?.includes('admin') || (link.permission && effectivePermissions[link.permission]);
     });
 
@@ -181,8 +186,10 @@ const Navbar = () => {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
-          {currentUser && !isAuthLoading && !isEffectivelyUnassigned && mainNavLinks.map((link) => {
-            const canViewLink = userProfile?.roles?.includes('admin') || (link.permission && effectivePermissions[link.permission]);
+          {currentUser && !isAuthLoading && !isPermissionsLoading && !isEffectivelyUnassigned && mainNavLinks.map((link) => {
+            const canViewLink = link.roles && link.roles.length > 0
+              ? hasAnyRole(userProfile?.roles, link.roles)
+              : userProfile?.roles?.includes('admin') || (link.permission && effectivePermissions[link.permission]);
             const selectionModel = activeOrganizationDetails?.selectionModel;
             const modelAllowed = !link.selectionModels || !selectionModel || link.selectionModels.includes(selectionModel);
             if (canViewLink && modelAllowed) {
@@ -197,7 +204,7 @@ const Navbar = () => {
             }
             return null;
           })}
-          {currentUser && !isAuthLoading && isEffectivelyUnassigned && mainNavLinks.filter(link => link.href === '/').map((link) => {
+          {currentUser && !isAuthLoading && !isPermissionsLoading && isEffectivelyUnassigned && mainNavLinks.filter(link => link.href === '/').map((link) => {
              const canViewLink = userProfile?.roles?.includes('admin') || (link.permission && effectivePermissions[link.permission]);
              if (canViewLink) {
                return (
