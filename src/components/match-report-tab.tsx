@@ -12,6 +12,7 @@ import {
   selectorCertifyMatchReportAction,
   selectorUncertifyMatchReportAction,
   getUserReportForGameAction,
+  getUserReportsForGameAction,
 } from '@/lib/actions/match-report-actions';
 import type { MatchReport, ScorecardSelectorAssignment, UserProfile } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -49,7 +50,7 @@ import {
 } from '@/lib/actions/match-report-ai-action';
 import {
   parseMatchReportImageAction, parseMatchReportDocxAction,
-  type ParsedMatchReport,
+  type ParsedMatchReport, type ParsedMatchReportPair,
 } from '@/lib/actions/match-report-import-action';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
 
@@ -102,6 +103,12 @@ export function MatchReportTab({
   const [isSavingDeltas, setIsSavingDeltas] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importPreview, setImportPreview] = useState<ParsedMatchReport | null>(null);
+  // Two-report import state
+  const [importPair, setImportPair] = useState<ParsedMatchReportPair | null>(null);
+  const [importTopA, setImportTopA] = useState<string[]>(['', '', '']);
+  const [importTopB, setImportTopB] = useState<string[]>(['', '', '']);
+  const [submittedTeams, setSubmittedTeams] = useState<Set<string>>(new Set());
+  const [isSubmittingTeam, setIsSubmittingTeam] = useState<string | null>(null);
 
   // Read pre-filled import data from sessionStorage (set by scorecard card/list import)
   useEffect(() => {
@@ -483,19 +490,19 @@ export function MatchReportTab({
                   <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
                     onChange={async e => {
                       const file = e.target.files?.[0]; if (!file) return;
-                      setIsImporting(true); setImportPreview(null);
+                      setIsImporting(true); setImportPreview(null); setImportPair(null);
                       const reader = new FileReader();
                       reader.onload = async ev => {
                         const base64 = (ev.target?.result as string).split(",")[1];
-                        const res = await parseMatchReportImageAction(base64, file.type as any, allPlayers.map(p => p.name));
+                        const rosterA = playersByTeam[team1] || [];
+                        const rosterB = playersByTeam[team2] || [];
+                        const res = await parseMatchReportImageAction(base64, file.type as any, team1, team2, rosterA, rosterB);
                         if (res.success && res.parsed) {
-                          setImportPreview(res.parsed);
-                          if (res.parsed.highlights) setHighlights(res.parsed.highlights);
-                          if (res.parsed.missedCatches) setMissedCatches(res.parsed.missedCatches);
-                          if (res.parsed.missedRunOuts) setMissedRunOuts(res.parsed.missedRunOuts);
-                          if (res.parsed.greatCatchesRunOuts) setGreatCatchesRunOuts(res.parsed.greatCatchesRunOuts);
-                          if (res.parsed.sportsmanship) setSportsmanship(res.parsed.sportsmanship);
-                          toast({ title: 'Report imported', description: 'Fields filled - review and edit before submitting.' });
+                          setImportPair(res.parsed);
+                          setImportTopA(res.parsed.teamA.top3Matched.concat(['','','']).slice(0,3));
+                          setImportTopB(res.parsed.teamB.top3Matched.concat(['','','']).slice(0,3));
+                          setSubmittedTeams(new Set());
+                          toast({ title: 'Report imported', description: 'Review each team panel below and submit independently.' });
                         } else toast({ title: 'Import failed', description: res.error, variant: 'destructive' });
                         setIsImporting(false);
                       };
@@ -508,7 +515,7 @@ export function MatchReportTab({
                   <input type="file" accept=".docx" className="hidden"
                     onChange={async e => {
                       const file = e.target.files?.[0]; if (!file) return;
-                      setIsImporting(true); setImportPreview(null);
+                      setIsImporting(true); setImportPreview(null); setImportPair(null);
                       const reader = new FileReader();
                       reader.onload = async ev => {
                         try {
@@ -523,15 +530,15 @@ export function MatchReportTab({
                             mammoth = (window as any).mammoth;
                           }
                           const result = await mammoth.extractRawText({ arrayBuffer: ev.target?.result as ArrayBuffer });
-                          const res = await parseMatchReportDocxAction(result.value, allPlayers.map(p => p.name));
+                          const rosterA = playersByTeam[team1] || [];
+                          const rosterB = playersByTeam[team2] || [];
+                          const res = await parseMatchReportDocxAction(result.value, team1, team2, rosterA, rosterB);
                           if (res.success && res.parsed) {
-                            setImportPreview(res.parsed);
-                            if (res.parsed.highlights) setHighlights(res.parsed.highlights);
-                            if (res.parsed.missedCatches) setMissedCatches(res.parsed.missedCatches);
-                            if (res.parsed.missedRunOuts) setMissedRunOuts(res.parsed.missedRunOuts);
-                            if (res.parsed.greatCatchesRunOuts) setGreatCatchesRunOuts(res.parsed.greatCatchesRunOuts);
-                            if (res.parsed.sportsmanship) setSportsmanship(res.parsed.sportsmanship);
-                            toast({ title: 'Report imported', description: 'Fields filled - review and edit before submitting.' });
+                            setImportPair(res.parsed);
+                            setImportTopA(res.parsed.teamA.top3Matched.concat(['','','']).slice(0,3));
+                            setImportTopB(res.parsed.teamB.top3Matched.concat(['','','']).slice(0,3));
+                            setSubmittedTeams(new Set());
+                            toast({ title: 'Report imported', description: 'Review each team panel below and submit independently.' });
                           } else toast({ title: 'Import failed', description: res.error, variant: 'destructive' });
                         } catch (err: any) {
                           toast({ title: 'Could not read docx', description: err.message, variant: 'destructive' });
@@ -547,14 +554,169 @@ export function MatchReportTab({
                   <Loader2 className="h-4 w-4 animate-spin text-primary" /> Scanning report - please wait...
                 </div>
               )}
-              {importPreview && !isImporting && (
+              {importPair && !isImporting && (
                 <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                  Fields filled from imported report. Review and edit below before submitting.
-                  <button onClick={() => setImportPreview(null)} className="ml-auto text-muted-foreground hover:text-foreground">x</button>
+                  Report split into two team panels below. Review and submit each independently.
+                  <button onClick={() => { setImportPair(null); setSubmittedTeams(new Set()); }} className="ml-auto text-muted-foreground hover:text-foreground">×</button>
                 </div>
               )}
             </div>
+
+            {/* ── Two-panel import layout ── */}
+            {importPair && !isImporting && (() => {
+              const handleImportSubmit = async (
+                teamName: string,
+                parsed: ParsedMatchReport,
+                top3State: string[]
+              ) => {
+                if (!currentUser || !userProfile) return;
+                const reportingTeam = teamName === team1 ? team2 : team1;
+                const filledTop3 = top3State.filter(p => p.trim());
+                if (filledTop3.length === 0) {
+                  toast({ title: 'Select at least 1 top performer', variant: 'destructive' }); return;
+                }
+                if (!parsed.highlights.trim()) {
+                  toast({ title: 'Highlights are required', variant: 'destructive' }); return;
+                }
+                setIsSubmittingTeam(teamName);
+                const res = await submitMatchReportAction({
+                  gameId,
+                  scorecardId,
+                  organizationId,
+                  seriesId,
+                  reportingTeam,
+                  opposingTeam: teamName,
+                  submittedBy: currentUser.uid,
+                  submittedByName: userProfile.displayName || userProfile.email || 'Unknown',
+                  top3Players: filledTop3,
+                  highlights: parsed.highlights,
+                  missedCatches: parsed.missedCatches,
+                  missedRunOuts: parsed.missedRunOuts,
+                  greatCatchesRunOuts: parsed.greatCatchesRunOuts,
+                  sportsmanship: parsed.sportsmanship,
+                });
+                if (res.success) {
+                  setSubmittedTeams(prev => new Set([...prev, teamName]));
+                  toast({ title: `${teamName} report submitted` });
+                  const [allRes, myRep] = await Promise.all([
+                    canView ? getMatchReportsForGameAction(gameId) : Promise.resolve({ success: true, reports: [] }),
+                    getUserReportForGameAction(gameId, currentUser.uid),
+                  ]);
+                  if (allRes.success) setReports(allRes.reports || []);
+                  setMyReport(myRep);
+                } else {
+                  toast({ title: 'Submission failed', description: res.error, variant: 'destructive' });
+                }
+                setIsSubmittingTeam(null);
+              };
+
+              const renderTeamPanel = (
+                teamName: string,
+                parsed: ParsedMatchReport,
+                top3State: string[],
+                setTop3State: (v: string[]) => void,
+                roster: string[],
+                colorClass: string
+              ) => {
+                const isSubmitted = submittedTeams.has(teamName);
+                const isThisSubmitting = isSubmittingTeam === teamName;
+                return (
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className={`px-4 py-2.5 border-b flex items-center justify-between ${colorClass}`}>
+                      <span className="text-sm font-medium">{teamName}</span>
+                      {parsed.unmatchedCount > 0 && !isSubmitted && (
+                        <span className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                          {parsed.unmatchedCount} name{parsed.unmatchedCount > 1 ? 's' : ''} not matched
+                        </span>
+                      )}
+                      {isSubmitted && (
+                        <span className="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" /> Submitted
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {/* Top 3 */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium flex items-center gap-1">
+                          <Trophy className="h-3 w-3 text-yellow-500" /> Top performers
+                        </label>
+                        {[0,1,2].map(i => (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground w-4">{i+1}.</span>
+                            <select
+                              className="flex-1 h-8 rounded-md border border-input bg-background px-2 text-sm"
+                              value={top3State[i] || ''}
+                              disabled={isSubmitted}
+                              onChange={e => {
+                                const updated = [...top3State];
+                                updated[i] = e.target.value;
+                                setTop3State(updated);
+                              }}
+                            >
+                              <option value="">— Select player —</option>
+                              {roster.map(p => (
+                                <option key={p} value={p} disabled={top3State.includes(p) && top3State[i] !== p}>{p}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Fields */}
+                      {[
+                        { label: 'Highlights', value: parsed.highlights, icon: '★', required: true },
+                        { label: 'Great catches / run outs', value: parsed.greatCatchesRunOuts, icon: '✓', required: false },
+                        { label: 'Missed catches', value: parsed.missedCatches, icon: '!', required: false },
+                        { label: 'Missed run outs', value: parsed.missedRunOuts, icon: '!', required: false },
+                        { label: 'Sportsmanship', value: parsed.sportsmanship, icon: '♥', required: false },
+                      ].map(({ label, value, required }) => (
+                        <div key={label} className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">
+                            {label}{required && <span className="text-destructive ml-0.5">*</span>}
+                          </label>
+                          {value ? (
+                            <p className="text-sm leading-relaxed bg-muted rounded-md px-3 py-2">{value}</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground italic px-3 py-2 bg-muted rounded-md">Nothing noted</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="px-4 pb-4">
+                      {isSubmitted ? (
+                        <div className="flex items-center justify-center gap-2 text-sm text-green-700 py-2">
+                          <CheckCircle2 className="h-4 w-4" /> {teamName} report submitted
+                        </div>
+                      ) : (
+                        <Button
+                          className="w-full"
+                          disabled={isThisSubmitting || !!isSubmittingTeam}
+                          onClick={() => handleImportSubmit(
+                            teamName, parsed, top3State
+                          )}
+                        >
+                          {isThisSubmitting
+                            ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> Submitting...</>
+                            : <><Send className="mr-2 h-3.5 w-3.5" /> Submit {teamName} report</>
+                          }
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                  {renderTeamPanel(team1, importPair.teamA, importTopA, setImportTopA, playersByTeam[team1] || [], 'bg-blue-50')}
+                  {renderTeamPanel(team2, importPair.teamB, importTopB, setImportTopB, playersByTeam[team2] || [], 'bg-green-50')}
+                </div>
+              );
+            })()}
+
+            {/* Manual form — only shown when no import active */}
+            {!importPair && <>
 
             {/* Top 3 performers */}
             <div className="space-y-2">
@@ -797,6 +959,7 @@ export function MatchReportTab({
                 Cancel
               </Button>
             )}
+            </>}
           </CardContent>
         </Card>
       )}

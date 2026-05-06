@@ -25,16 +25,21 @@ interface ScorecardImportModalProps {
   sc: MatchScorecard;
   open: boolean;
   onClose: () => void;
-  rosterPlayerNames: string[];
+  rosterPlayerNames: string[]; // kept for backwards compat
+  rosterByTeam?: Record<string, string[]>; // preferred: players keyed by team name
 }
 
 export function ScorecardImportModal({
-  sc, open, onClose, rosterPlayerNames,
+  sc, open, onClose, rosterPlayerNames, rosterByTeam,
 }: ScorecardImportModalProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
   const [done, setDone] = useState(false);
+
+  // Derive per-team rosters
+  const rosterA = rosterByTeam?.[sc.team1] || rosterPlayerNames.slice(0, Math.ceil(rosterPlayerNames.length / 2));
+  const rosterB = rosterByTeam?.[sc.team2] || rosterPlayerNames.slice(Math.ceil(rosterPlayerNames.length / 2));
 
   const handleSuccess = (parsed: any) => {
     // Store in sessionStorage keyed by scorecardId
@@ -59,7 +64,7 @@ export function ScorecardImportModal({
     reader.onload = async ev => {
       const base64 = (ev.target?.result as string).split(',')[1];
       const res = await parseMatchReportImageAction(
-        base64, file.type as any, rosterPlayerNames
+        base64, file.type as any, sc.team1, sc.team2, rosterA, rosterB
       );
       if (res.success && res.parsed) handleSuccess(res.parsed);
       else toast({ title: 'Import failed', description: res.error, variant: 'destructive' });
@@ -85,7 +90,7 @@ export function ScorecardImportModal({
           mammoth = (window as any).mammoth;
         }
         const result = await mammoth.extractRawText({ arrayBuffer: ev.target?.result as ArrayBuffer });
-        const res = await parseMatchReportDocxAction(result.value, rosterPlayerNames);
+        const res = await parseMatchReportDocxAction(result.value, sc.team1, sc.team2, rosterA, rosterB);
         if (res.success && res.parsed) handleSuccess(res.parsed);
         else toast({ title: 'Import failed', description: res.error, variant: 'destructive' });
       } catch (err: any) {

@@ -28,15 +28,16 @@ export async function submitMatchReportAction(
   report: Omit<MatchReport, 'id' | 'submittedAt' | 'isCertified'>
 ): Promise<{ success: boolean; reportId?: string; error?: string }> {
   try {
-    // One report per submitter per game
+    // One report per submitter per opposing team per game
     const existing = await adminDb.collection(COLLECTION)
       .where('gameId', '==', report.gameId)
       .where('submittedBy', '==', report.submittedBy)
+      .where('opposingTeam', '==', report.opposingTeam)
       .limit(1)
       .get();
 
     if (!existing.empty) {
-      return { success: false, error: 'You have already submitted a report for this game.' };
+      return { success: false, error: 'You have already submitted a report for this team in this game.' };
     }
 
     const ref = await adminDb.collection(COLLECTION).add({
@@ -296,12 +297,30 @@ export async function getUserReportForGameAction(
     const snap = await adminDb.collection(COLLECTION)
       .where('gameId', '==', gameId)
       .where('submittedBy', '==', userId)
-      .limit(1)
+      .limit(2)
       .get();
 
     if (snap.empty) return null;
     return serializeReport(snap.docs[0]) as MatchReport;
   } catch {
     return null;
+  }
+}
+
+// ─── Get both of this user's reports for a game (up to 2 — one per team) ─────
+
+export async function getUserReportsForGameAction(
+  gameId: string,
+  userId: string
+): Promise<MatchReport[]> {
+  try {
+    const snap = await adminDb.collection(COLLECTION)
+      .where('gameId', '==', gameId)
+      .where('submittedBy', '==', userId)
+      .limit(2)
+      .get();
+    return snap.docs.map(serializeReport) as MatchReport[];
+  } catch {
+    return [];
   }
 }
