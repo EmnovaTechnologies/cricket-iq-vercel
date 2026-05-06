@@ -144,3 +144,99 @@ export async function registerPlayerAdminAction(
     };
   }
 }
+
+export interface LinkPlayerAccountResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * linkPlayerAccountAction
+ *
+ * Called from signUpAsPlayer in auth-context AFTER createUserWithEmailAndPassword.
+ * Uses Admin SDK — bypasses all Firestore security rules.
+ *
+ * Atomically:
+ *   1. Validates the registrationToken (server clock — no client skew)
+ *   2. Writes the users/{uid} doc with roles: ['player'] + org assignment
+ *   3. Updates players/{playerId} with userId + deletes token fields
+ *
+ * This replaces the client-side createUserProfile call for the player path,
+ * eliminating the security rules conflict and the Timestamp comparison bug.
+ */
+export async function linkPlayerAccountAction(
+  uid: string,
+  email: string | null,
+  displayName: string,
+  registrationToken: string,
+): Promise<LinkPlayerAccountResult> {
+  try {
+    // ── Step 1: Find player by token, validate server-side expiry ──
+    const now = admin.firestore.Timestamp.now();
+    const playerQuery = await adminDb
+      .collection('players')
+      .where('registrationToken', '==', registrationToken)
+      .where('registrationTokenExpires', '>', now)
+      .limit(1)
+      .get();
+
+    if (playerQuery.empty) {
+      return {
+        success: false,
+        error: 'Registration token is invalid or has expired. Please restart the registration process.',
+      };
+    }
+
+    const playerDoc = playerQuery.docs[0];
+    const playerData = playerDoc.data();
+
+    // ── Step 2: Guard — don't let a second claim overwrite an existing link ──
+    if (playerData.userId) {
+      return {
+        success: false,
+        error: 'This player profile has already been linked to an account.',
+      };
+    }
+
+    const organizationId: string | null = playerData.organizationId || null;
+
+    // ── Step 3: Atomic batch — write user profile + link player ──
+    const batch = adminDb.batch();
+
+    // Write users/{uid}
+    const userDocRef = adminDb.collection('users').doc(uid);
+    batch.set(userDocRef, {
+      uid,
+      email,
+      displayName: displayName || null,
+      roles: ['player'],
+      assignedOrganizationIds: organizationId ? [organizationId] : [],
+      activeOrganizationId: organizationId,
+      assignedSeriesIds: [],
+      assignedTeamIds: [],
+      assignedGameIds: [],
+      phoneNumber: null,
+      createdAt: now,
+      lastLogin: now,
+    });
+
+    // Update players/{playerId} — link uid, remove token
+    batch.update(playerDoc.ref, {
+      userId: uid,
+      registrationToken: admin.firestore.FieldValue.delete(),
+      registrationTokenExpires: admin.firestore.FieldValue.delete(),
+    });
+
+    await batch.commit();
+
+    console.log(`[linkPlayerAccountAction] Successfully linked uid=${uid} to player=${playerDoc.id}`);
+    return { success: true };
+
+  } catch (e: any) {
+    console.error('[linkPlayerAccountAction] Error:', e);
+    return {
+      success: false,
+      error: `An unexpected server error occurred: ${e.message}`,
+    };
+  }
+}

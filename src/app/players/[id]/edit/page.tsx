@@ -25,6 +25,7 @@ export default function EditPlayerPage() {
   const [teamsForForm, setTeamsForForm] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOwnProfile, setIsOwnProfile] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -40,9 +41,10 @@ export default function EditPlayerPage() {
           // Authorization check: User must be able to edit THIS specific player.
           const isSuperAdmin = userProfile?.roles.includes('admin');
           const isOrgAdmin = userProfile?.roles.includes('Organization Admin') && playerDetails.organizationId === activeOrganizationId;
-          const isOwnProfile = userProfile?.playerId === playerDetails.id;
+          const ownProfile = userProfile?.playerId === playerDetails.id;
+          setIsOwnProfile(ownProfile);
           
-          if (!isSuperAdmin && !isOrgAdmin && !isOwnProfile) {
+          if (!isSuperAdmin && !isOrgAdmin && !ownProfile) {
              setError("You are not authorized to edit this player's profile.");
              setPlayer(null);
           } else {
@@ -64,14 +66,6 @@ export default function EditPlayerPage() {
   }, [playerId, isAuthLoading, userProfile, activeOrganizationId]);
   
   const renderContent = () => {
-    if (loading) {
-      return (
-        <div className="flex justify-center items-center py-10">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <p className="ml-2 text-muted-foreground">Loading player data...</p>
-        </div>
-      );
-    }
     if (error || !player) {
       return (
         <Alert variant="destructive" className="mt-8">
@@ -87,9 +81,50 @@ export default function EditPlayerPage() {
       <PlayerForm
         initialData={player}
         allTeams={teamsForForm}
+        isSelfEdit={isOwnProfile}
       />
     );
   };
+
+  // Wait until auth AND player fetch are complete before deciding which
+  // render path to take. Without this guard, AuthProviderClientComponent
+  // renders immediately with isOwnProfile=false and flashes "Access Denied"
+  // before the useEffect sets the correct value.
+  if (isAuthLoading || loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const playerContent = (
+    <div className="max-w-2xl mx-auto">
+      <div className="mb-4">
+        <Button variant="outline" size="sm" asChild>
+          <Link href={isOwnProfile ? '/profile' : (playerId ? `/players/${playerId}` : '/players')}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> {isOwnProfile ? 'Back to Profile' : 'Back to Player'}
+          </Link>
+        </Button>
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-headline text-primary">
+            {isOwnProfile ? 'My Cricket Profile' : `Edit Player: ${loading ? '...' : (player?.name || 'Not Found')}`}
+          </CardTitle>
+          <CardDescription>
+            {isOwnProfile ? 'Update your playing details and avatar.' : 'Modify the details for this player.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>{renderContent()}</CardContent>
+      </Card>
+    </div>
+  );
+
+  // Players editing their own profile bypass the PAGE_VIEW_PLAYER_EDIT permission check
+  if (isOwnProfile) {
+    return playerContent;
+  }
 
   return (
     <AuthProviderClientComponent
@@ -106,26 +141,7 @@ export default function EditPlayerPage() {
         </div>
       }
     >
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-4">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={playerId ? `/players/${playerId}` : '/players'}>
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Profile
-            </Link>
-          </Button>
-        </div>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl font-headline text-primary">
-              Edit Player: {loading ? '...' : (player?.name || 'Not Found')}
-            </CardTitle>
-            <CardDescription>
-              Modify the details for this player.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>{renderContent()}</CardContent>
-        </Card>
-      </div>
+      {playerContent}
     </AuthProviderClientComponent>
   );
 }

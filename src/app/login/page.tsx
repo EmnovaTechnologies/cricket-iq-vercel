@@ -103,18 +103,24 @@ function LoginForm() {
     setEmailFormSubmitting(true);
     try {
       await signInWithEmail(email, password);
-      // onAuthStateChanged blocks unverified users — check after sign-in
+      // If sign-in succeeded, onAuthStateChanged handles the rest.
+      // If the user is unverified, our gate in auth-context calls signOut immediately,
+      // leaving currentUser null and userProfile null — the form stays on the login page.
+      // We detect this by checking the Firebase Auth user directly after sign-in.
       const { getAuth } = await import('firebase/auth');
       const fbUser = getAuth().currentUser;
       if (fbUser && !fbUser.emailVerified) {
-        const { signOut: fbSignOut } = await import('firebase/auth');
-        await fbSignOut(getAuth());
+        // Still signed in but unverified — show the resend banner and sign out.
         setUnverifiedEmail(email);
         setUnverifiedPassword(password);
-        setEmailFormSubmitting(false);
-      } else {
-        setEmailFormSubmitting(false);
+        const { signOut: fbSignOut } = await import('firebase/auth');
+        await fbSignOut(getAuth());
+      } else if (!fbUser) {
+        // Gate already signed them out (unverified) — show banner without password stored.
+        setUnverifiedEmail(email);
+        setUnverifiedPassword(password);
       }
+      setEmailFormSubmitting(false);
     } catch (err: any) {
       let errorMessage = "Failed to login. Please check your credentials.";
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {

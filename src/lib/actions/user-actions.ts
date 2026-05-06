@@ -329,7 +329,12 @@ export async function createUserProfile(
     userProfileDataForFirestore.clubName = clubName.trim();
   }
 
-  batch.set(userDocRef, userProfileDataForFirestore);
+  // merge: true — if a concurrent onAuthStateChanged write already created this doc
+  // with roles: ['unassigned'], this write wins and correctly sets roles: ['player'].
+  // Without merge, fields not in this payload would be wiped (safe here since this
+  // is a new user), but merge prevents any timing-dependent double-write from
+  // silently stripping the player role.
+  batch.set(userDocRef, userProfileDataForFirestore, { merge: true });
   console.log('[createUserProfile] Committing user profile to Firestore...');
   await batch.commit();
   console.log('[createUserProfile] Firestore commit successful.');

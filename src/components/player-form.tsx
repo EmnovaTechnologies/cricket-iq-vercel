@@ -9,7 +9,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePickerField } from '@/components/date-picker-field';
-import { AlertTriangle, Loader2, UploadCloud, Trash2 } from 'lucide-react';
+import { AlertTriangle, Info, Loader2, UploadCloud, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { format, differenceInYears, parseISO, isValid } from 'date-fns';
@@ -78,6 +78,7 @@ interface PlayerFormProps {
   preselectedPrimaryTeamName?: string;
   preselectedPrimaryTeamAgeCategory?: AgeCategory;
   preselectedClubName?: string;
+  isSelfEdit?: boolean; // Player editing their own profile — locks identity fields
 }
 
 export function PlayerForm({
@@ -88,6 +89,7 @@ export function PlayerForm({
   preselectedPrimaryTeamName,
   preselectedPrimaryTeamAgeCategory,
   preselectedClubName,
+  isSelfEdit = false,
 }: PlayerFormProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -374,7 +376,7 @@ export function PlayerForm({
         const finalPlayerData = { ...initialData, ...basePlayerData, id: playerId, gamesPlayed: initialData?.gamesPlayed || 0 } as Player
         onSubmitSuccess(finalPlayerData);
       } else {
-        router.push(isEditMode ? `/players/${playerId}` : '/players');
+        router.push(isSelfEdit ? '/profile' : (isEditMode ? `/players/${playerId}` : '/players'));
       }
       router.refresh();
 
@@ -387,6 +389,9 @@ export function PlayerForm({
   }
 
   const disableSubmitButton = isSubmitting || isUploadingAvatar;
+  // In self-edit mode, identity fields are locked — player cannot change
+  // name, DOB, gender, cricClubs ID or team assignment.
+  const lockIdentity = isSelfEdit;
 
   if (!activeOrganizationId && !initialData) {
     return (
@@ -403,6 +408,17 @@ export function PlayerForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+
+        {isSelfEdit && (
+          <Alert className="border-blue-300 bg-blue-50">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertTitle className="text-blue-800">Cricket Profile</AlertTitle>
+            <AlertDescription className="text-blue-700">
+              You can update your playing details and avatar. Name, date of birth, gender and CricClubs ID are locked — contact an administrator to change these.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             control={form.control}
@@ -411,7 +427,7 @@ export function PlayerForm({
               <FormItem>
                 <FormLabel>First Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g., Virat" {...field} disabled={disableSubmitButton} />
+                  <Input placeholder="e.g., Virat" {...field} disabled={disableSubmitButton || lockIdentity} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -424,7 +440,7 @@ export function PlayerForm({
               <FormItem>
                 <FormLabel>Last Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g., Kohli" {...field} disabled={disableSubmitButton} />
+                  <Input placeholder="e.g., Kohli" {...field} disabled={disableSubmitButton || lockIdentity} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -439,7 +455,7 @@ export function PlayerForm({
             <FormItem>
               <FormLabel>CricClubs ID</FormLabel>
               <FormControl>
-                <Input placeholder="Enter CricClubs ID" {...field} value={field.value ?? ""} disabled={disableSubmitButton} />
+                <Input placeholder="Enter CricClubs ID" {...field} value={field.value ?? ""} disabled={disableSubmitButton || lockIdentity} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -473,7 +489,7 @@ export function PlayerForm({
                <DatePickerField
                 field={field} label="Date of Birth"
                 required fromYear={1950} toYear={new Date().getFullYear()}
-                disabled={disableSubmitButton}/>
+                disabled={disableSubmitButton || lockIdentity}/>
             )}/>
           <FormItem className="flex flex-col"><FormLabel>Age</FormLabel>
             <Input readOnly value={age !== undefined ? age : 'N/A'} className="bg-muted cursor-default mt-auto" />
@@ -483,7 +499,7 @@ export function PlayerForm({
         <FormField control={form.control} name="gender"
           render={({ field }) => (
             <FormItem><FormLabel>Gender</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value ?? ""} disabled={disableSubmitButton}>
+              <Select onValueChange={field.onChange} value={field.value ?? ""} disabled={disableSubmitButton || lockIdentity}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger></FormControl>
                 <SelectContent>{GENDERS.map((gender) => <SelectItem key={gender} value={gender}>{gender}</SelectItem>)}</SelectContent>
               </Select><FormMessage /></FormItem>

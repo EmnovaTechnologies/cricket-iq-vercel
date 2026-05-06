@@ -5,7 +5,7 @@ import type { Organization, Team } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
@@ -42,10 +42,11 @@ interface PlayerRegistrationFormProps {
 
 export function PlayerRegistrationForm({ organization, teams }: PlayerRegistrationFormProps) {
     const { toast } = useToast();
-    const router = useRouter();
-    const { signUpAsPlayer, currentUser, isAuthLoading } = useAuth();
+    const { signUpAsPlayer } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
     const [serverError, setServerError] = useState<string | null>(null);
+    const [registrationComplete, setRegistrationComplete] = useState(false);
+    const [registeredEmail, setRegisteredEmail] = useState<string>('');
 
     const form = useForm<PlayerRegistrationFormValues>({
         resolver: zodResolver(playerRegistrationSchema),
@@ -55,16 +56,6 @@ export function PlayerRegistrationForm({ organization, teams }: PlayerRegistrati
             clubName: undefined,
         },
     });
-
-    useEffect(() => {
-        if (!isAuthLoading && currentUser) {
-            toast({
-                title: "Registration Complete!",
-                description: "Welcome! Redirecting you to the dashboard...",
-            });
-            router.push('/');
-        }
-    }, [currentUser, isAuthLoading, router, toast]);
 
     async function onSubmit(data: PlayerRegistrationFormValues) {
         setIsLoading(true);
@@ -76,6 +67,10 @@ export function PlayerRegistrationForm({ organization, teams }: PlayerRegistrati
             if (validationResult.success && validationResult.registrationToken) {
                 const displayName = `${data.firstName} ${data.lastName}`;
                 await signUpAsPlayer(data.email, data.password, displayName, validationResult.registrationToken);
+                // signUpAsPlayer signs the user out after sending verification email.
+                // Show the "check your email" screen — do NOT redirect to dashboard.
+                setRegisteredEmail(data.email);
+                setRegistrationComplete(true);
             } else {
                 setServerError(validationResult.error || "An unknown validation error occurred.");
                 setIsLoading(false);
@@ -87,6 +82,20 @@ export function PlayerRegistrationForm({ organization, teams }: PlayerRegistrati
         }
     }
 
+
+    // ── Registration complete — show "check your email" screen ──
+    if (registrationComplete) {
+        return (
+            <Alert className="border-green-300 bg-green-50">
+                <AlertTriangle className="h-4 w-4 text-green-600" />
+                <AlertTitle className="text-green-800">Check Your Email!</AlertTitle>
+                <AlertDescription className="text-green-700 space-y-2">
+                    <p>Your player account has been created. A verification email has been sent to <strong>{registeredEmail}</strong>.</p>
+                    <p>Please click the link in that email to verify your address, then <a href="/login" className="underline font-medium">log in here</a>.</p>
+                </AlertDescription>
+            </Alert>
+        );
+    }
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

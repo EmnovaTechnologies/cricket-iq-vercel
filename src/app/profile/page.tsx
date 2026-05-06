@@ -9,11 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Phone, User, Mail, ShieldCheck, CheckCircle, Info } from 'lucide-react';
+import { Loader2, Phone, User, Mail, ShieldCheck, CheckCircle, Info, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { doc, updateDoc, getDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { ConfirmationResult } from 'firebase/auth';
 
 export default function ProfilePage() {
@@ -26,7 +27,6 @@ export default function ProfilePage() {
   const [duplicatePhoneWarning, setDuplicatePhoneWarning] = useState<string | null>(null);
 
   const checkPhoneDuplicate = async (formatted: string): Promise<boolean> => {
-    // Returns true if phone is already used by another user
     const q = query(
       collection(db, 'users'),
       where('phoneNumber', '==', formatted),
@@ -42,6 +42,7 @@ export default function ProfilePage() {
     setDuplicatePhoneWarning(null);
     return false;
   };
+
   const [isSaving, setIsSaving] = useState(false);
 
   // Phone linking state
@@ -51,6 +52,8 @@ export default function ProfilePage() {
   const [isCodeSent, setIsCodeSent] = useState(false);
   const [isLinkingPhone, setIsLinkingPhone] = useState(false);
   const [showPhoneSection, setShowPhoneSection] = useState(false);
+
+  const isPlayer = userProfile?.roles?.includes('player');
 
   useEffect(() => {
     if (!isAuthLoading && !currentUser) {
@@ -99,11 +102,10 @@ export default function ProfilePage() {
     try {
       const digits = newPhone.replace(/\D/g, '');
       const formatted = digits.startsWith('1') ? `+${digits}` : `+1${digits}`;
-      // Check for duplicate before sending OTP
       const isDuplicate = await checkPhoneDuplicate(formatted);
       if (isDuplicate) {
         setIsLinkingPhone(false);
-        return; // Warning already set, don't proceed
+        return;
       }
       const result = await signInWithPhoneNumberFlow(formatted, 'recaptcha-container-profile');
       setConfirmationResult(result);
@@ -120,15 +122,11 @@ export default function ProfilePage() {
     if (!confirmationResult || !otp.trim()) return;
     setIsLinkingPhone(true);
     try {
-      // Verify OTP with Firebase Auth
       await confirmPhoneNumberCode(confirmationResult, otp);
-
-      // Save phone number to Firestore profile
       const digits = newPhone.replace(/\D/g, '');
       const formatted = digits.startsWith('1') ? `+${digits}` : `+1${digits}`;
       const userDocRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userDocRef, { phoneNumber: formatted });
-
       setPhoneNumber(formatted);
       setShowPhoneSection(false);
       setIsCodeSent(false);
@@ -149,7 +147,6 @@ export default function ProfilePage() {
     try {
       const digits = newPhone.replace(/\D/g, '');
       const formatted = digits.startsWith('1') ? `+${digits}` : `+1${digits}`;
-      // Check for duplicate first
       const isDuplicate = await checkPhoneDuplicate(formatted);
       if (isDuplicate) {
         setIsSaving(false);
@@ -180,14 +177,14 @@ export default function ProfilePage() {
               <AvatarImage src={currentUser.photoURL || undefined} alt={userProfile.displayName || 'User'} />
               <AvatarFallback className="text-xl">{getInitials(userProfile.displayName, userProfile.email)}</AvatarFallback>
             </Avatar>
-            <div>
+            <div className="flex-1">
               <CardTitle className="text-2xl font-headline text-primary">
                 {userProfile.displayName || 'Your Profile'}
               </CardTitle>
               <CardDescription>{userProfile.email || currentUser.phoneNumber}</CardDescription>
               <div className="flex gap-1 mt-1 flex-wrap">
                 {(userProfile.roles || []).map(role => (
-                  <Badge key={role} variant="secondary" className="text-xs capitalize">{role}</Badge>
+                  <Badge key={role} variant="secondary" className="capitalize text-xs">{role}</Badge>
                 ))}
               </div>
             </div>
@@ -195,12 +192,41 @@ export default function ProfilePage() {
         </CardHeader>
       </Card>
 
+      {/* ── Cricket Profile — players only ── */}
+      {isPlayer && userProfile.playerId && (
+        <Card className="border-primary/30">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  🏏 Cricket Profile
+                </CardTitle>
+                <CardDescription>
+                  Update your playing details, skill, and avatar.
+                </CardDescription>
+              </div>
+              <Button asChild variant="outline" size="sm" className="gap-2">
+                <Link href={`/players/${userProfile.playerId}/edit`}>
+                  <Pencil className="h-4 w-4" />
+                  Edit Cricket Profile
+                </Link>
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
+      )}
+
       {/* Display Name */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <User className="h-5 w-5 text-primary" /> Display Name
           </CardTitle>
+          {isPlayer && (
+            <CardDescription>
+              This is your account display name shown in the navbar. It does not affect your cricket profile name.
+            </CardDescription>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1.5">
@@ -354,7 +380,7 @@ export default function ProfilePage() {
               <p className="font-mono text-xs text-muted-foreground">{currentUser.uid}</p>
             </div>
           </div>
-          {userProfile.assignedOrganizationIds?.length > 0 && (
+          {userProfile.assignedOrganizationIds && userProfile.assignedOrganizationIds.length > 0 && (
             <div className="flex items-center gap-3">
               <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0" />
               <div>
@@ -374,6 +400,7 @@ export default function ProfilePage() {
           )}
         </CardContent>
       </Card>
+
     </div>
   );
 }

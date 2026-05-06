@@ -18,6 +18,7 @@ import {
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { createUserProfile, getUserProfile } from '@/lib/actions/user-actions';
+import { linkPlayerAccountAction } from '@/lib/actions/register-player-admin-action';
 import type { UserProfile, Organization, PermissionKey, UserRole, Player, PredefinedThemeName, ThemeColorPalette } from '@/types';
 import { getOrganizationsByIdsAction } from '@/lib/actions/organization-actions';
 import { getAllOrganizationsFromDB, getOrganizationByIdFromDB } from '@/lib/db';
@@ -65,7 +66,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isOrgLoading, setIsOrgLoading] = useState(true);
   const [permissionsReady, setPermissionsReady] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [pendingRegistrationToken, setPendingRegistrationToken] = useState<string | null>(null);
   
   const [_activeOrganizationId, _setInternalActiveOrganizationId] = useState<string | null>(null);
   const [organizationsForSwitching, setOrganizationsForSwitching] = useState<Organization[]>([]);
@@ -132,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               targetDisplayNameFromStorage || user.displayName,
               user.phoneNumber,
               targetOrgIdFromStorage,
-              pendingRegistrationToken,
+              null, // registrationToken — handled server-side via linkPlayerAccountAction
               targetClubNameFromStorage,
             );
 
@@ -141,7 +141,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 sessionStorage.removeItem(SESSION_STORAGE_DISPLAY_NAME_KEY);
                 sessionStorage.removeItem(SESSION_STORAGE_CLUB_NAME_KEY);
             }
-            setPendingRegistrationToken(null);
         }
         
         if (user.uid) {
@@ -187,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
         setIsAuthLoading(false);
     }
-  }, [pendingRegistrationToken, logout]);
+  }, [logout]);
   
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -201,7 +200,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const needsVerification = !isGoogleUser && !isPhoneUser && !user.emailVerified;
 
         if (needsVerification) {
-          // User exists but email not verified — don't load profile, just stop loading
+          // Email not verified — sign them out immediately so the app never sees
+          // an authenticated-but-unverified session. The registration form will
+          // show a "check your email" screen after signUpAsPlayer resolves.
+          await signOut(auth);
           setIsAuthLoading(false);
           return;
         }
@@ -287,41 +289,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUpAsPlayer = async (email: string, password: string, displayName: string, registrationToken: string) => {
-    setPendingRegistrationToken(registrationToken);
     try {
+      // Step 1: Create the Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      if (displayName && userCredential.user) {
+      const uid = userCredential.user.uid;
+
+      // Step 2: Write users/{uid} + link players doc via Admin SDK (server action).
+      // This bypasses Firestore security rules and uses server-side clock for token
+      // expiry — no race condition, no Timestamp comparison bug, no rules conflict.
+      const linkResult = await linkPlayerAccountAction(uid, email, displayName, registrationToken);
+      if (!linkResult.success) {
+        // Profile write failed — delete the orphaned Auth user to keep state clean,
+        // then surface the error to the registration form.
+        await userCredential.user.delete();
+        throw new Error(linkResult.error || 'Failed to link player account.');
+      }
+
+      // Step 3: Set Firebase Auth display name (after profile write — avoids
+      // triggering a second onAuthStateChanged before the Firestore commit lands).
+      if (displayName) {
         await updateFirebaseProfile(userCredential.user, { displayName });
       }
 
-      // ── Create user profile immediately while we have the token ──
-      // We cannot rely on onAuthStateChanged to do this later because:
-      // 1. The email verification gate blocks loadUserProfileAndData for unverified users
-      // 2. pendingRegistrationToken state is lost when the user navigates away to verify email
-      // Calling createUserProfile now ensures the player role + userId link are written
-      // before we sign out.
-      await createUserProfile(
-        userCredential.user.uid,
-        userCredential.user.email,
-        displayName,
-        userCredential.user.phoneNumber,
-        null, // targetOrgId — derived from player doc via token
-        registrationToken
-      );
-      setPendingRegistrationToken(null);
-
-      // Send verification email then sign out — user must verify before accessing app
+      // Step 4: Send verification email then sign out.
+      // onAuthStateChanged will fire during signOut — the needsVerification gate
+      // will call signOut again (no-op) and stop loading. User must verify before
+      // they can log in and have their profile loaded.
       await sendEmailVerification(userCredential.user);
       await signOut(auth);
+
     } catch (error) {
-      setPendingRegistrationToken(null);
       console.error('[AuthContext] signUpAsPlayer error:', error);
       throw error;
     }
   };
 
   const signUpWithEmail = async (email: string, password: string, displayName?: string | null) => {
-    setPendingRegistrationToken(null);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       if (displayName && userCredential.user) {
