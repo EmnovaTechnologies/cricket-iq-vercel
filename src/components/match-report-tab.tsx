@@ -1269,9 +1269,9 @@ export function MatchReportTab({
                     </Button>
                   )}
 
-                  {/* Certify button — only available after selector has locked */}
+                  {/* Certify button — skip selector-lock requirement when admin submitted their own report */}
                   {canCertify && !report.isCertified && (
-                    report.isSelectorCertified ? (
+                    (report.isSelectorCertified || report.submittedBy === currentUser?.uid) ? (
                       <Button
                         size="sm" variant="outline"
                         className="border-green-500 text-green-600 hover:bg-green-50 w-full sm:w-auto"
