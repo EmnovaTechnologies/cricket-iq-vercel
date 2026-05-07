@@ -100,6 +100,8 @@ function RateCampInner() {
   // Assessment form
   const [form, setForm] = useState<AssessmentForm>(emptyForm());
   const [isSaving, setIsSaving] = useState(false);
+  const [showBibGrid, setShowBibGrid] = useState(true);
+  const [showSkillOverride, setShowSkillOverride] = useState(false);
 
   // Fitness
   const [fitnessScore, setFitnessScore] = useState('');
@@ -154,6 +156,7 @@ function RateCampInner() {
   // Load form when navigating to a new bib
   useEffect(() => {
     if (!currentPlayer) return;
+    setShowSkillOverride(false);
     const existing = myAssessments.get(currentPlayer.bibNumber);
     if (existing) {
       setForm({
@@ -344,38 +347,45 @@ function RateCampInner() {
 
       {/* ── ASSESS TAB ── */}
       {tab === 'assess' && currentPlayer && (
-        <div className="flex-1 px-4 pb-6 space-y-4 pt-4">
-          {/* Progress */}
+        <div className="flex-1 px-4 pb-6 space-y-3 pt-3">
+          {/* Progress bar only — bib grid hidden by default */}
           <div>
-            <div className="flex justify-between text-sm text-muted-foreground mb-1">
+            <div className="flex justify-between text-xs text-muted-foreground mb-1">
               <span>Bib {currentIndex + 1} of {sortedPlayers.length}</span>
-              <span>{lockedCount} locked</span>
+              <button
+                className="text-primary underline text-xs"
+                onClick={() => setShowBibGrid(v => !v)}
+              >
+                {showBibGrid ? 'Hide grid' : 'Show grid'}
+              </button>
             </div>
-            <div className="w-full bg-muted rounded-full h-2 mb-2">
-              <div className="bg-primary rounded-full h-2 transition-all"
+            <div className="w-full bg-muted rounded-full h-1.5 mb-1">
+              <div className="bg-primary rounded-full h-1.5 transition-all"
                 style={{ width: `${(lockedCount / sortedPlayers.length) * 100}%` }} />
             </div>
-            <div className="flex gap-1 flex-wrap">
-              {sortedPlayers.map((p, i) => {
-                const status = bibStatus(p);
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => navigateTo(i)}
-                    className={cn(
-                      'w-7 h-7 rounded-full text-xs font-medium transition-colors',
-                      i === currentIndex
-                        ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-1'
-                        : status === 'locked' ? 'bg-green-500 text-white'
-                        : status === 'draft' ? 'bg-amber-400 text-white'
-                        : 'bg-muted text-muted-foreground'
-                    )}
-                  >
-                    {p.bibNumber}
-                  </button>
-                );
-              })}
-            </div>
+            {showBibGrid && (
+              <div className="flex gap-1 flex-wrap mt-2">
+                {sortedPlayers.map((p, i) => {
+                  const status = bibStatus(p);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => navigateTo(i)}
+                      className={cn(
+                        'w-7 h-7 rounded-full text-xs font-medium transition-colors',
+                        i === currentIndex
+                          ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-1'
+                          : status === 'locked' ? 'bg-green-500 text-white'
+                          : status === 'draft' ? 'bg-amber-400 text-white'
+                          : 'bg-muted text-muted-foreground'
+                      )}
+                    >
+                      {p.bibNumber}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Bib card with arrows */}
@@ -427,76 +437,82 @@ function RateCampInner() {
             </div>
           )}
 
-          {/* Ratings */}
-          {RATING_DIMS.map(([key, label]) => (
-            <div key={key} className="bg-card border rounded-xl p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
-                {(form[key] as number) > 0 && (
-                  <span className="text-xs text-muted-foreground">{RATING_LABELS[form[key] as number]}</span>
-                )}
-              </div>
-              <StarRating
-                value={form[key] as number}
-                onChange={v => setF(key, v)}
-                disabled={isLocked}
-              />
-            </div>
-          ))}
-
-          {/* Skill override */}
+          {/* All ratings in one compact card */}
           {!isLocked && (
             <div className="bg-card border rounded-xl p-4 space-y-3">
-              <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Your skill assessment</p>
-              <Select
-                value={form.coachSuggestedSkill || 'keep'}
-                onValueChange={v => setF('coachSuggestedSkill', v === 'keep' ? '' : v)}
+              {RATING_DIMS.map(([key, label]) => (
+                <div key={key} className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-muted-foreground w-14 shrink-0">{label}</label>
+                  <StarRating
+                    value={form[key] as number}
+                    onChange={v => setF(key, v)}
+                    disabled={isLocked}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Skill override — collapsed by default */}
+          {!isLocked && (
+            <div className="bg-card border rounded-xl overflow-hidden">
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 text-sm"
+                onClick={() => setShowSkillOverride(v => !v)}
               >
-                <SelectTrigger className="text-sm">
-                  <SelectValue placeholder={`Keep as ${currentPlayer.playerPrimarySkill}`} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="keep">Keep: {currentPlayer.playerPrimarySkill}</SelectItem>
-                  {EFFECTIVE_SKILLS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <div className="grid grid-cols-2 gap-2">
-                <Select
-                  value={form.coachSuggestedBattingOrder || 'none'}
-                  onValueChange={v => setF('coachSuggestedBattingOrder', v === 'none' ? '' : v)}
-                >
-                  <SelectTrigger className="text-sm"><SelectValue placeholder="Batting order" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Not set</SelectItem>
-                    {BATTING_ORDERS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={form.coachSuggestedBowlingStyle || 'none'}
-                  onValueChange={v => setF('coachSuggestedBowlingStyle', v === 'none' ? '' : v)}
-                >
-                  <SelectTrigger className="text-sm"><SelectValue placeholder="Bowling style" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Not set</SelectItem>
-                    {BOWLING_STYLES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+                <span className="text-muted-foreground text-xs font-medium">Override skill / position</span>
+                <ChevronRight className={cn('h-4 w-4 text-muted-foreground transition-transform', showSkillOverride && 'rotate-90')} />
+              </button>
+              {showSkillOverride && (
+                <div className="px-4 pb-4 space-y-2 border-t pt-3">
+                  <Select
+                    value={form.coachSuggestedSkill || 'keep'}
+                    onValueChange={v => setF('coachSuggestedSkill', v === 'keep' ? '' : v)}
+                  >
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder={`Keep as ${currentPlayer.playerPrimarySkill}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="keep">Keep: {currentPlayer.playerPrimarySkill}</SelectItem>
+                      {EFFECTIVE_SKILLS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select
+                      value={form.coachSuggestedBattingOrder || 'none'}
+                      onValueChange={v => setF('coachSuggestedBattingOrder', v === 'none' ? '' : v)}
+                    >
+                      <SelectTrigger className="text-sm"><SelectValue placeholder="Batting order" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Not set</SelectItem>
+                        {BATTING_ORDERS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={form.coachSuggestedBowlingStyle || 'none'}
+                      onValueChange={v => setF('coachSuggestedBowlingStyle', v === 'none' ? '' : v)}
+                    >
+                      <SelectTrigger className="text-sm"><SelectValue placeholder="Bowling style" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Not set</SelectItem>
+                        {BOWLING_STYLES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* Notes */}
           {!isLocked && (
-            <div className="bg-card border rounded-xl p-4 space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Notes (optional)</label>
-              <Textarea
-                placeholder="Observations about this player..."
-                value={form.notes}
-                onChange={e => setF('notes', e.target.value)}
-                rows={3}
-                className="resize-none text-sm"
-              />
-            </div>
+            <Textarea
+              placeholder="Observations..."
+              value={form.notes}
+              onChange={e => setF('notes', e.target.value)}
+              rows={2}
+              className="resize-none text-sm"
+            />
           )}
 
           {/* Action buttons */}
