@@ -64,10 +64,11 @@ function ScoreBar({ value }: { value: number }) {
 interface CampTabContentProps {
   camp: SelectionCamp;
   seriesId: string;
-  navParam?: string;  // e.g. '?from=series&seriesId=xxx' or '?from=camps'
+  navParam?: string;
   initialPlayers?: CampPlayer[];
   initialAssessments?: CampAssessment[];
   initialFitness?: CampFitnessResult[];
+  defaultTab?: 'players' | 'assessment' | 'fitness' | 'results';
 }
 
 export function CampTabContent({
@@ -77,6 +78,7 @@ export function CampTabContent({
   initialPlayers = [],
   initialAssessments = [],
   initialFitness = [],
+  defaultTab = 'players',
 }: CampTabContentProps) {
   const { currentUser, userProfile, activeOrganizationId, effectivePermissions } = useAuth();
   const canManage = !!(effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] ||
@@ -340,7 +342,7 @@ export function CampTabContent({
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <Tabs defaultValue="players" className="mt-2">
+    <Tabs defaultValue={defaultTab} className="mt-2">
       <TabsList className={`grid w-full ${canManage ? 'grid-cols-4' : 'grid-cols-3'}`}>
         <TabsTrigger value="players"><Users className="h-3.5 w-3.5 mr-1.5" />Players</TabsTrigger>
         <TabsTrigger value="assessment"><Star className="h-3.5 w-3.5 mr-1.5" />Assessment</TabsTrigger>
