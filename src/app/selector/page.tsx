@@ -139,7 +139,10 @@ export default function SelectorDashboard() {
         setGames(assignedGames);
 
         // Scorecards + report check
-        const scList = scorecardsResult.success ? scorecardsResult.scorecards || [] : [];
+        const rawScList = scorecardsResult.success ? scorecardsResult.scorecards || [] : [];
+        // Deduplicate by id — getScorecardsForSelectorAction may return duplicates
+        const seen = new Set<string>();
+        const scList = rawScList.filter(sc => { if (seen.has(sc.id)) return false; seen.add(sc.id); return true; });
         const reportChecks = await Promise.all(scList.map(async sc => {
           try {
             const reports = await getUserReportsForGameAction(sc.linkedGameId || sc.id, currentUser.uid);
@@ -173,8 +176,8 @@ export default function SelectorDashboard() {
         }));
         setCamps(campsWithCounts);
 
-        const gPending = assignedGames.filter(g => g.isPending).length;
-        const scPending = scWithStatus.filter(s => !s.hasReport).length;
+        const gPending = showGames ? assignedGames.filter(g => g.isPending).length : 0;
+        const scPending = showScorecards ? scWithStatus.filter(s => !s.hasReport).length : 0;
         const cPending = campsWithCounts.filter(c => c.pendingCount > 0).length;
         setPendingTotal(gPending + scPending + cPending);
       } catch (e) {
