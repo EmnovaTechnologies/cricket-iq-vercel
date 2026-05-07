@@ -210,6 +210,7 @@ export async function linkPlayerAccountAction(
       email,
       displayName: displayName || null,
       roles: ['player'],
+      playerId: playerDoc.id,          // ← link back to player profile
       assignedOrganizationIds: organizationId ? [organizationId] : [],
       activeOrganizationId: organizationId,
       assignedSeriesIds: [],
