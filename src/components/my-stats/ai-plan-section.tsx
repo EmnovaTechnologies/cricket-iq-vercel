@@ -1,15 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { PlayerStatsResult } from '@/lib/actions/player-stats-action';
 import { generatePlayerAIPlanAction } from '@/lib/actions/player-ai-plan-action';
 import type { AIPlanSuggestion } from '@/lib/actions/player-ai-plan-action';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Sparkles, RefreshCw } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 
 interface Props {
   stats: PlayerStatsResult;
+  playerId: string;
+  seriesId: string;
 }
 
 const impactColors: Record<string, string> = {
@@ -18,10 +21,33 @@ const impactColors: Record<string, string> = {
   low:    'bg-muted text-muted-foreground',
 };
 
-export function AiPlanSection({ stats }: Props) {
+interface StoredPlan {
+  suggestions: AIPlanSuggestion[];
+  generatedAt: string;
+  seriesId: string;
+}
+
+export function AiPlanSection({ stats, playerId, seriesId }: Props) {
   const [suggestions, setSuggestions] = useState<AIPlanSuggestion[] | null>(null);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const storageKey = `improvement_plan_${playerId}_${seriesId}`;
+
+  // Load persisted plan on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed: StoredPlan = JSON.parse(saved);
+        if (parsed.suggestions && parsed.seriesId === seriesId) {
+          setSuggestions(parsed.suggestions);
+          setGeneratedAt(parsed.generatedAt);
+        }
+      }
+    } catch {}
+  }, [storageKey, seriesId]);
 
   const generate = async () => {
     setIsGenerating(true);
@@ -29,7 +55,16 @@ export function AiPlanSection({ stats }: Props) {
     try {
       const result = await generatePlayerAIPlanAction(stats);
       if (result.success && result.suggestions) {
+        const now = new Date().toISOString();
         setSuggestions(result.suggestions);
+        setGeneratedAt(now);
+        // Persist to localStorage
+        const stored: StoredPlan = {
+          suggestions: result.suggestions,
+          generatedAt: now,
+          seriesId,
+        };
+        localStorage.setItem(storageKey, JSON.stringify(stored));
       } else {
         setError(result.error || 'Failed to generate plan.');
       }
@@ -45,7 +80,7 @@ export function AiPlanSection({ stats }: Props) {
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
-          AI improvement plan
+          Improvement plan
         </CardTitle>
         <p className="text-xs text-muted-foreground mt-1">
           Synthesised from your stats, benchmark position, selector feedback and camp ratings.
@@ -92,10 +127,17 @@ export function AiPlanSection({ stats }: Props) {
                 </div>
               ))}
             </div>
-            <Button onClick={generate} variant="ghost" size="sm" className="gap-2 text-muted-foreground" disabled={isGenerating}>
-              <RefreshCw className="h-3 w-3" />
-              Regenerate plan
-            </Button>
+            <div className="flex items-center justify-between pt-1">
+              {generatedAt && (
+                <span className="text-xs text-muted-foreground">
+                  Generated {format(parseISO(generatedAt), 'MMM d, yyyy h:mm a')}
+                </span>
+              )}
+              <Button onClick={generate} variant="ghost" size="sm" className="gap-2 text-muted-foreground ml-auto" disabled={isGenerating}>
+                <RefreshCw className="h-3 w-3" />
+                Regenerate
+              </Button>
+            </div>
           </>
         )}
       </CardContent>

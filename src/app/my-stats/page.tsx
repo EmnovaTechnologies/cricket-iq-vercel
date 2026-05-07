@@ -91,8 +91,8 @@ export default function MyStatsPage() {
           {stats && (
             <p className="text-sm text-muted-foreground mt-1">
               {stats.playerName}
-              {stats.dominantHandBatting && ` · ${stats.dominantHandBatting} bat`}
-              {stats.bowlingStyle && ` · ${stats.bowlingStyle}`}
+              {stats.dominantHandBatting && ` · Bat: ${stats.dominantHandBatting}`}
+              {stats.bowlingStyle && ` · Bowl: ${stats.bowlingStyle}`}
             </p>
           )}
         </div>
@@ -164,7 +164,7 @@ export default function MyStatsPage() {
           <BenchmarkSection benchmarks={stats.benchmarks} />
           <FeedbackSection feedback={stats.feedback} />
           <CampSection campPerformance={stats.campPerformance} />
-          <AiPlanSection stats={stats} />
+          <AiPlanSection stats={stats} playerId={playerId || ''} seriesId={selectedSeriesId} />
         </>
       )}
 
