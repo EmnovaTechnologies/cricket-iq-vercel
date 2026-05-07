@@ -218,11 +218,18 @@ function AdminUsersV2PageInner() {
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>(
     (searchParams.get('role') as UserRole | 'all') || 'all'
   );
-  const [orgFilter, setOrgFilter] = useState<string>('all');
   const [clubFilter, setClubFilter] = useState<string>('all');
   const [clubFilterOpen, setClubFilterOpen] = useState(false);
 
   const isSuperAdmin = userProfile?.roles.includes('admin') ?? false;
+
+  // Players hidden by default for org admins, visible for system admins
+  const [showPlayers, setShowPlayers] = useState(isSuperAdmin);
+
+  // Default org filter to active org for system admins
+  const [orgFilter, setOrgFilter] = useState<string>(
+    isSuperAdmin && activeOrganizationId ? activeOrganizationId : 'all'
+  );
 
   const handleUpdated = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -313,6 +320,8 @@ function AdminUsersV2PageInner() {
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
       if (user.roles.includes('admin')) return false; // never show super admins
+      // Hide players for org admins unless showPlayers is enabled
+      if (!showPlayers && user.roles.length === 1 && user.roles[0] === 'player') return false;
       const q = nameFilter.toLowerCase();
       const nameMatch = !q ||
         user.displayName?.toLowerCase().includes(q) ||
@@ -325,7 +334,7 @@ function AdminUsersV2PageInner() {
       const clubMatch = clubFilter === 'all' || user.clubName === clubFilter;
       return nameMatch && phoneMatch && roleMatch && orgMatch && clubMatch;
     });
-  }, [users, nameFilter, phoneFilter, roleFilter, orgFilter, clubFilter, isSuperAdmin]);
+  }, [users, nameFilter, phoneFilter, roleFilter, orgFilter, clubFilter, isSuperAdmin, showPlayers]);
 
 
   const renderContent = () => {
@@ -371,7 +380,7 @@ function AdminUsersV2PageInner() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={cn('grid gap-4', isSuperAdmin ? 'grid-cols-1 md:grid-cols-5' : 'grid-cols-1 md:grid-cols-4')}>
+              <div className={cn('grid gap-4', isSuperAdmin ? 'grid-cols-1 md:grid-cols-5' : 'grid-cols-1 md:grid-cols-5')}>
 
                 {/* 1. Organization — super admin only */}
                 {isSuperAdmin && (
@@ -472,6 +481,24 @@ function AdminUsersV2PageInner() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Show players — read-only for org admins, hidden for super admin (always shown) */}
+                {!isSuperAdmin && (
+                  <div className="flex flex-col justify-end">
+                    <Label className="text-xs text-muted-foreground mb-1.5">Players</Label>
+                    <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-muted/30 cursor-not-allowed opacity-60">
+                      <input
+                        type="checkbox"
+                        checked={showPlayers}
+                        readOnly
+                        disabled
+                        className="cursor-not-allowed"
+                      />
+                      <span className="text-sm text-muted-foreground">Show players</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">Managed automatically by system</p>
+                  </div>
+                )}
 
               </div>
             </CardContent>
