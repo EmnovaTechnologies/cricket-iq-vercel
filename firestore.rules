@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -36,10 +35,31 @@ service cloud.firestore {
     match /users/{userId} {
       // Any user can create their own document.
       allow create: if request.auth.uid == userId;
-      // Any signed-in user can read any profile (to prevent recursive lookup errors).
-      allow read: if isSignedIn();
-      // Only the owner or a super admin can update a profile.
-      allow update: if isOwner(userId) || isSuperAdmin();
+      // Any signed-in user can read any profile or list users.
+      allow read, list: if isSignedIn();
+      // Who can update?
+      // 1. The owner of the profile.
+      // 2. A super admin.
+      // 3. An Organization Admin, with specific restrictions.
+      allow update: if isOwner(userId) || isSuperAdmin() ||
+        (
+          // Org admin check
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['Organization Admin']) &&
+          // Cannot edit an existing admin's profile
+          !resource.data.roles.hasAny(['admin']) &&
+          // Cannot grant admin role
+          !request.resource.data.roles.hasAny(['admin']) &&
+          // Can only affect specific assignment/role fields
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'roles',
+            'activeOrganizationId',
+            'assignedOrganizationIds',
+            'assignedSeriesIds',
+            'assignedTeamIds',
+            'assignedGameIds',
+            'lastLogin'
+          ])
+        );
     }
 
     match /organizations/{orgId} {
@@ -48,13 +68,20 @@ service cloud.firestore {
     }
 
     match /role_permissions_config/{roleName} {
-        allow read: if isSignedIn();
-        allow write: if isSuperAdmin();
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /genkit-traces/{traceId} {
+      allow write: if isSignedIn();
+    }
+
+    match /genkit-flows/{flowId} {
+      allow write: if isSignedIn();
     }
 
     match /players/{playerId} {
-      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow write: if
         // Super Admins can do anything.
         isSuperAdmin() ||
@@ -80,39 +107,31 @@ service cloud.firestore {
     }
 
     match /teams/{docId} {
-      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
     }
     match /series/{docId} {
-      // Temporarily relaxed for diagnostics to see if isAssignedToOrg is the issue on 'get'
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
     }
     match /venues/{docId} {
-      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
     }
     match /games/{docId} {
-      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
     }
     match /playerRatings/{docId} {
-      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
     }
     match /fitnessTests/{docId} {
-      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
     }
     match /fitnessTestResults/{docId} {
-      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow write: if isSuperAdmin() || isAssignedToOrg(request.resource.data.organizationId);
     }
 
@@ -126,7 +145,6 @@ service cloud.firestore {
       allow list: if isSignedIn();
       allow write: if false; // Admin SDK only
     }
-
     match /scorecardScoringConfig/{docId} {
       allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
       allow list: if isSignedIn();
@@ -134,10 +152,18 @@ service cloud.firestore {
     }
 
     match /matchReports/{docId} {
-      // Assigned selectors and org members can read reports for their org
-      allow get: if isSuperAdmin() || isAssignedToOrg(resource.data.organizationId);
+      allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow write: if false; // Admin SDK only
+      allow write: if false; // server-side only
+    }
+
+    // Player improvement plans — player reads/writes own plan only
+    match /playerImprovementPlans/{docId} {
+      allow read, write: if isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.playerId != null
+        && docId.matches(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.playerId + '_.*');
+      allow read: if isSuperAdmin();
     }
 
     // Default deny all access to other paths.
