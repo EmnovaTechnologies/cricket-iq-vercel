@@ -84,6 +84,9 @@ export default function SelectorDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [pendingTotal, setPendingTotal] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [gameIndex, setGameIndex] = useState(0);
+  const [scorecardIndex, setScorecardIndex] = useState(0);
+  const [campIndex, setCampIndex] = useState(0);
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
@@ -174,9 +177,6 @@ export default function SelectorDashboard() {
     );
   }
 
-  const [gameIndex, setGameIndex] = useState(0);
-  const [scorecardIndex, setScorecardIndex] = useState(0);
-  const [campIndex, setCampIndex] = useState(0);
 
   const displayName = (userProfile?.displayName || currentUser?.email || 'Selector').split(' ')[0];
   const hour = new Date().getHours();
