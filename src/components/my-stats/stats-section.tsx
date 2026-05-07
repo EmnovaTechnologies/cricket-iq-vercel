@@ -8,12 +8,34 @@ interface Props {
   stats: PlayerStatsResult;
 }
 
+function StatBox({ val, lbl }: { val: string | number; lbl: string }) {
+  return (
+    <div className="bg-muted rounded-lg p-3 text-center">
+      <div className="text-xl font-medium">{val}</div>
+      <div className="text-xs text-muted-foreground mt-1">{lbl}</div>
+    </div>
+  );
+}
+
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-3 mb-1.5 first:mt-0">
+      {label}
+    </div>
+  );
+}
+
 export function StatsSection({ stats }: Props) {
   const agg = stats.aggregated;
   if (!agg) return null;
 
   const trend = stats.scoreTrend;
   const maxTrend = Math.max(...trend, 1);
+
+  const hasBatting = agg.totalBalls > 0 || agg.totalRuns > 0;
+  const hasBowling = agg.totalOvers > 0 || agg.totalWickets > 0;
+  const hasFielding = agg.totalCatches > 0 || agg.totalRunOuts > 0;
+  const hasKeeping = agg.totalStumpings > 0;
 
   return (
     <Card>
@@ -23,40 +45,21 @@ export function StatsSection({ stats }: Props) {
           My performance
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Stat grid */}
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { val: agg.gamesPlayed, lbl: 'Games' },
-            { val: agg.totalRuns, lbl: 'Runs' },
-            { val: agg.avgStrikeRate, lbl: 'Strike rate' },
-            { val: agg.avgScorePerGame, lbl: 'Avg score' },
-          ].map(({ val, lbl }) => (
-            <div key={lbl} className="bg-muted rounded-lg p-3 text-center">
-              <div className="text-xl font-medium">{val}</div>
-              <div className="text-xs text-muted-foreground mt-1">{lbl}</div>
-            </div>
-          ))}
+      <CardContent className="space-y-1">
+
+        {/* Overview */}
+        <div className="grid grid-cols-3 gap-2">
+          <StatBox val={agg.gamesPlayed} lbl="Games" />
+          <StatBox val={agg.avgScorePerGame} lbl="Avg score/game" />
+          <StatBox val={agg.totalScore} lbl="Total score" />
         </div>
 
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { val: agg.totalWickets, lbl: 'Wickets' },
-            { val: agg.avgEconomy || '—', lbl: 'Economy' },
-            { val: agg.totalCatches, lbl: 'Catches' },
-            { val: agg.totalScore, lbl: 'Total score' },
-          ].map(({ val, lbl }) => (
-            <div key={lbl} className="bg-muted rounded-lg p-3 text-center">
-              <div className="text-xl font-medium">{val}</div>
-              <div className="text-xs text-muted-foreground mt-1">{lbl}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Score trend sparkline */}
+        {/* Score trend */}
         {trend.length > 0 && (
-          <div>
-            <div className="text-xs text-muted-foreground mb-2">Score trend — last {trend.length} game{trend.length !== 1 ? 's' : ''}</div>
+          <div className="pt-2">
+            <div className="text-xs text-muted-foreground mb-2">
+              Score trend — last {trend.length} game{trend.length !== 1 ? 's' : ''}
+            </div>
             <div className="flex items-end gap-1.5 h-10">
               {trend.map((score, i) => (
                 <div
@@ -70,16 +73,61 @@ export function StatsSection({ stats }: Props) {
           </div>
         )}
 
-        {/* Extra fielding detail */}
-        {(agg.totalRunOuts > 0 || agg.totalStumpings > 0 || agg.totalFours > 0) && (
-          <div className="text-xs text-muted-foreground flex flex-wrap gap-3 pt-1 border-t">
-            {agg.totalFours > 0 && <span>{agg.totalFours} fours</span>}
-            {agg.totalSixes > 0 && <span>{agg.totalSixes} sixes</span>}
-            {agg.totalWickets > 0 && <span>{agg.totalOvers} overs bowled</span>}
-            {agg.totalRunOuts > 0 && <span>{agg.totalRunOuts} run outs</span>}
-            {agg.totalStumpings > 0 && <span>{agg.totalStumpings} stumpings</span>}
-          </div>
+        {/* Batting */}
+        {hasBatting && (
+          <>
+            <SectionLabel label="Batting" />
+            <div className="grid grid-cols-4 gap-2">
+              <StatBox val={agg.totalRuns} lbl="Runs" />
+              <StatBox val={agg.totalBalls} lbl="Balls" />
+              <StatBox val={agg.avgStrikeRate} lbl="Strike rate" />
+              <StatBox val={agg.totalFours > 0 || agg.totalSixes > 0
+                ? `${agg.totalFours}/${agg.totalSixes}`
+                : '—'} lbl="4s / 6s" />
+            </div>
+          </>
         )}
+
+        {/* Bowling */}
+        {hasBowling && (
+          <>
+            <SectionLabel label="Bowling" />
+            <div className="grid grid-cols-4 gap-2">
+              <StatBox val={agg.totalWickets} lbl="Wickets" />
+              <StatBox val={agg.totalOvers} lbl="Overs" />
+              <StatBox val={agg.avgEconomy || '—'} lbl="Economy" />
+              <StatBox val={agg.totalWickets > 0 && agg.totalOvers > 0
+                ? Math.round((agg.totalOvers / agg.totalWickets) * 6 * 10) / 10
+                : '—'} lbl="Strike rate" />
+            </div>
+          </>
+        )}
+
+        {/* Fielding */}
+        {hasFielding && (
+          <>
+            <SectionLabel label="Fielding" />
+            <div className="grid grid-cols-3 gap-2">
+              <StatBox val={agg.totalCatches} lbl="Catches" />
+              <StatBox val={agg.totalRunOuts} lbl="Run outs" />
+              {hasKeeping
+                ? <StatBox val={agg.totalStumpings} lbl="Stumpings" />
+                : <div />}
+            </div>
+          </>
+        )}
+
+        {/* Wicket keeping — only if no fielding section OR stumpings > 0 without other fielding */}
+        {hasKeeping && !hasFielding && (
+          <>
+            <SectionLabel label="Wicket keeping" />
+            <div className="grid grid-cols-2 gap-2">
+              <StatBox val={agg.totalStumpings} lbl="Stumpings" />
+              <StatBox val={agg.totalCatches} lbl="Keeper catches" />
+            </div>
+          </>
+        )}
+
       </CardContent>
     </Card>
   );
