@@ -188,16 +188,48 @@ export async function getPlayerStatsAction(
           }
         }
         // Fielding — parse dismissal text
+        // Dismissal formats seen: "c Aarav A b Bowler", "c Pilkhane b Bowler",
+        // "c Aarav Arora b Bowler", "c A Arora b Bowler", "run out (Pilkhane)"
         for (const b of (inn.batting || [])) {
           const d = (b.dismissal || '').toLowerCase();
           for (const name of linkedNames) {
-            const nl = name.toLowerCase();
-            // Catch: "c Name b Bowler" or "c †Name b Bowler"
-            if (d.startsWith('c ') && d.includes(nl) && d.includes(' b ')) catches++;
-            // Run out
-            if (d.includes('run out') && d.includes(nl)) runOuts++;
-            // Stumping
-            if (d.startsWith('st ') && d.includes(nl)) stumpings++;
+            const parts = name.toLowerCase().trim().split(/\s+/);
+            const firstName = parts[0] || '';
+            const lastName = parts[parts.length - 1] || '';
+            const firstInitial = firstName[0] || '';
+            const lastInitial = lastName[0] || '';
+            const fullName = name.toLowerCase();
+
+            // Build all candidate match strings
+            const candidates = new Set<string>([
+              fullName,                                        // "aarav arora"
+              firstName && lastName ? `${firstName} ${lastName}` : '', // same as full for 2-part names
+              firstName && lastInitial ? `${firstName} ${lastInitial}` : '', // "aarav a"
+              firstInitial && lastName ? `${firstInitial} ${lastName}` : '', // "a arora"
+              firstInitial && lastInitial ? `${firstInitial} ${lastInitial}` : '', // "a a" — too ambiguous, skip
+              lastName,                                        // "arora" — surname only
+              firstName,                                       // "aarav" — first name only
+            ]);
+            // Remove empty strings and overly short/ambiguous ones (single char)
+            const validCandidates = [...candidates].filter(c => c && c.length > 1);
+
+            // For surname/firstname-only matches, require word boundary to avoid false partials
+            // e.g. "arora" should not match "arorasmith"
+            const matches = validCandidates.some(candidate => {
+              // For longer candidates (3+ chars) a simple includes is fine
+              // For short candidates, wrap with word-boundary-like check
+              if (candidate.length >= 4) return d.includes(candidate);
+              // Short candidates: check surrounded by space/start/end/punctuation
+              const re = new RegExp(`(?:^|\\s|†)${candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$|\\b)`);
+              return re.test(d);
+            });
+
+            // Catch: "c Name b Bowler"
+            if (d.startsWith('c ') && matches && d.includes(' b ')) catches++;
+            // Run out: "run out (Name)" or "run out Name"
+            if (d.includes('run out') && matches) runOuts++;
+            // Stumping: "st Name b Bowler"
+            if (d.startsWith('st ') && matches) stumpings++;
           }
         }
         // Did not bat — still appeared
