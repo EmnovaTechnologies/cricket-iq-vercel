@@ -519,7 +519,8 @@ export async function getAvailableSeriesForPlayer(
 
   if (spSnap.empty) return [];
 
-  // Get all series that have scorecards in this org — no orderBy to avoid index requirement
+  // Get all series for this org — sorted most recent first
+  // Future: filter to series where player appeared (requires seriesId on scorecardPlayers)
   const seriesSnap = await adminDb.collection('series')
     .where('organizationId', '==', organizationId)
     .get();
@@ -530,6 +531,6 @@ export async function getAvailableSeriesForPlayer(
       name: d.data().name || 'Unknown series',
       createdAt: d.data().createdAt?.toMillis?.() || 0,
     }))
-    .sort((a, b) => b.createdAt - a.createdAt) // most recent first
+    .sort((a, b) => b.createdAt - a.createdAt)
     .map(({ id, name }) => ({ id, name }));
 }
