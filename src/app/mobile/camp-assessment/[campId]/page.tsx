@@ -3,23 +3,20 @@
 /**
  * FILE: src/app/mobile/camp-assessment/[campId]/page.tsx
  *
- * Mobile-optimised camp assessment page for selectors.
- * Wraps CampTabContent with swipe navigation between assigned camps,
- * defaulting to the Assessment tab.
+ * Mobile entry point for camp assessment.
+ * Loads the camp to get seriesId, then redirects directly to
+ * the existing assess scratchpad page which is already mobile-friendly.
+ * Shows swipe navigation between assigned camps via arrow buttons.
  */
 
 import { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import {
-  getCampByIdAction, getCampPlayersAction,
-  getCampAssessmentsAction, getCampFitnessResultsAction,
-} from '@/lib/actions/camp-actions';
+import { getCampByIdAction } from '@/lib/actions/camp-actions';
 import { getSelectorAssignedCampIdsAction } from '@/lib/actions/selector-mobile-action';
-import { CampTabContent } from '@/components/camp/camp-tab-content';
-import type { SelectionCamp, CampPlayer, CampAssessment, CampFitnessResult } from '@/types';
 import { Loader2, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import type { SelectionCamp } from '@/types';
 
 function MobileCampAssessmentInner() {
   const params = useParams<{ campId: string }>();
@@ -27,9 +24,6 @@ function MobileCampAssessmentInner() {
   const { currentUser, activeOrganizationId } = useAuth();
 
   const [camp, setCamp] = useState<SelectionCamp | null>(null);
-  const [campPlayers, setCampPlayers] = useState<CampPlayer[]>([]);
-  const [campAssessments, setCampAssessments] = useState<CampAssessment[]>([]);
-  const [campFitness, setCampFitness] = useState<CampFitnessResult[]>([]);
   const [assignedIds, setAssignedIds] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,7 +47,6 @@ function MobileCampAssessmentInner() {
     router.replace(`/mobile/camp-assessment/${assignedIds[index]}`);
   };
 
-  // Load assigned IDs
   useEffect(() => {
     if (!currentUser || !activeOrganizationId) return;
     getSelectorAssignedCampIdsAction(currentUser.uid, activeOrganizationId).then(ids => {
@@ -63,50 +56,41 @@ function MobileCampAssessmentInner() {
     });
   }, [currentUser, activeOrganizationId, params.campId]);
 
-  // Load camp data
   useEffect(() => {
-    if (!params.campId || !activeOrganizationId) return;
-    setIsLoading(true);
-    Promise.all([
-      getCampByIdAction(params.campId),
-      getCampPlayersAction(params.campId),
-      getCampAssessmentsAction(params.campId),
-      getCampFitnessResultsAction(params.campId),
-    ]).then(([campRes, playersRes, assessRes, fitnessRes]) => {
-      setCamp(campRes.camp || null);
-      setCampPlayers(playersRes.players || []);
-      setCampAssessments(assessRes.assessments || []);
-      setCampFitness(fitnessRes.results || []);
+    if (!params.campId) return;
+    getCampByIdAction(params.campId).then(res => {
+      setCamp(res.camp || null);
       setIsLoading(false);
     });
-  }, [params.campId, activeOrganizationId]);
+  }, [params.campId]);
 
-  if (isLoading || !camp) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  // Once camp loaded, redirect to assess page
+  useEffect(() => {
+    if (!isLoading && camp) {
+      router.replace(`/series/${camp.seriesId}/camp/${camp.id}/assess?from=selector`);
+    }
+  }, [isLoading, camp, router]);
 
+  // While loading show spinner with back button
   return (
     <div
-      className="min-h-screen bg-background"
+      className="min-h-screen bg-background flex flex-col max-w-lg mx-auto"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Top nav bar */}
-      <div className="sticky top-0 z-10 bg-background border-b px-3 py-2 flex items-center gap-3">
-        <Link href="/selector" className="shrink-0">
-          <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate">{camp.name}</div>
-          <div className="text-xs text-muted-foreground capitalize">{camp.status}{camp.venue ? ` · ${camp.venue}` : ''}</div>
+      {/* Top nav */}
+      <div className="bg-primary text-primary-foreground px-4 py-2.5 sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <Link href="/selector" className="opacity-80 hover:opacity-100 -ml-1">
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <p className="text-xs font-medium flex-1 truncate">
+            {camp?.name || 'Camp Assessment'}
+          </p>
         </div>
       </div>
 
-      {/* Swipe navigation bar — matches rate page style */}
+      {/* Swipe nav */}
       {assignedIds.length > 1 && (
         <div className="flex items-center gap-2 px-3 py-2 border-b">
           <button
@@ -142,18 +126,11 @@ function MobileCampAssessmentInner() {
         </div>
       )}
 
-      {/* Camp tab content — default to assessment tab */}
-      <div className="px-3 pb-6">
-        <CampTabContent
-          camp={camp}
-          seriesId={camp.seriesId}
-          navParam=""
-          initialPlayers={campPlayers}
-          initialAssessments={campAssessments}
-          initialFitness={campFitness}
-          defaultTab="assessment"
-          isMobile={true}
-        />
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">Loading assessment...</p>
+        </div>
       </div>
 
       {assignedIds.length > 1 && (

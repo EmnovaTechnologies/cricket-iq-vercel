@@ -61,10 +61,13 @@ export default function CampAssessPage() {
   const searchParams = useSearchParams();
   const fromSeries = searchParams.get('from') === 'series';
   const fromSeriesId = searchParams.get('seriesId') || seriesId;
-  const backHref = fromSeries
+  const fromSelector = searchParams.get('from') === 'selector';
+  const backHref = fromSelector
+    ? '/selector'
+    : fromSeries
     ? `/camps/${campId}?from=series&seriesId=${fromSeriesId}`
     : `/camps/${campId}?from=camps`;
-  const backLabel = fromSeries ? 'Back to Camp (via Series)' : 'Back to Camp';
+  const backLabel = fromSelector ? 'Back to Tasks' : fromSeries ? 'Back to Camp (via Series)' : 'Back to Camp';
   const { currentUser, userProfile } = useAuth();
   const { toast } = useToast();
 

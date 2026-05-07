@@ -342,13 +342,6 @@ export function CampTabContent({
 
   const sortedPlayers = useMemo(() => [...campPlayers].sort((a, b) => a.bibNumber - b.bibNumber), [campPlayers]);
 
-  // On mobile, redirect directly to the assess scratchpad
-  useEffect(() => {
-    if (isMobile && defaultTab === 'assessment') {
-      router.replace(`/series/${seriesId}/camp/${camp.id}/assess${navParam}`);
-    }
-  }, [isMobile, defaultTab, seriesId, camp.id, navParam, router]);
-
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
     <Tabs defaultValue={defaultTab} className="mt-2">
