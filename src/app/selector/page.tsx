@@ -209,7 +209,7 @@ export default function SelectorDashboard() {
   const campHref = (id: string) => `/rate-camp/${id}?from=selector`;
 
   return (
-    <div className="min-h-screen bg-background max-w-lg mx-auto">
+    <div className="min-h-screen bg-background max-w-lg mx-auto overflow-x-hidden">
       {/* Header */}
       <div className="bg-primary text-primary-foreground px-4 py-3 sticky top-0 z-10">
         <div className="flex items-center justify-between">
@@ -234,7 +234,7 @@ export default function SelectorDashboard() {
         </div>
       </div>
 
-      <div className="px-4 py-5 space-y-5">
+      <div className="px-2 py-4 space-y-4">
 
         {allDone && (
           <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
