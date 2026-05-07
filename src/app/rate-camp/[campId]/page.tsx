@@ -21,6 +21,7 @@ import {
   recordCampFitnessResultAction, getCampFitnessResultsAction,
 } from '@/lib/actions/camp-actions';
 import type { SelectionCamp, CampPlayer, CampAssessment, CampFitnessResult } from '@/types';
+import { EFFECTIVE_SKILLS, BOWLING_STYLES, BATTING_ORDERS } from '@/lib/constants';
 import { CampScratchpad } from '@/components/camp/camp-scratchpad';
 import {
   Loader2, ChevronLeft, ChevronRight, Star, Lock,
