@@ -28,7 +28,7 @@ const statusColors: Record<SelectionCamp['status'], string> = {
 
 export default function CampsListPage() {
   const router = useRouter();
-  const { activeOrganizationId, effectivePermissions } = useAuth();
+  const { activeOrganizationId, effectivePermissions, currentUser, userProfile } = useAuth();
 
   const [camps, setCamps] = useState<SelectionCamp[]>([]);
   const [seriesNames, setSeriesNames] = useState<Map<string, string>>(new Map());
@@ -44,11 +44,17 @@ export default function CampsListPage() {
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY];
 
+  const isSelector = userProfile?.roles?.includes('selector') && !canManage;
+
   useEffect(() => {
     if (!activeOrganizationId) return;
     getCampsForOrgAction(activeOrganizationId).then(async res => {
       if (res.success && res.camps) {
-        setCamps(res.camps);
+        // For selectors, only show camps they are assigned to
+        const visibleCamps = isSelector && currentUser
+          ? res.camps.filter(c => (c.assignedSelectors || []).some((s: any) => s.uid === currentUser.uid))
+          : res.camps;
+        setCamps(visibleCamps);
         // Load series names
         const uniqueSeriesIds = [...new Set(res.camps.map(c => c.seriesId))];
         const nameMap = new Map<string, string>();

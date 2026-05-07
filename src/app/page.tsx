@@ -20,6 +20,7 @@ import { getScorecardsForOrgAction, getScorecardsForSelectorAction } from '@/lib
 import { getCampsForOrgAction, getCampPlayersAction, getCampAssessmentsAction } from '@/lib/actions/camp-actions';
 import { getGamesForUserViewAction } from '@/lib/actions/game-actions';
 import { format } from 'date-fns';
+import { SelectorMobileLanding } from '@/components/selector-mobile-landing';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -336,7 +337,11 @@ export default function DashboardPage() {
   } = useAuth();
 
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    setIsMobile(window.innerWidth < 768);
+  }, []);
 
   useEffect(() => {
     if (!currentUser && !isAuthLoading) router.push('/login');
@@ -574,6 +579,19 @@ export default function DashboardPage() {
   }
 
   const displayName = userProfile?.displayName || userProfile?.email?.split('@')[0] || 'there';
+  const isSelector = userProfile?.roles?.includes('selector');
+
+  // ── Mobile selector landing — replaces dashboard on mobile for selector role ──
+  if (isSelector && isMobile && currentUser && activeOrganizationId) {
+    return (
+      <SelectorMobileLanding
+        selectorUid={currentUser.uid}
+        organizationId={activeOrganizationId}
+        selectionModel={activeOrganizationDetails?.selectionModel || 'hybrid'}
+        displayName={displayName}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 w-full">

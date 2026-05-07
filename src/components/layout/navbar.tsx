@@ -66,10 +66,22 @@ const Navbar = () => {
   } = useAuth();
   
   const [isClient, setIsClient] = useState(false);
+  const [selectorPendingCount, setSelectorPendingCount] = useState(0);
 
+  useEffect(() => { setIsClient(true); }, []);
+
+  // Fetch pending count for selector badge
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    if (!isClient) return;
+    const isSelector = userProfile?.roles?.includes('selector');
+    if (!isSelector || !currentUser || !activeOrganizationId) { setSelectorPendingCount(0); return; }
+    import('@/lib/actions/selector-mobile-action').then(({ getSelectorMobilePendingAction }) => {
+      getSelectorMobilePendingAction(
+        currentUser.uid, activeOrganizationId,
+        activeOrganizationDetails?.selectionModel || 'hybrid'
+      ).then(res => { if (res.success) setSelectorPendingCount(res.pendingTotal); });
+    });
+  }, [isClient, userProfile, currentUser, activeOrganizationId, activeOrganizationDetails]);
 
 
   const siteDisplayName = isClient && activeOrganizationId && activeOrganizationDetails?.name
@@ -91,7 +103,7 @@ const Navbar = () => {
 
   const mainNavLinks = [
     { href: '/', label: 'Dashboard', icon: <Leaf className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_DASHBOARD },
-    { href: '/my-stats', label: 'My Stats', icon: <BarChart3 className="h-5 w-5" />, permission: PERMISSIONS.PLAYER_VIEW_OWN_PROFILE, roles: ['player'] },
+    { href: '/my-stats', label: 'My Stats', icon: <BarChart3 className="h-5 w-5" />, permission: PERMISSIONS.PLAYER_VIEW_OWN_PROFILE },
     { href: '/series', label: 'Series', icon: <Layers className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SERIES_LIST },
     { href: '/games', label: 'Games', icon: <Gamepad2 className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_GAMES_LIST },
     { href: '/teams', label: 'Teams', icon: <Users className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAMS_LIST },
@@ -142,7 +154,6 @@ const Navbar = () => {
   let mobileLinks: Array<{ href: string; label: string; icon: JSX.Element; roles?: string[]; permission?: PermissionKey }> = [];
   if (currentUser && !isAuthLoading && !isPermissionsLoading) {
     const visibleMainNavLinks = mainNavLinks.filter(link => {
-      // If link has explicit role restriction, check role first (regardless of permissions)
       if (link.roles && link.roles.length > 0) {
         return hasAnyRole(userProfile?.roles, link.roles);
       }
@@ -186,7 +197,7 @@ const Navbar = () => {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
-          {currentUser && !isAuthLoading && !isPermissionsLoading && !isEffectivelyUnassigned && mainNavLinks.map((link) => {
+        {currentUser && !isAuthLoading && !isPermissionsLoading && !isEffectivelyUnassigned && mainNavLinks.map((link) => {
             const canViewLink = link.roles && link.roles.length > 0
               ? hasAnyRole(userProfile?.roles, link.roles)
               : userProfile?.roles?.includes('admin') || (link.permission && effectivePermissions[link.permission]);
@@ -204,7 +215,7 @@ const Navbar = () => {
             }
             return null;
           })}
-          {currentUser && !isAuthLoading && !isPermissionsLoading && isEffectivelyUnassigned && mainNavLinks.filter(link => link.href === '/').map((link) => {
+          {currentUser && !isAuthLoading && isEffectivelyUnassigned && mainNavLinks.filter(link => link.href === '/').map((link) => {
              const canViewLink = userProfile?.roles?.includes('admin') || (link.permission && effectivePermissions[link.permission]);
              if (canViewLink) {
                return (
@@ -304,10 +315,17 @@ const Navbar = () => {
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-8 flex items-center justify-start gap-2 ml-2">
-                        <Avatar className="h-8 w-8">
-                            <AvatarImage src={currentUser.photoURL || undefined} alt={userProfile.displayName || userProfile.email || 'User'} />
-                            <AvatarFallback>{getInitials(userProfile.displayName, userProfile.email)}</AvatarFallback>
-                        </Avatar>
+                        <div className="relative">
+                          <Avatar className="h-8 w-8">
+                              <AvatarImage src={currentUser.photoURL || undefined} alt={userProfile.displayName || userProfile.email || 'User'} />
+                              <AvatarFallback>{getInitials(userProfile.displayName, userProfile.email)}</AvatarFallback>
+                          </Avatar>
+                          {selectorPendingCount > 0 && (
+                            <span className="absolute -top-1 -right-1 h-4 min-w-4 rounded-full bg-amber-500 text-white text-[10px] font-medium flex items-center justify-center px-0.5">
+                              {selectorPendingCount > 9 ? '9+' : selectorPendingCount}
+                            </span>
+                          )}
+                        </div>
                         <span className="hidden sm:inline-block truncate max-w-[100px]">
                           {userProfile.displayName || userProfile.email || userProfile.phoneNumber}
                         </span>
@@ -333,7 +351,7 @@ const Navbar = () => {
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href={userProfile.playerId ? `/players/${userProfile.playerId}` : '/profile'}>
+                      <Link href="/profile">
                           <User className="mr-2 h-4 w-4" />Profile
                       </Link>
                     </DropdownMenuItem>
