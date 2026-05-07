@@ -48,13 +48,16 @@ function ScorecardsPageInner() {
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [isMobile, setIsMobile] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const defaultTab = searchParams.get('tab') === 'missing' ? 'missing' : 'imported';
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
 
   useEffect(() => {
-    setIsMobile(window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
+    const mobile = window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    setIsMobile(mobile);
+    setFiltersOpen(!mobile);
   }, []);
 
   useEffect(() => { setMounted(true); }, []);
@@ -265,12 +268,14 @@ function ScorecardsPageInner() {
           <>
             {/* Filters */}
             <Card className="p-4 sm:p-6 shadow">
-              <CardHeader className="p-0 pb-4 mb-4 border-b">
+              <button className="w-full flex items-center justify-between" onClick={() => isMobile && setFiltersOpen(v => !v)}>
                 <CardTitle className="text-xl flex items-center gap-2 text-foreground">
                   <Filter className="h-5 w-5" /> Filters
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
+                {isMobile && <span className="text-xs text-muted-foreground">{filtersOpen ? 'Hide ▲' : 'Show ▼'}</span>}
+              </button>
+              {filtersOpen && (
+              <CardContent className="p-0 mt-4">
                 <div className="flex flex-wrap items-end gap-4">
                   <div className="flex-1 min-w-[140px]">
                     <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Year</label>
@@ -352,9 +357,10 @@ function ScorecardsPageInner() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+              )}
 
             {/* Tabs: Imported + Missing */}
+            </Card>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList>
                 <TabsTrigger value="imported">

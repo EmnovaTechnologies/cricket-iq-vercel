@@ -16,7 +16,7 @@ import { AuthProviderClientComponent } from '@/components/auth-provider-client-c
 import type { SelectionCamp } from '@/types';
 import {
   Loader2, ShieldAlert, PlusCircle, Trophy,
-  Users, Target, CalendarDays, MapPin, Layers, LayoutGrid, List
+  Users, Target, CalendarDays, MapPin, Layers, LayoutGrid, List, Filter
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -35,6 +35,13 @@ export default function CampsListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [isMobile, setIsMobile] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  useEffect(() => {
+    const mobile = window.innerWidth < 768;
+    setIsMobile(mobile);
+    setFiltersOpen(!mobile);
+  }, []);
   const [filterYear, setFilterYear] = useState('all');
   const [filterSeries, setFilterSeries] = useState('all');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
@@ -121,53 +128,66 @@ export default function CampsListPage() {
           )}
         </div>
 
-        {/* Filters — matches series page style */}
-        <div className="flex flex-col sm:flex-row gap-4 p-4 border rounded-lg bg-card shadow">
-          <div className="flex-1 min-w-[130px]">
-            <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Year</label>
-            <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger><SelectValue placeholder="All Years" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Years</SelectItem>
-                {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex-1 min-w-[180px]">
-            <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Series</label>
-            <Select value={filterSeries} onValueChange={setFilterSeries}>
-              <SelectTrigger><SelectValue placeholder="All Series" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Series</SelectItem>
-                {camps.map(c => c.seriesId).filter((id, i, arr) => arr.indexOf(id) === i).map(sid => (
-                  <SelectItem key={sid} value={sid}>{seriesNames.get(sid) || sid}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex-1 min-w-[140px]">
-            <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Status</label>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="upcoming">Upcoming</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col items-end gap-1 justify-end">
-            <span className="text-xs text-muted-foreground">{filtered.length} {filtered.length === 1 ? 'camp' : 'camps'}</span>
-            <div className="flex rounded-md border border-input overflow-hidden">
-              <button onClick={() => setViewMode('cards')}
-                className={`flex items-center px-3 py-2 text-sm transition-colors ${viewMode === 'cards' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
-                title="Card view"><LayoutGrid className="h-4 w-4" /></button>
-              <button onClick={() => setViewMode('list')}
-                className={`flex items-center px-3 py-2 text-sm transition-colors border-l border-input ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
-                title="List view"><List className="h-4 w-4" /></button>
+        {/* Filters */}
+        <div className="border rounded-lg bg-card shadow">
+          <button
+            className="w-full flex items-center justify-between p-4"
+            onClick={() => isMobile && setFiltersOpen(v => !v)}
+          >
+            <span className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+              <Filter className="h-4 w-4" /> Filters
+            </span>
+            {isMobile && <span className="text-xs text-muted-foreground">{filtersOpen ? 'Hide ▲' : 'Show ▼'}</span>}
+          </button>
+          {filtersOpen && (
+          <div className="flex flex-col sm:flex-row gap-4 px-4 pb-4">
+            <div className="flex-1 min-w-[130px]">
+              <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Year</label>
+              <Select value={filterYear} onValueChange={setFilterYear}>
+                <SelectTrigger><SelectValue placeholder="All Years" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Years</SelectItem>
+                  {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 min-w-[180px]">
+              <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Series</label>
+              <Select value={filterSeries} onValueChange={setFilterSeries}>
+                <SelectTrigger><SelectValue placeholder="All Series" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Series</SelectItem>
+                  {camps.map(c => c.seriesId).filter((id, i, arr) => arr.indexOf(id) === i).map(sid => (
+                    <SelectItem key={sid} value={sid}>{seriesNames.get(sid) || sid}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 min-w-[140px]">
+              <label className="block text-sm font-medium text-muted-foreground mb-1">Filter by Status</label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="upcoming">Upcoming</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col items-end gap-1 justify-end">
+              <span className="text-xs text-muted-foreground">{filtered.length} {filtered.length === 1 ? 'camp' : 'camps'}</span>
+              <div className="flex rounded-md border border-input overflow-hidden">
+                <button onClick={() => setViewMode('cards')}
+                  className={`flex items-center px-3 py-2 text-sm transition-colors ${viewMode === 'cards' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                  title="Card view"><LayoutGrid className="h-4 w-4" /></button>
+                <button onClick={() => setViewMode('list')}
+                  className={`flex items-center px-3 py-2 text-sm transition-colors border-l border-input ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                  title="List view"><List className="h-4 w-4" /></button>
+              </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* Content */}

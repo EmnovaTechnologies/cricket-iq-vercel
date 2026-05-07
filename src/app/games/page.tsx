@@ -49,6 +49,14 @@ function GamesPageInner() {
 
   const searchParams = useSearchParams();
   const currentYearString = useMemo(() => new Date().getFullYear().toString(), []);
+  const [isMobile, setIsMobile] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  useEffect(() => {
+    const mobile = window.innerWidth < 768;
+    setIsMobile(mobile);
+    setFiltersOpen(!mobile); // open by default on desktop, closed on mobile
+  }, []);
+
   const [selectedYear, setSelectedYear] = useState<string>(
     searchParams.get('year') || currentYearString
   );
@@ -308,12 +316,22 @@ function GamesPageInner() {
       {activeOrganizationId && (
         <>
           <Card className="p-4 sm:p-6 shadow">
-            <CardHeader className="p-0 pb-4 mb-4 border-b">
+            <button
+              className="w-full flex items-center justify-between"
+              onClick={() => isMobile && setFiltersOpen(v => !v)}
+            >
               <CardTitle className="text-xl flex items-center gap-2 text-foreground">
                 <Filter className="h-5 w-5" /> Filters
               </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
+              {isMobile && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  {filtersOpen ? 'Hide' : 'Show'}
+                  <span className="text-base">{filtersOpen ? '▲' : '▼'}</span>
+                </span>
+              )}
+            </button>
+            {filtersOpen && (
+            <CardContent className="p-0 mt-4">
               <div className="flex flex-wrap items-end gap-4">
                 <div className="flex-1 min-w-[140px]">
                   <label htmlFor="year-filter" className="block text-sm font-medium text-muted-foreground mb-1">Filter by Year</label>
@@ -425,6 +443,7 @@ function GamesPageInner() {
                 </div>
               </div>
             </CardContent>
+            )}
           </Card>
 
           {isLoading ? (
