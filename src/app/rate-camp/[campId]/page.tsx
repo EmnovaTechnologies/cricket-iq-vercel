@@ -439,15 +439,21 @@ function RateCampInner() {
 
           {/* All ratings in one compact card */}
           {!isLocked && (
-            <div className="bg-card border rounded-xl p-4 space-y-3">
+            <div className="bg-card border rounded-xl p-3 space-y-2">
               {RATING_DIMS.map(([key, label]) => (
-                <div key={key} className="flex items-center gap-3">
-                  <label className="text-xs font-medium text-muted-foreground w-14 shrink-0">{label}</label>
-                  <StarRating
-                    value={form[key] as number}
-                    onChange={v => setF(key, v)}
-                    disabled={isLocked}
-                  />
+                <div key={key} className="flex items-center gap-2">
+                  <label className="text-xs text-muted-foreground w-12 shrink-0">{label}</label>
+                  <div className="flex gap-0.5">
+                    {[1,2,3,4,5].map(n => (
+                      <button key={n} type="button"
+                        onClick={() => setF(key, (form[key] as number) === n ? 0 : n)}>
+                        <Star className={`h-6 w-6 ${n <= (form[key] as number) ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/20'}`} />
+                      </button>
+                    ))}
+                  </div>
+                  {(form[key] as number) > 0 && (
+                    <span className="text-xs text-muted-foreground ml-1">{RATING_LABELS[form[key] as number]}</span>
+                  )}
                 </div>
               ))}
             </div>
