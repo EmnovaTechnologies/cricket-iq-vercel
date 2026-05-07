@@ -519,13 +519,42 @@ export async function getAvailableSeriesForPlayer(
 
   if (spSnap.empty) return [];
 
-  // Get all series for this org — sorted most recent first
-  // Future: filter to series where player appeared (requires seriesId on scorecardPlayers)
+  // Find which series this player appeared in by looking up their name in matchScorecards
+  const playerNames = spSnap.docs.map(d => (d.data().name as string).toLowerCase().trim());
+  
+  // Get all scorecards for this org
+  const scSnap = await adminDb.collection('matchScorecards')
+    .where('organizationId', '==', organizationId)
+    .get();
+
+  // Find seriesIds where player appeared
+  const playerSeriesIds = new Set<string>();
+  for (const scDoc of scSnap.docs) {
+    const data = scDoc.data();
+    const seriesId = data.seriesId;
+    if (!seriesId) continue;
+    // Check innings for player name
+    const innings = data.innings || [];
+    let found = false;
+    for (const inn of innings) {
+      if (found) break;
+      for (const b of (inn.batting || [])) {
+        if (playerNames.includes((b.name || '').toLowerCase().trim())) { found = true; break; }
+      }
+      for (const b of (inn.bowling || [])) {
+        if (playerNames.includes((b.name || '').toLowerCase().trim())) { found = true; break; }
+      }
+    }
+    if (found) playerSeriesIds.add(seriesId);
+  }
+
+  // Get all series for org, filter to where player appeared
   const seriesSnap = await adminDb.collection('series')
     .where('organizationId', '==', organizationId)
     .get();
 
   return seriesSnap.docs
+    .filter(d => playerSeriesIds.size === 0 || playerSeriesIds.has(d.id))
     .map(d => ({
       id: d.id,
       name: d.data().name || 'Unknown series',
