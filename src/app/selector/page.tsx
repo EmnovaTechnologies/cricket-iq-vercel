@@ -12,7 +12,7 @@ import { getScorecardsForSelectorAction } from '@/lib/actions/scorecard-actions'
 import { getCampsForOrgAction, getCampPlayersAction, getMyCampAssessmentsAction } from '@/lib/actions/camp-actions';
 import { getUserReportsForGameAction } from '@/lib/actions/match-report-actions';
 import type { Game, MatchScorecard, SelectionCamp } from '@/types';
-import { Loader2, ChevronRight, CheckCircle, Clock, LogOut } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, CheckCircle, Clock, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { format, parseISO, startOfDay } from 'date-fns';
 
@@ -174,13 +174,14 @@ export default function SelectorDashboard() {
     );
   }
 
+  const [gameIndex, setGameIndex] = useState(0);
+  const [scorecardIndex, setScorecardIndex] = useState(0);
+  const [campIndex, setCampIndex] = useState(0);
+
   const displayName = (userProfile?.displayName || currentUser?.email || 'Selector').split(' ')[0];
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const allDone = pendingTotal === 0;
-  const nextGame = games[0];
-  const nextScorecard = scorecards[0];
-  const nextCamp = camps[0];
 
   const rateHref = (gameId: string) =>
     isMobile && currentUser ? `/rate/${gameId}?uid=${currentUser.uid}` : `/games/${gameId}/rate-enhanced`;
@@ -222,55 +223,103 @@ export default function SelectorDashboard() {
           </div>
         )}
 
-        {showGames && games.length > 0 && (
-          <section>
-            <SectionHeader title="Next game to rate" moreCount={games.length - 1} />
-            {nextGame && (
-              <ActionCard
-                iconBg="#E6F1FB"
-                icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="#185FA5" strokeWidth="1.3"/><path d="M5 8h2M6 7v2M10 8h2" stroke="#185FA5" strokeWidth="1.3" strokeLinecap="round"/></svg>}
-                title={`${nextGame.team1} vs ${nextGame.team2}`}
-                meta={`${safeFormatDate(nextGame.date)}${nextGame.seriesName ? ` · ${nextGame.seriesName}` : ''}`}
-                isPending={nextGame.isPending}
-                onClick={() => router.push(rateHref(nextGame.id))}
-              />
-            )}
-          </section>
-        )}
+        {showGames && games.length > 0 && (() => {
+          const game = games[Math.min(gameIndex, games.length - 1)];
+          return (
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Games to rate</span>
+                <span className="text-xs text-muted-foreground">{gameIndex + 1} of {games.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setGameIndex(i => Math.max(0, i - 1))} disabled={gameIndex === 0}
+                  className="h-8 w-8 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-20 hover:bg-muted transition-colors">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <div className="flex-1">
+                  <ActionCard
+                    iconBg="#E6F1FB"
+                    icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="#185FA5" strokeWidth="1.3"/><path d="M5 8h2M6 7v2M10 8h2" stroke="#185FA5" strokeWidth="1.3" strokeLinecap="round"/></svg>}
+                    title={`${game.team1} vs ${game.team2}`}
+                    meta={`${safeFormatDate(game.date)}${game.seriesName ? ` · ${game.seriesName}` : ''}`}
+                    isPending={game.isPending}
+                    onClick={() => router.push(rateHref(game.id))}
+                  />
+                </div>
+                <button onClick={() => setGameIndex(i => Math.min(games.length - 1, i + 1))} disabled={gameIndex === games.length - 1}
+                  className="h-8 w-8 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-20 hover:bg-muted transition-colors">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </section>
+          );
+        })()}
 
-        {showScorecards && scorecards.length > 0 && (
-          <section>
-            <SectionHeader title="Next match report" moreCount={scorecards.length - 1} />
-            {nextScorecard && (
-              <ActionCard
-                iconBg="#E1F5EE"
-                icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 1h8a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z" stroke="#0F6E56" strokeWidth="1.3"/><path d="M5 5h6M5 8h4" stroke="#0F6E56" strokeWidth="1.3" strokeLinecap="round"/></svg>}
-                title={`${nextScorecard.team1} vs ${nextScorecard.team2}`}
-                meta={`${safeFormatDate(nextScorecard.date)} · ${nextScorecard.hasReport ? 'Submitted' : 'Not submitted'}`}
-                isPending={!nextScorecard.hasReport}
-                onClick={() => router.push(reportHref(nextScorecard.id))}
-              />
-            )}
-          </section>
-        )}
+        {showScorecards && scorecards.length > 0 && (() => {
+          const sc = scorecards[Math.min(scorecardIndex, scorecards.length - 1)];
+          return (
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Match reports</span>
+                <span className="text-xs text-muted-foreground">{scorecardIndex + 1} of {scorecards.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setScorecardIndex(i => Math.max(0, i - 1))} disabled={scorecardIndex === 0}
+                  className="h-8 w-8 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-20 hover:bg-muted transition-colors">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <div className="flex-1">
+                  <ActionCard
+                    iconBg="#E1F5EE"
+                    icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 1h8a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z" stroke="#0F6E56" strokeWidth="1.3"/><path d="M5 5h6M5 8h4" stroke="#0F6E56" strokeWidth="1.3" strokeLinecap="round"/></svg>}
+                    title={`${sc.team1} vs ${sc.team2}`}
+                    meta={`${safeFormatDate(sc.date)} · ${sc.hasReport ? 'Submitted' : 'Not submitted'}`}
+                    isPending={!sc.hasReport}
+                    onClick={() => router.push(reportHref(sc.id))}
+                  />
+                </div>
+                <button onClick={() => setScorecardIndex(i => Math.min(scorecards.length - 1, i + 1))} disabled={scorecardIndex === scorecards.length - 1}
+                  className="h-8 w-8 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-20 hover:bg-muted transition-colors">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </section>
+          );
+        })()}
 
-        {camps.length > 0 && (
-          <section>
-            <SectionHeader title="Next camp assessment" moreCount={camps.length - 1} />
-            {nextCamp && (
-              <ActionCard
-                iconBg="#FAEEDA"
-                icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1l7 13H1L8 1z" stroke="#854F0B" strokeWidth="1.3" strokeLinejoin="round"/></svg>}
-                title={nextCamp.name}
-                meta={nextCamp.pendingCount > 0
-                  ? `${nextCamp.pendingCount} player${nextCamp.pendingCount !== 1 ? 's' : ''} not assessed`
-                  : 'All players assessed'}
-                isPending={nextCamp.pendingCount > 0}
-                onClick={() => router.push(campHref(nextCamp.id))}
-              />
-            )}
-          </section>
-        )}
+        {camps.length > 0 && (() => {
+          const camp = camps[Math.min(campIndex, camps.length - 1)];
+          return (
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Camp assessments</span>
+                <span className="text-xs text-muted-foreground">{campIndex + 1} of {camps.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setCampIndex(i => Math.max(0, i - 1))} disabled={campIndex === 0}
+                  className="h-8 w-8 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-20 hover:bg-muted transition-colors">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <div className="flex-1">
+                  <ActionCard
+                    iconBg="#FAEEDA"
+                    icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1l7 13H1L8 1z" stroke="#854F0B" strokeWidth="1.3" strokeLinejoin="round"/></svg>}
+                    title={camp.name}
+                    meta={camp.pendingCount > 0
+                      ? `${camp.pendingCount} player${camp.pendingCount !== 1 ? 's' : ''} not assessed`
+                      : 'All players assessed'}
+                    isPending={camp.pendingCount > 0}
+                    onClick={() => router.push(campHref(camp.id))}
+                  />
+                </div>
+                <button onClick={() => setCampIndex(i => Math.min(camps.length - 1, i + 1))} disabled={campIndex === camps.length - 1}
+                  className="h-8 w-8 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-20 hover:bg-muted transition-colors">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </section>
+          );
+        })()}
 
         <div className="pt-2 border-t">
           <Link href="/" className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground py-2">
