@@ -21,7 +21,7 @@ import {
   recordCampFitnessResultAction, getCampFitnessResultsAction,
 } from '@/lib/actions/camp-actions';
 import type { SelectionCamp, CampPlayer, CampAssessment, CampFitnessResult } from '@/types';
-import { EFFECTIVE_SKILLS, BOWLING_STYLES, BATTING_ORDERS } from '@/lib/constants';
+import { CampScratchpad } from '@/components/camp/camp-scratchpad';
 import {
   Loader2, ChevronLeft, ChevronRight, Star, Lock,
   ClipboardList, Activity, Check, Search, X,
@@ -516,22 +516,13 @@ function RateCampInner() {
 
       {/* ── SCRATCHPAD TAB ── */}
       {tab === 'scratchpad' && camp && (
-        <div className="flex-1 px-4 pb-6 pt-4 flex flex-col items-center justify-center gap-4 text-center">
-          <ClipboardList className="h-10 w-10 text-muted-foreground/40" />
-          <div>
-            <p className="text-sm font-medium">Scratchpad</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Use the full scratchpad with bib autocomplete
-            </p>
-          </div>
-          <Button
-            onClick={() => router.push(`/series/${camp.seriesId}/camp/${camp.id}/assess?from=selector&mode=scratchpad`)}
-            variant="outline"
-            className="gap-2"
-          >
-            <ClipboardList className="h-4 w-4" />
-            Open Scratchpad
-          </Button>
+        <div className="flex-1 px-4 pb-6 pt-4">
+          <CampScratchpad
+            camp={camp}
+            campPlayers={sortedPlayers}
+            initialAssessments={myAssessments}
+            onAssessmentsUpdated={setMyAssessments}
+          />
         </div>
       )}
 

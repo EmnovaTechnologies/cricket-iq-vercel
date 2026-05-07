@@ -81,9 +81,7 @@ export default function CampAssessPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [step, setStep] = useState<'bib' | 'assess'>('bib');
-  const [mode, setMode] = useState<'bib' | 'scratchpad'>(
-    searchParams.get('mode') === 'scratchpad' ? 'scratchpad' : 'bib'
-  );
+  const [mode, setMode] = useState<'bib' | 'scratchpad'>('bib');
   const [scratchpad, setScratchpad] = useState('');
   const [scratchpadParsed, setScratchpadParsed] = useState<Map<number, string>>(new Map());
   const [isApplyingScratchpad, setIsApplyingScratchpad] = useState(false);
