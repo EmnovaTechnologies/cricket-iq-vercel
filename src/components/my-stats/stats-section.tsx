@@ -81,7 +81,7 @@ export function StatsSection({ stats }: Props) {
         {trend.length > 0 && (
           <div className="pt-2">
             <div className="text-xs text-muted-foreground mb-2">
-              Score trend — last {trend.length} game{trend.length !== 1 ? 's' : ''}
+              CIQ Score trend — last {trend.length} game{trend.length !== 1 ? 's' : ''}
             </div>
             <div className="flex items-end gap-1.5 h-10">
               {trend.map((score, i) => (
