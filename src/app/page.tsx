@@ -579,11 +579,17 @@ export default function DashboardPage() {
   }
 
   const displayName = userProfile?.displayName || userProfile?.email?.split('@')[0] || 'there';
-  const isSelector = userProfile?.roles?.includes('selector');
+  const isSelector = userProfile?.roles?.includes('selector') &&
+    !userProfile?.roles?.some(r => ['admin','Organization Admin','Series Admin'].includes(r));
 
-  // ── Mobile selector — redirect to /selector route ──
+  useEffect(() => {
+    if (isSelector && isMobile && currentUser && activeOrganizationId) {
+      router.replace('/selector');
+    }
+  }, [isSelector, isMobile, currentUser, activeOrganizationId, router]);
+
+  // Show spinner while redirecting mobile selector
   if (isSelector && isMobile && currentUser && activeOrganizationId) {
-    router.replace('/selector');
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
