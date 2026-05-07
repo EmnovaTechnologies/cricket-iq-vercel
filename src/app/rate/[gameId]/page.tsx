@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { getGameByIdFromDB, getPlayerByIdFromDB, getRatingsForGameFromDB } from '@/lib/db';
 import { saveMobileRatingAction, certifyMobileRatingAction } from '@/lib/actions/mobile-rating-action';
@@ -55,6 +55,7 @@ function SkillIcon({ skill }: { skill: string }) {
 function MobileRatePage() {
   const params = useParams<{ gameId: string }>();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const gameId = params.gameId;
   const selectorUidFromUrl = searchParams.get('uid');
 
@@ -489,11 +490,20 @@ function MobileRatePage() {
     <div className="min-h-screen bg-background flex flex-col max-w-lg mx-auto">
       {/* Header */}
       <div className="bg-primary text-primary-foreground px-4 py-2.5 sticky top-0 z-10">
-        <p className="text-xs font-medium leading-snug truncate">
-          {game.team1} vs {game.team2}
-          {game.seriesName ? <span className="opacity-70"> · {game.seriesName}</span> : ''}
-        </p>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 mb-0.5">
+          <button
+            onClick={() => router.push(selectorUidFromUrl ? '/selector' : '/games')}
+            className="opacity-80 hover:opacity-100 transition-opacity shrink-0 -ml-1"
+            aria-label="Back"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <p className="text-xs font-medium leading-snug truncate flex-1">
+            {game.team1} vs {game.team2}
+            {game.seriesName ? <span className="opacity-70"> · {game.seriesName}</span> : ''}
+          </p>
+        </div>
+        <div className="flex items-center justify-between gap-2 pl-7">
           <p className="text-xs opacity-75 leading-snug truncate">
             {game.date ? (() => { try { return new Date(game.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); } catch { return ''; } })() : ''}
             {game.venue ? <span> · {game.venue}</span> : ''}
