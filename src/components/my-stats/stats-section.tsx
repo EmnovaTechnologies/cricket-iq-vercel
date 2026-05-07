@@ -2,17 +2,32 @@
 
 import type { PlayerStatsResult } from '@/lib/actions/player-stats-action';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart3 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { BarChart3, Info } from 'lucide-react';
 
 interface Props {
   stats: PlayerStatsResult;
 }
 
-function StatBox({ val, lbl }: { val: string | number; lbl: string }) {
+function StatBox({ val, lbl, tooltip }: { val: string | number; lbl: string; tooltip?: string }) {
   return (
     <div className="bg-muted rounded-lg p-3 text-center">
       <div className="text-xl font-medium">{val}</div>
-      <div className="text-xs text-muted-foreground mt-1">{lbl}</div>
+      <div className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+        {lbl}
+        {tooltip && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3 w-3 text-muted-foreground/60 cursor-help shrink-0" />
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[220px] text-xs text-center">
+                {tooltip}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
     </div>
   );
 }
@@ -50,8 +65,16 @@ export function StatsSection({ stats }: Props) {
         {/* Overview */}
         <div className="grid grid-cols-3 gap-2">
           <StatBox val={agg.gamesPlayed} lbl="Games" />
-          <StatBox val={agg.avgScorePerGame} lbl="Avg score/game" />
-          <StatBox val={agg.totalScore} lbl="Total score" />
+          <StatBox
+            val={agg.avgScorePerGame}
+            lbl="Avg CIQ/game"
+            tooltip="Average Cricket IQ Score per game — a composite of batting, bowling and fielding contributions weighted for impact."
+          />
+          <StatBox
+            val={agg.totalScore}
+            lbl="Cricket IQ Score"
+            tooltip="Your total Cricket IQ Score across all games in this series. Calculated from runs scored, wickets taken, economy rate, catches and run outs."
+          />
         </div>
 
         {/* Score trend */}
