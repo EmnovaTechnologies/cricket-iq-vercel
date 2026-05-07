@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import type { PlayerStatsResult } from '@/lib/actions/player-stats-action';
-import { generatePlayerAIPlanAction } from '@/lib/actions/player-ai-plan-action';
+import {
+  generatePlayerAIPlanAction,
+  loadImprovementPlanAction,
+} from '@/lib/actions/player-ai-plan-action';
 import type { AIPlanSuggestion } from '@/lib/actions/player-ai-plan-action';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,50 +24,36 @@ const impactColors: Record<string, string> = {
   low:    'bg-muted text-muted-foreground',
 };
 
-interface StoredPlan {
-  suggestions: AIPlanSuggestion[];
-  generatedAt: string;
-  seriesId: string;
-}
-
 export function AiPlanSection({ stats, playerId, seriesId }: Props) {
   const [suggestions, setSuggestions] = useState<AIPlanSuggestion[] | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const storageKey = `improvement_plan_${playerId}_${seriesId}`;
-
-  // Load persisted plan on mount
+  // Load persisted plan from Firestore on mount / series change
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed: StoredPlan = JSON.parse(saved);
-        if (parsed.suggestions && parsed.seriesId === seriesId) {
-          setSuggestions(parsed.suggestions);
-          setGeneratedAt(parsed.generatedAt);
-        }
+    if (!playerId || !seriesId) return;
+    setIsLoading(true);
+    setSuggestions(null);
+    setGeneratedAt(null);
+    loadImprovementPlanAction(playerId, seriesId).then(res => {
+      if (res.success && res.suggestions) {
+        setSuggestions(res.suggestions);
+        setGeneratedAt(res.generatedAt || null);
       }
-    } catch {}
-  }, [storageKey, seriesId]);
+      setIsLoading(false);
+    });
+  }, [playerId, seriesId]);
 
   const generate = async () => {
     setIsGenerating(true);
     setError(null);
     try {
-      const result = await generatePlayerAIPlanAction(stats);
+      const result = await generatePlayerAIPlanAction(stats, playerId, seriesId);
       if (result.success && result.suggestions) {
-        const now = new Date().toISOString();
         setSuggestions(result.suggestions);
-        setGeneratedAt(now);
-        // Persist to localStorage
-        const stored: StoredPlan = {
-          suggestions: result.suggestions,
-          generatedAt: now,
-          seriesId,
-        };
-        localStorage.setItem(storageKey, JSON.stringify(stored));
+        setGeneratedAt(result.generatedAt || new Date().toISOString());
       } else {
         setError(result.error || 'Failed to generate plan.');
       }
@@ -87,7 +76,14 @@ export function AiPlanSection({ stats, playerId, seriesId }: Props) {
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
-        {!suggestions && !isGenerating && (
+        {isLoading && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading...
+          </div>
+        )}
+
+        {!isLoading && !suggestions && !isGenerating && (
           <Button onClick={generate} variant="outline" className="gap-2">
             <Sparkles className="h-4 w-4" />
             Generate my improvement plan
@@ -101,11 +97,9 @@ export function AiPlanSection({ stats, playerId, seriesId }: Props) {
           </div>
         )}
 
-        {error && (
-          <p className="text-sm text-destructive">{error}</p>
-        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
-        {suggestions && (
+        {suggestions && !isGenerating && (
           <>
             <div className="space-y-2">
               {suggestions.map(s => (

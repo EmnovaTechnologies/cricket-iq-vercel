@@ -1,20 +1,67 @@
 'use server';
 
-/**
- * FILE: src/lib/actions/player-ai-plan-action.ts
- *
- * Calls Claude to synthesise a player's stats, benchmarks, selector feedback
- * and camp ratings into 3 prioritised, actionable improvement suggestions.
- *
- * Privacy guarantees:
- * - No other player names are passed in
- * - Benchmarks are anonymous percentiles only
- * - Selector feedback is already distilled (reasons only, no names)
- * - Camp ratings are averaged — no individual coach breakdown
- */
-
 import Anthropic from '@anthropic-ai/sdk';
+import { adminDb } from '../firebase-admin';
 import type { PlayerStatsResult } from './player-stats-action';
+
+export interface AIPlanSuggestion {
+  rank: number;
+  dimension: string;
+  suggestion: string;
+  impact: 'high' | 'medium' | 'low';
+}
+
+export interface AIPlanResult {
+  success: boolean;
+  suggestions?: AIPlanSuggestion[];
+  generatedAt?: string;
+  error?: string;
+}
+
+// ─── Firestore persistence ────────────────────────────────────────────────────
+
+const COLLECTION = 'playerImprovementPlans';
+
+function planDocId(playerId: string, seriesId: string) {
+  return `${playerId}_${seriesId}`;
+}
+
+export async function loadImprovementPlanAction(
+  playerId: string,
+  seriesId: string
+): Promise<AIPlanResult> {
+  try {
+    const doc = await adminDb.collection(COLLECTION).doc(planDocId(playerId, seriesId)).get();
+    if (!doc.exists) return { success: true, suggestions: undefined };
+    const data = doc.data()!;
+    return {
+      success: true,
+      suggestions: data.suggestions as AIPlanSuggestion[],
+      generatedAt: data.generatedAt,
+    };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function saveImprovementPlanAction(
+  playerId: string,
+  seriesId: string,
+  suggestions: AIPlanSuggestion[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await adminDb.collection(COLLECTION).doc(planDocId(playerId, seriesId)).set({
+      playerId,
+      seriesId,
+      suggestions,
+      generatedAt: new Date().toISOString(),
+      updatedAt: adminDb.firestore ? undefined : new Date().toISOString(),
+    });
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
 
 export interface AIPlanSuggestion {
   rank: number;
@@ -30,7 +77,9 @@ export interface AIPlanResult {
 }
 
 export async function generatePlayerAIPlanAction(
-  stats: PlayerStatsResult
+  stats: PlayerStatsResult,
+  playerId: string,
+  seriesId: string
 ): Promise<AIPlanResult> {
   try {
     if (!stats.aggregated) {
@@ -113,15 +162,16 @@ Respond ONLY with a JSON array. No markdown, no preamble. Format:
       .join('');
 
     const clean = text.replace(/```json|```/g, '').trim();
-    const suggestions = JSON.parse(clean) as AIPlanSuggestion[];
+    const suggestions: AIPlanSuggestion[] = JSON.parse(clean).slice(0, 3).map((s: any, i: number) => ({
+      ...s, rank: i + 1,
+    }));
 
-    return {
-      success: true,
-      suggestions: suggestions.slice(0, 3).map((s, i) => ({
-        ...s,
-        rank: i + 1,
-      })),
-    };
+    const generatedAt = new Date().toISOString();
+
+    // Save to Firestore for cross-device persistence
+    await saveImprovementPlanAction(playerId, seriesId, suggestions);
+
+    return { success: true, suggestions, generatedAt };
   } catch (e: any) {
     console.error('[generatePlayerAIPlanAction] Error:', e);
     return { success: false, error: e.message };
