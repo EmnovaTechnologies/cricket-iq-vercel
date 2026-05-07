@@ -71,6 +71,14 @@ export default function CampAssessPage() {
   const { currentUser, userProfile } = useAuth();
   const { toast } = useToast();
 
+  // Selectors are bib-blind — only admins/org-admins/series-admins can see names
+  const canSeeNames = !!(
+    userProfile?.roles?.includes('admin') ||
+    userProfile?.roles?.includes('Organization Admin') ||
+    userProfile?.roles?.includes('Series Admin') ||
+    userProfile?.roles?.includes('Team Manager')
+  );
+
   const [camp, setCamp] = useState<SelectionCamp | null>(null);
   const [campPlayers, setCampPlayers] = useState<CampPlayer[]>([]);
   const [myAssessments, setMyAssessments] = useState<Map<number, CampAssessment>>(new Map());
@@ -609,7 +617,7 @@ ${notes}` : notes;
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   className="pl-9"
-                  placeholder="Search by name or type bib #..."
+                  placeholder={canSeeNames ? "Search by name or type bib #..." : "Type bib # to find player..."}
                   value={bibInput}
                   onChange={e => setBibInput(e.target.value)}
                   onKeyDown={e => {
@@ -637,6 +645,8 @@ ${notes}` : notes;
                       if (!bibInput) return true;
                       const asNum = parseInt(bibInput);
                       if (!isNaN(asNum)) return p.bibNumber === asNum;
+                      // Selectors are bib-blind — name search disabled
+                      if (!canSeeNames) return false;
                       return p.playerName.toLowerCase().includes(bibInput.toLowerCase());
                     })
                     .sort((a, b) => a.bibNumber - b.bibNumber)
@@ -674,9 +684,9 @@ ${notes}` : notes;
                           {/* Bib number */}
                           <span className="text-lg font-bold text-primary w-10 shrink-0">#{p.bibNumber}</span>
 
-                          {/* Player info — skill only, no name in assessment mode */}
+                          {/* Player info — skill only for selectors, name shown for admins */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{p.playerName}</p>
+                            {canSeeNames && <p className="text-sm font-medium truncate">{p.playerName}</p>}
                             <p className="text-xs text-muted-foreground">{p.playerPrimarySkill}
                               {p.playerBowlingStyle ? ` · ${p.playerBowlingStyle}` : ''}
                               {p.playerBattingOrder ? ` · ${p.playerBattingOrder}` : ''}
