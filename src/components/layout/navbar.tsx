@@ -4,7 +4,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Leaf, Users, UserSquare2, Gamepad2, Target, Menu, Layers, MapPinned, LogIn, LogOut, UserPlus, UserCog, ShieldCheck, Building, ChevronsUpDown, Check, Hourglass, ListFilter, ImageIcon, User, Download, ChevronRight, BarChart3, Table, ClipboardCheck, Trophy } from 'lucide-react';
+import { Leaf, Users, UserSquare2, Gamepad2, Target, Menu, Layers, MapPinned, LogIn, LogOut, UserPlus, UserCog, ShieldCheck, Building, ChevronsUpDown, Check, Hourglass, ListFilter, ImageIcon, User, Download, ChevronRight, BarChart3, Table, ClipboardCheck, Trophy, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useState, useEffect } from 'react';
@@ -103,7 +103,8 @@ const Navbar = () => {
 
   const mainNavLinks = [
     { href: '/', label: 'Dashboard', icon: <Leaf className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_DASHBOARD },
-    { href: '/my-stats', label: 'My Stats', icon: <BarChart3 className="h-5 w-5" />, permission: PERMISSIONS.PLAYER_VIEW_OWN_PROFILE },
+    { href: '/my-stats', label: 'My Stats', icon: <BarChart3 className="h-5 w-5" />, permission: PERMISSIONS.PLAYER_VIEW_OWN_PROFILE, roles: ['player'] },
+    { href: '/selector', label: 'My Tasks', icon: <CheckCircle className="h-5 w-5" />, permission: PERMISSIONS.GAMES_RATE_ASSIGNED, roles: ['selector'] },
     { href: '/series', label: 'Series', icon: <Layers className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_SERIES_LIST },
     { href: '/games', label: 'Games', icon: <Gamepad2 className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_GAMES_LIST },
     { href: '/teams', label: 'Teams', icon: <Users className="h-5 w-5" />, permission: PERMISSIONS.PAGE_VIEW_TEAMS_LIST },

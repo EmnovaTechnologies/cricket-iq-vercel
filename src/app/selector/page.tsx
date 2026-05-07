@@ -2,130 +2,144 @@
 
 /**
  * FILE: src/app/selector/page.tsx
- *
- * Mobile dashboard for selector-role users who log in directly on their phone.
- * Shows their assigned games (with Rate Players link) and scorecards
- * (with Match Report link) — all linking to the mobile-optimised pages.
- *
- * Also accessible from desktop — links are mobile-aware but the page itself
- * is readable on any screen size.
  */
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { getGamesForUserViewAction } from '@/lib/actions/game-actions';
-import { getScorecardsForOrgAction, getScorecardsForSelectorAction } from '@/lib/actions/scorecard-actions';
-import type { Game, MatchScorecard } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  Loader2, Edit3, FileText, CalendarDays, MapPin,
-  CheckCircle, AlertCircle, LogOut, ChevronRight,
-} from 'lucide-react';
+import { getScorecardsForSelectorAction } from '@/lib/actions/scorecard-actions';
+import { getCampsForOrgAction } from '@/lib/actions/camp-actions';
+import { getUserReportsForGameAction } from '@/lib/actions/match-report-actions';
+import type { Game, MatchScorecard, SelectionCamp } from '@/types';
+import { Loader2, ChevronRight, CheckCircle, Clock, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { format, parseISO, startOfDay } from 'date-fns';
-import { cn } from '@/lib/utils';
+
+function safeFormatDate(date: string): string {
+  if (!date) return '';
+  try { return format(parseISO(date.replace(/-/g, '/')), 'MMM d'); } catch { return date; }
+}
+
+function isCertPending(game: Game, uid: string): boolean {
+  if (!game.selectorUserIds?.includes(uid)) return false;
+  if (game.ratingsFinalized) return false;
+  const cert = game.selectorCertifications?.[uid];
+  if (!cert || cert.status === 'pending') return true;
+  if (cert.status === 'certified' && game.ratingsLastModifiedAt) {
+    return new Date(cert.certifiedAt) < new Date(game.ratingsLastModifiedAt);
+  }
+  return false;
+}
+
+function PendingDot() {
+  return <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF9F27', flexShrink: 0 }} />;
+}
+
+function DoneBadge() {
+  return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-800">Done</span>;
+}
+
+function ActionCard({ iconBg, icon, title, meta, isPending, onClick }: {
+  iconBg: string; icon: React.ReactNode; title: string; meta: string;
+  isPending: boolean; onClick: () => void;
+}) {
+  return (
+    <div onClick={onClick} className="flex items-center gap-3 p-3 bg-card border rounded-xl cursor-pointer active:bg-muted transition-colors">
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: iconBg, flexShrink: 0 }} className="flex items-center justify-center">
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate">{title}</div>
+        <div className="text-xs text-muted-foreground mt-0.5 truncate">{meta}</div>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        {isPending ? <PendingDot /> : <DoneBadge />}
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({ title, moreCount }: { title: string; moreCount: number }) {
+  return (
+    <div className="flex items-center justify-between mb-2">
+      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</span>
+      {moreCount > 0 && <span className="text-xs text-muted-foreground">+{moreCount} more</span>}
+    </div>
+  );
+}
 
 export default function SelectorDashboard() {
   const { currentUser, userProfile, activeOrganizationId, activeOrganizationDetails, logout, isAuthLoading } = useAuth();
   const router = useRouter();
 
-  // Org selection model — drives what sections are shown
   const selectionModel = activeOrganizationDetails?.selectionModel || 'hybrid';
   const showGames = selectionModel === 'rating' || selectionModel === 'hybrid';
   const showScorecards = selectionModel === 'performance' || selectionModel === 'hybrid';
 
-  const [games, setGames] = useState<Game[]>([]);
-  const [scorecards, setScorecards] = useState<MatchScorecard[]>([]);
-  const [assignedScorecardIds, setAssignedScorecardIds] = useState<Set<string>>(new Set());
+  const [games, setGames] = useState<(Game & { isPending: boolean })[]>([]);
+  const [scorecards, setScorecards] = useState<(MatchScorecard & { hasReport: boolean })[]>([]);
+  const [camps, setCamps] = useState<(SelectionCamp & { pendingCount: number })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingTotal, setPendingTotal] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
   }, []);
 
-  // Redirect non-selectors away
   useEffect(() => {
     if (isAuthLoading) return;
     if (!currentUser) { router.push('/login'); return; }
-    const isSelector = userProfile?.roles?.includes('selector') ||
-      userProfile?.roles?.includes('Series Admin') ||
-      userProfile?.roles?.includes('Organization Admin') ||
-      userProfile?.roles?.includes('admin');
-    if (!isSelector) router.push('/');
+    const allowed = userProfile?.roles?.some(r => ['selector','Series Admin','Organization Admin','admin'].includes(r));
+    if (!allowed) router.push('/');
   }, [currentUser, userProfile, isAuthLoading, router]);
 
   useEffect(() => {
-    if (!currentUser || !userProfile) return;
+    if (!currentUser || !userProfile || !activeOrganizationId) return;
+    setIsLoading(true);
     const load = async () => {
-      setIsLoading(true);
       try {
-        // Always fetch both — selectionModel only affects display, not fetching
-        // (activeOrganizationDetails may not be loaded yet when this runs)
-        const [gamesResult, scorecardsResult, directScorecardsResult] = await Promise.all([
+        const [gamesResult, scorecardsResult, campsResult] = await Promise.all([
           getGamesForUserViewAction(userProfile, activeOrganizationId),
-          activeOrganizationId
-            ? getScorecardsForOrgAction(activeOrganizationId)
-            : Promise.resolve({ success: true, scorecards: [] }),
-          activeOrganizationId
-            ? getScorecardsForSelectorAction(currentUser.uid, activeOrganizationId)
-            : Promise.resolve({ success: true, scorecards: [] }),
+          getScorecardsForSelectorAction(currentUser.uid, activeOrganizationId),
+          getCampsForOrgAction(activeOrganizationId),
         ]);
 
-        // Only show games this selector is assigned to, not finalized, not future
-        const assignedGames = (gamesResult || []).filter(g =>
-          g.selectorUserIds?.includes(currentUser.uid) &&
-          !g.ratingsFinalized &&
-          startOfDay(parseISO(g.date)) <= startOfDay(new Date())
-        );
-        // Sort: pending certification first
-        assignedGames.sort((a, b) => {
-          const aPending = isCertPending(a, currentUser.uid);
-          const bPending = isCertPending(b, currentUser.uid);
-          if (aPending && !bPending) return -1;
-          if (!aPending && bPending) return 1;
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
-        });
+        // Games
+        const assignedGames = (gamesResult || [])
+          .filter(g => g.selectorUserIds?.includes(currentUser.uid) && !g.ratingsFinalized &&
+            g.date && startOfDay(parseISO(g.date)) <= startOfDay(new Date()))
+          .map(g => ({ ...g, isPending: isCertPending(g, currentUser.uid) }))
+          .sort((a, b) => (b.isPending ? 1 : 0) - (a.isPending ? 1 : 0));
         setGames(assignedGames);
 
-        // Build scorecard list:
-        // 1. Directly assigned (via selectorAssignments)
-        // 2. Game-linked (via assigned games)
-        // 3. All org scorecards (fallback — matching web behavior)
-        // Determine if pure selector (no admin/org-admin/series-admin)
-        const isSelectorOnly =
-          !!userProfile?.roles?.includes('selector') &&
-          !userProfile?.roles?.includes('admin') &&
-          !userProfile?.roles?.includes('Organization Admin') &&
-          !userProfile?.roles?.includes('Series Admin');
+        // Scorecards + report check
+        const scList = scorecardsResult.success ? scorecardsResult.scorecards || [] : [];
+        const reportChecks = await Promise.all(scList.map(async sc => {
+          try {
+            const reports = await getUserReportsForGameAction(sc.linkedGameId || sc.id, currentUser.uid);
+            return { id: sc.id, hasReport: reports.length > 0 };
+          } catch { return { id: sc.id, hasReport: false }; }
+        }));
+        const reportMap = new Map(reportChecks.map(r => [r.id, r.hasReport]));
+        const scWithStatus = scList
+          .map(sc => ({ ...sc, hasReport: reportMap.get(sc.id) || false }))
+          .sort((a, b) => (a.hasReport ? 1 : 0) - (b.hasReport ? 1 : 0));
+        setScorecards(scWithStatus);
 
-        const assignedGameIds = new Set(assignedGames.map(g => g.id));
-        const direct = directScorecardsResult.success ? directScorecardsResult.scorecards || [] : [];
-        const directIds = new Set(direct.map((sc: any) => sc.id));
-        const gameLinked = (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
-          .filter((sc: any) => sc.linkedGameId && assignedGameIds.has(sc.linkedGameId) && !directIds.has(sc.id));
-        const gameLinkedIds = new Set(gameLinked.map((sc: any) => sc.id));
+        // Camps — filter to assigned
+        const allCamps = campsResult.success ? campsResult.camps || [] : [];
+        const assignedCamps = allCamps
+          .filter(c => (c.assignedSelectors || []).some((s: any) => s.uid === currentUser.uid) && c.status !== 'completed')
+          .map(c => ({ ...c, pendingCount: c.status === 'active' ? 1 : 0 }));
+        setCamps(assignedCamps);
 
-        // Pure selectors only see their assigned + game-linked scorecards
-        // Admins/org-admins/series-admins see all org scorecards
-        const allOthers = isSelectorOnly ? [] : (scorecardsResult.success ? scorecardsResult.scorecards || [] : [])
-          .filter((sc: any) => !directIds.has(sc.id) && !gameLinkedIds.has(sc.id));
-
-        const merged = [
-          ...direct,
-          ...gameLinked,
-          ...allOthers,
-        ].sort((a: any, b: any) => {
-          const aAssigned = directIds.has(a.id);
-          const bAssigned = directIds.has(b.id);
-          if (aAssigned && !bAssigned) return -1;
-          if (!aAssigned && bAssigned) return 1;
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
-        });
-        setScorecards(merged);
-        setAssignedScorecardIds(directIds);
+        const gPending = assignedGames.filter(g => g.isPending).length;
+        const scPending = scWithStatus.filter(s => !s.hasReport).length;
+        const cPending = assignedCamps.filter(c => c.pendingCount > 0).length;
+        setPendingTotal(gPending + scPending + cPending);
       } catch (e) {
         console.error('Selector dashboard load error:', e);
       } finally {
@@ -140,167 +154,115 @@ export default function SelectorDashboard() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-3" />
-          <p className="text-muted-foreground">Loading your dashboard...</p>
+          <p className="text-sm text-muted-foreground">Loading your dashboard...</p>
         </div>
       </div>
     );
   }
 
-  const displayName = userProfile?.displayName || currentUser?.email || 'Selector';
+  const displayName = (userProfile?.displayName || currentUser?.email || 'Selector').split(' ')[0];
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const allDone = pendingTotal === 0;
+  const nextGame = games[0];
+  const nextScorecard = scorecards[0];
+  const nextCamp = camps[0];
+
   const rateHref = (gameId: string) =>
-    isMobile && currentUser
-      ? `/rate/${gameId}?uid=${currentUser.uid}`
-      : `/games/${gameId}/rate-enhanced?from=game-list`;
-  const reportHref = (scorecardId: string) =>
-    isMobile && currentUser
-      ? `/match-report/${scorecardId}?uid=${currentUser.uid}`
-      : `/scorecards/${scorecardId}`;
+    isMobile && currentUser ? `/rate/${gameId}?uid=${currentUser.uid}` : `/games/${gameId}/rate-enhanced`;
+  const reportHref = (id: string) => `/mobile/scorecard-report/${id}`;
+  const campHref = (id: string) => `/mobile/camp-assessment/${id}`;
 
   return (
     <div className="min-h-screen bg-background max-w-lg mx-auto">
       {/* Header */}
-      <div className="bg-primary text-primary-foreground px-4 py-4 sticky top-0 z-10">
+      <div className="bg-primary text-primary-foreground px-4 py-3 sticky top-0 z-10">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-base font-bold">🏏 Cricket IQ</h1>
-            <p className="text-xs opacity-75 mt-0.5">Welcome, {displayName}</p>
+            <h1 className="text-sm font-semibold">🏏 Cricket IQ</h1>
+            <p className="text-xs opacity-75">{greeting}, {displayName}</p>
           </div>
-          <button
-            onClick={() => logout().then(() => router.push('/login'))}
-            className="flex items-center gap-1.5 text-xs opacity-80 hover:opacity-100 transition-opacity"
-          >
-            <LogOut className="h-4 w-4" /> Sign out
-          </button>
+          <div className="flex items-center gap-3">
+            {pendingTotal > 0 ? (
+              <span className="flex items-center gap-1 text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-medium">
+                <Clock className="h-3 w-3" /> {pendingTotal} pending
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-medium">
+                <CheckCircle className="h-3 w-3" /> All done
+              </span>
+            )}
+            <button onClick={() => logout().then(() => router.push('/login'))} className="opacity-75 hover:opacity-100">
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="px-4 py-5 space-y-6">
+      <div className="px-4 py-5 space-y-5">
 
-        {/* ── Assigned Games — rating/hybrid models only ── */}
-        {showGames && <section>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-            <Edit3 className="h-4 w-4" /> My Assigned Games
-          </h2>
+        {allDone && (
+          <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
+            <CheckCircle className="h-4 w-4 shrink-0" />
+            All ratings, reports and assessments are up to date.
+          </div>
+        )}
 
-          {games.length === 0 ? (
-            <div className="bg-card border rounded-xl p-6 text-center text-muted-foreground text-sm">
-              No pending games assigned to you.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {games.map(game => {
-                const pending = isCertPending(game, currentUser!.uid);
-                return (
-                  <div key={game.id} className={cn(
-                    'bg-card border rounded-xl p-4 flex items-center gap-3',
-                    pending ? 'border-amber-300 bg-amber-50/40' : ''
-                  )}>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate">
-                        {game.team1} vs {game.team2}
-                      </p>
-                      <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <CalendarDays className="h-3 w-3" />
-                          {format(new Date(game.date.replace(/-/g, '/')), 'PP')}
-                        </span>
-                        {game.venue && (
-                          <span className="flex items-center gap-1 truncate">
-                            <MapPin className="h-3 w-3" />
-                            <span className="truncate">{game.venue}</span>
-                          </span>
-                        )}
-                      </div>
-                      {pending ? (
-                        <Badge variant="destructive" className="mt-1.5 text-xs gap-1 h-5">
-                          <AlertCircle className="h-3 w-3" /> Cert. pending
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="mt-1.5 text-xs gap-1 h-5">
-                          <CheckCircle className="h-3 w-3 text-green-500" /> Certified
-                        </Badge>
-                      )}
-                    </div>
-                    <Link href={rateHref(game.id)}>
-                      <Button size="sm" className="shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground h-9 px-3 text-xs">
-                        <Edit3 className="h-3.5 w-3.5 mr-1.5" /> Rate
-                      </Button>
-                    </Link>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>}
+        {showGames && games.length > 0 && (
+          <section>
+            <SectionHeader title="Next game to rate" moreCount={games.length - 1} />
+            {nextGame && (
+              <ActionCard
+                iconBg="#E6F1FB"
+                icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="#185FA5" strokeWidth="1.3"/><path d="M5 8h2M6 7v2M10 8h2" stroke="#185FA5" strokeWidth="1.3" strokeLinecap="round"/></svg>}
+                title={`${nextGame.team1} vs ${nextGame.team2}`}
+                meta={`${safeFormatDate(nextGame.date)}${nextGame.seriesName ? ` · ${nextGame.seriesName}` : ''}`}
+                isPending={nextGame.isPending}
+                onClick={() => router.push(rateHref(nextGame.id))}
+              />
+            )}
+          </section>
+        )}
 
-        {/* ── Recent Scorecards — performance/hybrid models only ── */}
-        {showScorecards && <section>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-            <FileText className="h-4 w-4" /> Match Reports
-          </h2>
+        {showScorecards && scorecards.length > 0 && (
+          <section>
+            <SectionHeader title="Next match report" moreCount={scorecards.length - 1} />
+            {nextScorecard && (
+              <ActionCard
+                iconBg="#E1F5EE"
+                icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 1h8a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z" stroke="#0F6E56" strokeWidth="1.3"/><path d="M5 5h6M5 8h4" stroke="#0F6E56" strokeWidth="1.3" strokeLinecap="round"/></svg>}
+                title={`${nextScorecard.team1} vs ${nextScorecard.team2}`}
+                meta={`${safeFormatDate(nextScorecard.date)} · ${nextScorecard.hasReport ? 'Submitted' : 'Not submitted'}`}
+                isPending={!nextScorecard.hasReport}
+                onClick={() => router.push(reportHref(nextScorecard.id))}
+              />
+            )}
+          </section>
+        )}
 
-          {scorecards.length === 0 ? (
-            <div className="bg-card border rounded-xl p-6 text-center text-muted-foreground text-sm">
-              No scorecards assigned to you yet.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {scorecards.map(sc => (
-                <div key={sc.id} className="bg-card border rounded-xl p-4 flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate">{sc.team1} vs {sc.team2}</p>
-                    <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <CalendarDays className="h-3 w-3" />
-                        {sc.date ? (() => { try { return format(new Date(sc.date.replace(/-/g, '/')), 'PP'); } catch { return sc.date; } })() : ''}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {assignedScorecardIds.has(sc.id) && (
-                        <Badge className="text-xs h-4 px-1.5 bg-primary/10 text-primary border border-primary/20">
-                          Assigned
-                        </Badge>
-                      )}
-                      {sc.innings.map((inn, i) => (
-                        <Badge key={i} variant="secondary" className="text-xs h-4 px-1.5">
-                          {inn.battingTeam}: {inn.totalRuns}/{inn.wickets}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <Link href={reportHref(sc.id)}>
-                    <Button size="sm" className="shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground h-9 px-3 text-xs">
-                      <FileText className="h-3.5 w-3.5 mr-1.5" /> Report
-                    </Button>
-                  </Link>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        {camps.length > 0 && (
+          <section>
+            <SectionHeader title="Next camp assessment" moreCount={camps.length - 1} />
+            {nextCamp && (
+              <ActionCard
+                iconBg="#FAEEDA"
+                icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1l7 13H1L8 1z" stroke="#854F0B" strokeWidth="1.3" strokeLinejoin="round"/></svg>}
+                title={nextCamp.name}
+                meta={nextCamp.pendingCount > 0 ? 'Assessment pending' : 'All assessed'}
+                isPending={nextCamp.pendingCount > 0}
+                onClick={() => router.push(campHref(nextCamp.id))}
+              />
+            )}
+          </section>
+        )}
 
-        }
-
-        {/* ── Full app link ── */}
-        <div className="pb-4">
-          <Link href="/games" className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Go to full app <ChevronRight className="h-4 w-4" />
+        <div className="pt-2 border-t">
+          <Link href="/" className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground py-2">
+            Go to full app <ChevronRight className="h-3.5 w-3.5" />
           </Link>
         </div>
 
       </div>
     </div>
   );
-}
-
-// ── Helper ────────────────────────────────────────────────────────────────────
-function isCertPending(game: Game, uid: string): boolean {
-  if (!game.selectorUserIds?.includes(uid)) return false;
-  if (game.ratingsFinalized) return false;
-  const cert = game.selectorCertifications?.[uid];
-  if (!cert || cert.status === 'pending') return true;
-  if (cert.status === 'certified' && game.ratingsLastModifiedAt) {
-    return new Date(cert.certifiedAt) < new Date(game.ratingsLastModifiedAt);
-  }
-  return false;
 }
