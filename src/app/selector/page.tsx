@@ -171,7 +171,7 @@ export default function SelectorDashboard() {
   const rateHref = (gameId: string) =>
     isMobile && currentUser ? `/rate/${gameId}?uid=${currentUser.uid}` : `/games/${gameId}/rate-enhanced`;
   const reportHref = (id: string) => `/mobile/scorecard-report/${id}`;
-  const campHref = (id: string) => `/mobile/camp-assessment/${id}`;
+  const campHref = (id: string) => `/rate-camp/${id}?from=selector`;
 
   return (
     <div className="min-h-screen bg-background max-w-lg mx-auto">

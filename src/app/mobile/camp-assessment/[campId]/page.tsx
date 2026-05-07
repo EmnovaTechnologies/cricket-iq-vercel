@@ -67,7 +67,7 @@ function MobileCampAssessmentInner() {
   // Once camp loaded, redirect to assess page
   useEffect(() => {
     if (!isLoading && camp) {
-      router.replace(`/series/${camp.seriesId}/camp/${camp.id}/assess?from=selector`);
+      router.replace(`/rate-camp/${camp.id}?from=selector`);
     }
   }, [isLoading, camp, router]);
 
