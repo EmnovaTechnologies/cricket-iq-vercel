@@ -250,22 +250,24 @@ function RateCampInner() {
     if (isNaN(score)) { toast({ title: 'Enter a valid score', variant: 'destructive' }); return; }
     setIsSavingFitness(true);
     try {
+      const passing = camp.fitnessTestPassingScore || 0;
+      const passed = fitnessPassed !== null ? fitnessPassed : score >= passing;
       await recordCampFitnessResultAction({
         campId, playerId: currentPlayer.playerId,
         organizationId: camp.organizationId,
-        score, passed: fitnessPassed ?? score >= (camp.fitnessTestPassingScore || 0),
+        score, passed,
         testType: camp.fitnessTestType || 'Fitness Test',
         recordedByUid: currentUser.uid,
       });
       const updated: CampFitnessResult = {
         id: '', campId, playerId: currentPlayer.playerId,
         organizationId: camp.organizationId,
-        score, passed: fitnessPassed ?? score >= (camp.fitnessTestPassingScore || 0),
+        score, passed,
         testType: camp.fitnessTestType || 'Fitness Test',
         recordedByUid: currentUser.uid, recordedAt: new Date().toISOString(),
       };
       setFitnessResults(prev => { const n = new Map(prev); n.set(currentPlayer.playerId, updated); return n; });
-      toast({ title: `Fitness recorded for Bib #${currentPlayer.bibNumber}` });
+      toast({ title: `Fitness recorded for Bib #${currentPlayer.bibNumber} — ${passed ? 'PASS ✓' : 'FAIL ✗'}` });
     } catch (e: any) {
       toast({ title: 'Save failed', description: e.message, variant: 'destructive' });
     } finally {
@@ -581,7 +583,14 @@ function RateCampInner() {
                 step="0.1"
                 placeholder={`e.g. ${camp.fitnessTestPassingScore || '16.1'}`}
                 value={fitnessScore}
-                onChange={e => setFitnessScore(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value;
+                  setFitnessScore(val);
+                  if (camp.fitnessTestPassingScore && val) {
+                    const score = parseFloat(val);
+                    if (!isNaN(score)) setFitnessPassed(score >= camp.fitnessTestPassingScore);
+                  }
+                }}
                 className="text-lg font-bold text-center"
               />
             </div>
