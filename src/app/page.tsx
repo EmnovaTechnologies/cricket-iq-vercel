@@ -328,6 +328,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const {
     activeOrganizationDetails,
+    activeOrganizationId,
     isAuthLoading,
     userProfile,
     currentUser,
