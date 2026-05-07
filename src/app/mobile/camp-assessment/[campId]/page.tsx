@@ -152,6 +152,7 @@ function MobileCampAssessmentInner() {
           initialAssessments={campAssessments}
           initialFitness={campFitness}
           defaultTab="assessment"
+          isMobile={true}
         />
       </div>
 

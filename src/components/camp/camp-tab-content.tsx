@@ -69,6 +69,7 @@ interface CampTabContentProps {
   initialAssessments?: CampAssessment[];
   initialFitness?: CampFitnessResult[];
   defaultTab?: 'players' | 'assessment' | 'fitness' | 'results';
+  isMobile?: boolean;
 }
 
 export function CampTabContent({
@@ -79,6 +80,7 @@ export function CampTabContent({
   initialAssessments = [],
   initialFitness = [],
   defaultTab = 'players',
+  isMobile = false,
 }: CampTabContentProps) {
   const { currentUser, userProfile, activeOrganizationId, effectivePermissions } = useAuth();
   const canManage = !!(effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] ||
@@ -340,6 +342,13 @@ export function CampTabContent({
 
   const sortedPlayers = useMemo(() => [...campPlayers].sort((a, b) => a.bibNumber - b.bibNumber), [campPlayers]);
 
+  // On mobile, redirect directly to the assess scratchpad
+  useEffect(() => {
+    if (isMobile && defaultTab === 'assessment') {
+      router.replace(`/series/${seriesId}/camp/${camp.id}/assess${navParam}`);
+    }
+  }, [isMobile, defaultTab, seriesId, camp.id, navParam, router]);
+
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
     <Tabs defaultValue={defaultTab} className="mt-2">
@@ -456,11 +465,13 @@ export function CampTabContent({
       <TabsContent value="assessment" className="space-y-4 mt-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-sm text-muted-foreground">{assessments.length} assessments from {new Set(assessments.map(a => a.assessedByUid)).size} coaches</p>
+          {!isMobile && (
           <Button asChild variant="outline" size="sm">
             <Link href={`/series/${seriesId}/camp/${camp.id}/assess${navParam}`}>
               <Star className="mr-2 h-3.5 w-3.5" /> Mobile Assessment View
             </Link>
           </Button>
+          )}
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Sort:</span>
             {(['avgOverall', 'bibNumber'] as const).map(key => (
