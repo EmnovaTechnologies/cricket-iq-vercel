@@ -18,7 +18,9 @@ import { format, parseISO, startOfDay } from 'date-fns';
 
 function safeFormatDate(date: string): string {
   if (!date) return '';
-  try { return format(parseISO(date.replace(/-/g, '/')), 'MMM d'); } catch { return date; }
+  try { return format(parseISO(date), 'MMM d'); } catch {
+    try { return format(new Date(date), 'MMM d'); } catch { return date.slice(0, 10); }
+  }
 }
 
 function isCertPending(game: Game, uid: string): boolean {
@@ -40,22 +42,40 @@ function DoneBadge() {
   return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-800">Done</span>;
 }
 
-function ActionCard({ iconBg, icon, title, meta, isPending, onClick }: {
+function ActionCard({ iconBg, icon, title, meta, isPending, onClick,
+  onPrev, onNext, hasPrev, hasNext, position }: {
   iconBg: string; icon: React.ReactNode; title: string; meta: string;
   isPending: boolean; onClick: () => void;
+  onPrev?: () => void; onNext?: () => void;
+  hasPrev?: boolean; hasNext?: boolean; position?: string;
 }) {
   return (
-    <div onClick={onClick} className="flex items-center gap-3 p-3 bg-card border rounded-xl cursor-pointer active:bg-muted transition-colors">
-      <div style={{ width: 36, height: 36, borderRadius: 10, background: iconBg, flexShrink: 0 }} className="flex items-center justify-center">
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium truncate">{title}</div>
-        <div className="text-xs text-muted-foreground mt-0.5 truncate">{meta}</div>
-      </div>
-      <div className="flex items-center gap-1.5 shrink-0">
-        {isPending ? <PendingDot /> : <DoneBadge />}
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+    <div className="bg-card border rounded-xl overflow-hidden">
+      {position && (
+        <div className="flex items-center justify-between px-3 pt-2">
+          <button onClick={onPrev} disabled={!hasPrev}
+            className="h-7 w-7 rounded-full border flex items-center justify-center disabled:opacity-20 hover:bg-muted transition-colors">
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <span className="text-[10px] text-muted-foreground">{position}</span>
+          <button onClick={onNext} disabled={!hasNext}
+            className="h-7 w-7 rounded-full border flex items-center justify-center disabled:opacity-20 hover:bg-muted transition-colors">
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+      <div onClick={onClick} className="flex items-center gap-3 p-3 cursor-pointer active:bg-muted transition-colors">
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: iconBg, flexShrink: 0 }} className="flex items-center justify-center">
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium truncate">{title}</div>
+          <div className="text-xs text-muted-foreground mt-0.5 truncate">{meta}</div>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isPending ? <PendingDot /> : <DoneBadge />}
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </div>
       </div>
     </div>
   );
@@ -227,30 +247,20 @@ export default function SelectorDashboard() {
           const game = games[Math.min(gameIndex, games.length - 1)];
           return (
             <section>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Games to rate</span>
-                <span className="text-xs text-muted-foreground">{gameIndex + 1} of {games.length}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setGameIndex(i => Math.max(0, i - 1))} disabled={gameIndex === 0}
-                  className="h-8 w-8 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-20 hover:bg-muted transition-colors">
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <div className="flex-1">
-                  <ActionCard
-                    iconBg="#E6F1FB"
-                    icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="#185FA5" strokeWidth="1.3"/><path d="M5 8h2M6 7v2M10 8h2" stroke="#185FA5" strokeWidth="1.3" strokeLinecap="round"/></svg>}
-                    title={`${game.team1} vs ${game.team2}`}
-                    meta={`${safeFormatDate(game.date)}${game.seriesName ? ` · ${game.seriesName}` : ''}`}
-                    isPending={game.isPending}
-                    onClick={() => router.push(rateHref(game.id))}
-                  />
-                </div>
-                <button onClick={() => setGameIndex(i => Math.min(games.length - 1, i + 1))} disabled={gameIndex === games.length - 1}
-                  className="h-8 w-8 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-20 hover:bg-muted transition-colors">
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">Games to rate</span>
+              <ActionCard
+                iconBg="#E6F1FB"
+                icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="#185FA5" strokeWidth="1.3"/><path d="M5 8h2M6 7v2M10 8h2" stroke="#185FA5" strokeWidth="1.3" strokeLinecap="round"/></svg>}
+                title={`${game.team1} vs ${game.team2}`}
+                meta={`${safeFormatDate(game.date)}${game.seriesName ? ` · ${game.seriesName}` : ''}`}
+                isPending={game.isPending}
+                onClick={() => router.push(rateHref(game.id))}
+                position={games.length > 1 ? `${gameIndex + 1} of ${games.length}` : undefined}
+                hasPrev={gameIndex > 0}
+                hasNext={gameIndex < games.length - 1}
+                onPrev={() => setGameIndex(i => Math.max(0, i - 1))}
+                onNext={() => setGameIndex(i => Math.min(games.length - 1, i + 1))}
+              />
             </section>
           );
         })()}
@@ -259,30 +269,20 @@ export default function SelectorDashboard() {
           const sc = scorecards[Math.min(scorecardIndex, scorecards.length - 1)];
           return (
             <section>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Match reports</span>
-                <span className="text-xs text-muted-foreground">{scorecardIndex + 1} of {scorecards.length}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setScorecardIndex(i => Math.max(0, i - 1))} disabled={scorecardIndex === 0}
-                  className="h-8 w-8 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-20 hover:bg-muted transition-colors">
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <div className="flex-1">
-                  <ActionCard
-                    iconBg="#E1F5EE"
-                    icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 1h8a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z" stroke="#0F6E56" strokeWidth="1.3"/><path d="M5 5h6M5 8h4" stroke="#0F6E56" strokeWidth="1.3" strokeLinecap="round"/></svg>}
-                    title={`${sc.team1} vs ${sc.team2}`}
-                    meta={`${safeFormatDate(sc.date)} · ${sc.hasReport ? 'Submitted' : 'Not submitted'}`}
-                    isPending={!sc.hasReport}
-                    onClick={() => router.push(reportHref(sc.id))}
-                  />
-                </div>
-                <button onClick={() => setScorecardIndex(i => Math.min(scorecards.length - 1, i + 1))} disabled={scorecardIndex === scorecards.length - 1}
-                  className="h-8 w-8 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-20 hover:bg-muted transition-colors">
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">Match reports</span>
+              <ActionCard
+                iconBg="#E1F5EE"
+                icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 1h8a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z" stroke="#0F6E56" strokeWidth="1.3"/><path d="M5 5h6M5 8h4" stroke="#0F6E56" strokeWidth="1.3" strokeLinecap="round"/></svg>}
+                title={`${sc.team1} vs ${sc.team2}`}
+                meta={`${safeFormatDate(sc.date)} · ${sc.hasReport ? 'Submitted' : 'Not submitted'}`}
+                isPending={!sc.hasReport}
+                onClick={() => router.push(reportHref(sc.id))}
+                position={scorecards.length > 1 ? `${scorecardIndex + 1} of ${scorecards.length}` : undefined}
+                hasPrev={scorecardIndex > 0}
+                hasNext={scorecardIndex < scorecards.length - 1}
+                onPrev={() => setScorecardIndex(i => Math.max(0, i - 1))}
+                onNext={() => setScorecardIndex(i => Math.min(scorecards.length - 1, i + 1))}
+              />
             </section>
           );
         })()}
@@ -291,36 +291,25 @@ export default function SelectorDashboard() {
           const camp = camps[Math.min(campIndex, camps.length - 1)];
           return (
             <section>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Camp assessments</span>
-                <span className="text-xs text-muted-foreground">{campIndex + 1} of {camps.length}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setCampIndex(i => Math.max(0, i - 1))} disabled={campIndex === 0}
-                  className="h-8 w-8 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-20 hover:bg-muted transition-colors">
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <div className="flex-1">
-                  <ActionCard
-                    iconBg="#FAEEDA"
-                    icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1l7 13H1L8 1z" stroke="#854F0B" strokeWidth="1.3" strokeLinejoin="round"/></svg>}
-                    title={camp.name}
-                    meta={camp.pendingCount > 0
-                      ? `${camp.pendingCount} player${camp.pendingCount !== 1 ? 's' : ''} not assessed`
-                      : 'All players assessed'}
-                    isPending={camp.pendingCount > 0}
-                    onClick={() => router.push(campHref(camp.id))}
-                  />
-                </div>
-                <button onClick={() => setCampIndex(i => Math.min(camps.length - 1, i + 1))} disabled={campIndex === camps.length - 1}
-                  className="h-8 w-8 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-20 hover:bg-muted transition-colors">
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">Camp assessments</span>
+              <ActionCard
+                iconBg="#FAEEDA"
+                icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1l7 13H1L8 1z" stroke="#854F0B" strokeWidth="1.3" strokeLinejoin="round"/></svg>}
+                title={camp.name}
+                meta={camp.pendingCount > 0
+                  ? `${camp.pendingCount} player${camp.pendingCount !== 1 ? 's' : ''} not assessed`
+                  : 'All players assessed'}
+                isPending={camp.pendingCount > 0}
+                onClick={() => router.push(campHref(camp.id))}
+                position={camps.length > 1 ? `${campIndex + 1} of ${camps.length}` : undefined}
+                hasPrev={campIndex > 0}
+                hasNext={campIndex < camps.length - 1}
+                onPrev={() => setCampIndex(i => Math.max(0, i - 1))}
+                onNext={() => setCampIndex(i => Math.min(camps.length - 1, i + 1))}
+              />
             </section>
           );
         })()}
-
         <div className="pt-2 border-t">
           <Link href="/" className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground py-2">
             Go to full app <ChevronRight className="h-3.5 w-3.5" />
