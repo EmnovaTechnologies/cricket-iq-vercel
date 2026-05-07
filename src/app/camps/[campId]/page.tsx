@@ -45,12 +45,17 @@ function CampDetailInner() {
   const fromSeriesId = searchParams.get('seriesId') || '';
   const backHref = fromSeries && fromSeriesId
     ? `/series/${fromSeriesId}/details?tab=camp`
-    : '/camps';
-  const backLabel = fromSeries ? 'Back to Series' : 'Back to Camps';
+    : (isSelector && isMobile ? '/selector' : '/camps');
+  const backLabel = fromSeries ? 'Back to Series' : (isSelector && isMobile ? 'Back to Tasks' : 'Back to Camps');
   // Pass navigation context to sub-pages
   const navParam = fromSeries ? `?from=series&seriesId=${fromSeriesId}` : '?from=camps';
   const { currentUser, userProfile, activeOrganizationId, effectivePermissions } = useAuth();
   const { toast } = useToast();
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    setIsMobile(window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
+  }, []);
 
   const [camp, setCamp] = useState<SelectionCamp | null>(null);
   const [seriesName, setSeriesName] = useState<string>('');
@@ -73,6 +78,15 @@ function CampDetailInner() {
   const canManage = effectivePermissions[PERMISSIONS.SERIES_MANAGE_TEAMS_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ASSIGNED] ||
     effectivePermissions[PERMISSIONS.ORGANIZATIONS_EDIT_ANY];
+
+  const isSelector = !canManage && !!userProfile?.roles?.includes('selector');
+
+  // Auto-redirect selector to mobile assessment page on mobile
+  useEffect(() => {
+    if (isSelector && isMobile && campId) {
+      router.replace(`/mobile/camp-assessment/${campId}`);
+    }
+  }, [isSelector, isMobile, campId, router]);
 
   useEffect(() => {
     if (!campId || !activeOrganizationId) return;

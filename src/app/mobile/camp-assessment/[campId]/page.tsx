@@ -97,48 +97,48 @@ function MobileCampAssessmentInner() {
     >
       {/* Top nav bar */}
       <div className="sticky top-0 z-10 bg-background border-b px-3 py-2 flex items-center gap-3">
-        <Link href="/" className="shrink-0">
+        <Link href="/selector" className="shrink-0">
           <ArrowLeft className="h-5 w-5 text-muted-foreground" />
         </Link>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium truncate">{camp.name}</div>
           <div className="text-xs text-muted-foreground capitalize">{camp.status}{camp.venue ? ` · ${camp.venue}` : ''}</div>
         </div>
-        {assignedIds.length > 1 && (
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={() => navigateTo(currentIndex - 1)}
-              disabled={currentIndex === 0}
-              className="w-7 h-7 flex items-center justify-center rounded border disabled:opacity-30"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-xs text-muted-foreground px-1">
-              {currentIndex + 1}/{assignedIds.length}
-            </span>
-            <button
-              onClick={() => navigateTo(currentIndex + 1)}
-              disabled={currentIndex === assignedIds.length - 1}
-              className="w-7 h-7 flex items-center justify-center rounded border disabled:opacity-30"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* Dot indicators */}
+      {/* Swipe navigation bar — matches rate page style */}
       {assignedIds.length > 1 && (
-        <div className="flex justify-center gap-1.5 py-2">
-          {assignedIds.map((_, i) => (
-            <div
-              key={i}
-              onClick={() => navigateTo(i)}
-              className={`rounded-full cursor-pointer transition-all ${
-                i === currentIndex ? 'w-2 h-2 bg-primary' : 'w-1.5 h-1.5 bg-border'
-              }`}
-            />
-          ))}
+        <div className="flex items-center gap-2 px-3 py-2 border-b">
+          <button
+            onClick={() => navigateTo(currentIndex - 1)}
+            disabled={currentIndex === 0}
+            className="h-10 w-10 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-30 hover:bg-muted transition-colors"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <div className="flex-1 flex flex-col items-center gap-1">
+            <span className="text-xs text-muted-foreground">
+              {currentIndex + 1} of {assignedIds.length} camps
+            </span>
+            <div className="flex gap-1.5">
+              {assignedIds.map((_, i) => (
+                <div
+                  key={i}
+                  onClick={() => navigateTo(i)}
+                  className={`rounded-full cursor-pointer transition-all ${
+                    i === currentIndex ? 'w-2 h-2 bg-primary' : 'w-1.5 h-1.5 bg-border'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+          <button
+            onClick={() => navigateTo(currentIndex + 1)}
+            disabled={currentIndex === assignedIds.length - 1}
+            className="h-10 w-10 rounded-full border flex items-center justify-center shrink-0 disabled:opacity-30 hover:bg-muted transition-colors"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
         </div>
       )}
 
@@ -155,13 +155,8 @@ function MobileCampAssessmentInner() {
         />
       </div>
 
-      {/* Swipe hint */}
       {assignedIds.length > 1 && (
-        <div className="text-center text-xs text-muted-foreground py-3 flex items-center justify-center gap-1">
-          <ChevronLeft className="h-3 w-3" />
-          Swipe to navigate camps
-          <ChevronRight className="h-3 w-3" />
-        </div>
+        <p className="text-center text-xs text-muted-foreground py-3">← swipe to navigate →</p>
       )}
     </div>
   );
