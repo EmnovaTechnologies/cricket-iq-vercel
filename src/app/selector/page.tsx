@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { getGamesForUserViewAction } from '@/lib/actions/game-actions';
 import { getScorecardsForSelectorAction } from '@/lib/actions/scorecard-actions';
-import { getCampsForOrgAction } from '@/lib/actions/camp-actions';
+import { getCampsForOrgAction, getCampPlayersAction, getMyCampAssessmentsAction } from '@/lib/actions/camp-actions';
 import { getUserReportsForGameAction } from '@/lib/actions/match-report-actions';
 import type { Game, MatchScorecard, SelectionCamp } from '@/types';
 import { Loader2, ChevronRight, CheckCircle, Clock, LogOut } from 'lucide-react';
@@ -129,16 +129,30 @@ export default function SelectorDashboard() {
           .sort((a, b) => (a.hasReport ? 1 : 0) - (b.hasReport ? 1 : 0));
         setScorecards(scWithStatus);
 
-        // Camps — filter to assigned
+        // Camps — filter to assigned, check real assessment counts
         const allCamps = campsResult.success ? campsResult.camps || [] : [];
-        const assignedCamps = allCamps
-          .filter(c => (c.assignedSelectors || []).some((s: any) => s.uid === currentUser.uid) && c.status !== 'completed')
-          .map(c => ({ ...c, pendingCount: c.status === 'active' ? 1 : 0 }));
-        setCamps(assignedCamps);
+        const filteredCamps = allCamps.filter(c =>
+          (c.assignedSelectors || []).some((s: any) => s.uid === currentUser.uid) && c.status !== 'completed'
+        );
+        const campsWithCounts = await Promise.all(filteredCamps.map(async c => {
+          try {
+            const [playersRes, assessRes] = await Promise.all([
+              getCampPlayersAction(c.id),
+              getMyCampAssessmentsAction(c.id, currentUser.uid),
+            ]);
+            const totalPlayers = (playersRes.players || []).filter(p => p.status !== 'withdrawn').length;
+            const assessedBibs = new Set((assessRes.assessments || []).map(a => a.bibNumber));
+            const pendingCount = Math.max(0, totalPlayers - assessedBibs.size);
+            return { ...c, pendingCount };
+          } catch {
+            return { ...c, pendingCount: 0 };
+          }
+        }));
+        setCamps(campsWithCounts);
 
         const gPending = assignedGames.filter(g => g.isPending).length;
         const scPending = scWithStatus.filter(s => !s.hasReport).length;
-        const cPending = assignedCamps.filter(c => c.pendingCount > 0).length;
+        const cPending = campsWithCounts.filter(c => c.pendingCount > 0).length;
         setPendingTotal(gPending + scPending + cPending);
       } catch (e) {
         console.error('Selector dashboard load error:', e);
@@ -248,7 +262,9 @@ export default function SelectorDashboard() {
                 iconBg="#FAEEDA"
                 icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1l7 13H1L8 1z" stroke="#854F0B" strokeWidth="1.3" strokeLinejoin="round"/></svg>}
                 title={nextCamp.name}
-                meta={nextCamp.pendingCount > 0 ? 'Assessment pending' : 'All assessed'}
+                meta={nextCamp.pendingCount > 0
+                  ? `${nextCamp.pendingCount} player${nextCamp.pendingCount !== 1 ? 's' : ''} not assessed`
+                  : 'All players assessed'}
                 isPending={nextCamp.pendingCount > 0}
                 onClick={() => router.push(campHref(nextCamp.id))}
               />
