@@ -519,14 +519,17 @@ export async function getAvailableSeriesForPlayer(
 
   if (spSnap.empty) return [];
 
-  // Get all series that have scorecards in this org
+  // Get all series that have scorecards in this org — no orderBy to avoid index requirement
   const seriesSnap = await adminDb.collection('series')
     .where('organizationId', '==', organizationId)
-    .orderBy('createdAt', 'desc')
     .get();
 
-  return seriesSnap.docs.map(d => ({
-    id: d.id,
-    name: d.data().name || 'Unknown series',
-  }));
+  return seriesSnap.docs
+    .map(d => ({
+      id: d.id,
+      name: d.data().name || 'Unknown series',
+      createdAt: d.data().createdAt?.toMillis?.() || 0,
+    }))
+    .sort((a, b) => b.createdAt - a.createdAt) // most recent first
+    .map(({ id, name }) => ({ id, name }));
 }
