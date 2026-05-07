@@ -534,6 +534,15 @@ export default function DashboardPage() {
 
   useEffect(() => { if (mounted && activeOrganizationDetails) fetchCounts(); }, [mounted, activeOrganizationDetails]);
 
+  const isSelector = userProfile?.roles?.includes('selector') &&
+    !userProfile?.roles?.some(r => ['admin','Organization Admin','Series Admin'].includes(r));
+
+  useEffect(() => {
+    if (isSelector && isMobile && currentUser && activeOrganizationId) {
+      router.replace('/selector');
+    }
+  }, [isSelector, isMobile, currentUser, activeOrganizationId, router]);
+
   const dashboard = useRoleDashboard(counts);
   const today = mounted ? format(new Date(), 'EEEE, MMM d') : '';
 
@@ -579,14 +588,6 @@ export default function DashboardPage() {
   }
 
   const displayName = userProfile?.displayName || userProfile?.email?.split('@')[0] || 'there';
-  const isSelector = userProfile?.roles?.includes('selector') &&
-    !userProfile?.roles?.some(r => ['admin','Organization Admin','Series Admin'].includes(r));
-
-  useEffect(() => {
-    if (isSelector && isMobile && currentUser && activeOrganizationId) {
-      router.replace('/selector');
-    }
-  }, [isSelector, isMobile, currentUser, activeOrganizationId, router]);
 
   // Show spinner while redirecting mobile selector
   if (isSelector && isMobile && currentUser && activeOrganizationId) {
