@@ -19,7 +19,7 @@ import type { CampPlayer, CampAssessment, SelectionCamp } from '@/types';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Star, Loader2, Check } from 'lucide-react';
+import { Star, Loader2, Check, ChevronRight } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -183,10 +183,20 @@ export function CampScratchpad({
     setIsApplying(false);
   };
 
+  const [expandedBibs, setExpandedBibs] = useState<Set<number>>(new Set());
+
+  const toggleExpand = (bib: number) => {
+    setExpandedBibs(prev => {
+      const next = new Set(prev);
+      next.has(bib) ? next.delete(bib) : next.add(bib);
+      return next;
+    });
+  };
+
   const ratingKeys: { key: keyof AssessmentRatings; label: string }[] = [
     { key: 'batting', label: 'Batting' }, { key: 'bowling', label: 'Bowling' },
     { key: 'fielding', label: 'Fielding' }, { key: 'fitness', label: 'Fitness' },
-    { key: 'attitude', label: 'Attitude' }, { key: 'overall', label: 'Overall' },
+    { key: 'attitude', label: 'Attitude' },
   ];
 
   return (
@@ -240,39 +250,66 @@ export function CampScratchpad({
         </CardContent>
       </Card>
 
-      {/* Preview detected bibs */}
+      {/* Preview detected bibs — Option A: compact row + tap to expand */}
       {scratchpadParsed.size > 0 && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-3 space-y-2">
             <p className="text-xs font-medium text-primary">
               Detected {scratchpadParsed.size} bib{scratchpadParsed.size !== 1 ? 's' : ''}:
             </p>
-            <div className="space-y-3 max-h-64 overflow-y-auto">
+            <div className="space-y-1.5">
               {Array.from(scratchpadParsed.entries()).sort((a, b) => a[0] - b[0]).map(([bib, note]) => {
                 const player = campPlayers.find(p => p.bibNumber === bib);
                 const existing = initialAssessments.get(bib);
                 const isLocked = existing?.isLocked === true;
                 const bibRatings = scratchpadRatings.get(bib) || {};
+                const isExpanded = expandedBibs.has(bib);
+                const overallVal = bibRatings.overall || 0;
+
                 return (
-                  <div key={bib} className={`border rounded-lg p-3 space-y-2 ${isLocked ? 'opacity-60 bg-muted/30' : 'bg-background'}`}>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-primary text-sm">#{bib}</span>
-                      {player
-                        ? <span className="text-xs text-muted-foreground">({player.playerPrimarySkill})</span>
-                        : <span className="text-xs text-destructive">(not in camp — will skip)</span>}
-                      {isLocked
-                        ? <span className="text-xs text-destructive font-medium">🔒 Locked</span>
-                        : existing
-                          ? <span className="text-xs text-amber-600">· will append</span>
-                          : <span className="text-xs text-green-600">· new</span>}
+                  <div key={bib} className={`border rounded-lg overflow-hidden ${isLocked ? 'opacity-60' : 'bg-background'}`}>
+                    {/* Compact row */}
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <span className="font-bold text-primary text-sm w-7 shrink-0">#{bib}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-muted-foreground">{player?.playerPrimarySkill || 'Unknown'}</div>
+                        <div className="text-xs text-muted-foreground italic truncate max-w-[120px]">"{note}"</div>
+                      </div>
+                      {/* Overall dots */}
+                      {!isLocked && (
+                        <div className="flex gap-1 shrink-0">
+                          {[1,2,3,4,5].map(n => (
+                            <button key={n} type="button"
+                              onClick={e => { e.stopPropagation(); setRating(bib, 'overall', overallVal === n ? 0 : n); }}
+                              className={`w-3.5 h-3.5 rounded-full border transition-colors ${n <= overallVal ? 'bg-amber-400 border-amber-400' : 'bg-background border-border'}`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {/* Status + expand toggle */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isLocked
+                          ? <span className="text-[10px] text-destructive font-medium">🔒</span>
+                          : existing
+                            ? <span className="text-[10px] text-amber-600">append</span>
+                            : <span className="text-[10px] text-green-600">new</span>}
+                        {!isLocked && (
+                          <button type="button" onClick={() => toggleExpand(bib)}
+                            className="text-muted-foreground hover:text-foreground transition-transform"
+                            style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', display: 'inline-block' }}>
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    {!isLocked && <p className="text-xs text-muted-foreground italic">"{note}"</p>}
-                    {!isLocked && (
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+
+                    {/* Expanded detail — all dimensions */}
+                    {isExpanded && !isLocked && (
+                      <div className="border-t px-3 py-2 bg-muted/30 space-y-1.5">
                         {ratingKeys.map(({ key, label }) => (
-                          <div key={key} className="flex items-center gap-1.5">
-                            <span className="text-xs text-muted-foreground w-14">{label}</span>
-                            <div className="flex gap-0.5">
+                          <div key={key} className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground w-12 shrink-0">{label}</span>
+                            <div className="flex gap-1">
                               {[1,2,3,4,5].map(n => (
                                 <button key={n} type="button"
                                   onClick={() => setRating(bib, key, (bibRatings[key] || 0) === n ? 0 : n)}>
