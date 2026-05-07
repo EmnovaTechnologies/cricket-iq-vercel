@@ -100,9 +100,6 @@ function RateCampInner() {
   const [form, setForm] = useState<AssessmentForm>(emptyForm());
   const [isSaving, setIsSaving] = useState(false);
 
-  // Scratchpad
-  const [scratchpad, setScratchpad] = useState('');
-
   // Fitness
   const [fitnessScore, setFitnessScore] = useState('');
   const [fitnessPassed, setFitnessPassed] = useState<boolean | null>(null);
@@ -151,9 +148,6 @@ function RateCampInner() {
       }
       setIsLoading(false);
     });
-    // Load scratchpad
-    const saved = localStorage.getItem(`scratchpad_${campId}`);
-    if (saved) setScratchpad(saved);
   }, [campId, currentUser]);
 
   // Load form when navigating to a new bib
@@ -521,26 +515,23 @@ function RateCampInner() {
       )}
 
       {/* ── SCRATCHPAD TAB ── */}
-      {tab === 'scratchpad' && (
-        <div className="flex-1 px-4 pb-6 pt-4 space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Use <span className="font-mono font-bold">#N</span> to tag a bib number, e.g. <span className="font-mono">#7 great batting, quick between wickets</span>
-          </p>
-          <Textarea
-            placeholder="#1 good bowling, hard length
-#7 excellent catching
-#14 needs work on batting technique"
-            value={scratchpad}
-            onChange={e => {
-              setScratchpad(e.target.value);
-              localStorage.setItem(`scratchpad_${campId}`, e.target.value);
-            }}
-            rows={16}
-            className="resize-none text-sm font-mono"
-          />
-          <p className="text-xs text-muted-foreground text-center">
-            Notes auto-saved locally. Use the Assess tab to enter star ratings.
-          </p>
+      {tab === 'scratchpad' && camp && (
+        <div className="flex-1 px-4 pb-6 pt-4 flex flex-col items-center justify-center gap-4 text-center">
+          <ClipboardList className="h-10 w-10 text-muted-foreground/40" />
+          <div>
+            <p className="text-sm font-medium">Scratchpad</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Use the full scratchpad with bib autocomplete
+            </p>
+          </div>
+          <Button
+            onClick={() => router.push(`/series/${camp.seriesId}/camp/${camp.id}/assess?from=selector&mode=scratchpad`)}
+            variant="outline"
+            className="gap-2"
+          >
+            <ClipboardList className="h-4 w-4" />
+            Open Scratchpad
+          </Button>
         </div>
       )}
 

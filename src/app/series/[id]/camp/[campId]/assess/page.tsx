@@ -61,23 +61,12 @@ export default function CampAssessPage() {
   const searchParams = useSearchParams();
   const fromSeries = searchParams.get('from') === 'series';
   const fromSeriesId = searchParams.get('seriesId') || seriesId;
-  const fromSelector = searchParams.get('from') === 'selector';
-  const backHref = fromSelector
-    ? '/selector'
-    : fromSeries
+  const backHref = fromSeries
     ? `/camps/${campId}?from=series&seriesId=${fromSeriesId}`
     : `/camps/${campId}?from=camps`;
-  const backLabel = fromSelector ? 'Back to Tasks' : fromSeries ? 'Back to Camp (via Series)' : 'Back to Camp';
+  const backLabel = fromSeries ? 'Back to Camp (via Series)' : 'Back to Camp';
   const { currentUser, userProfile } = useAuth();
   const { toast } = useToast();
-
-  // Selectors are bib-blind — only admins/org-admins/series-admins can see names
-  const canSeeNames = !!(
-    userProfile?.roles?.includes('admin') ||
-    userProfile?.roles?.includes('Organization Admin') ||
-    userProfile?.roles?.includes('Series Admin') ||
-    userProfile?.roles?.includes('Team Manager')
-  );
 
   const [camp, setCamp] = useState<SelectionCamp | null>(null);
   const [campPlayers, setCampPlayers] = useState<CampPlayer[]>([]);
@@ -92,7 +81,9 @@ export default function CampAssessPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [step, setStep] = useState<'bib' | 'assess'>('bib');
-  const [mode, setMode] = useState<'bib' | 'scratchpad'>('bib');
+  const [mode, setMode] = useState<'bib' | 'scratchpad'>(
+    searchParams.get('mode') === 'scratchpad' ? 'scratchpad' : 'bib'
+  );
   const [scratchpad, setScratchpad] = useState('');
   const [scratchpadParsed, setScratchpadParsed] = useState<Map<number, string>>(new Map());
   const [isApplyingScratchpad, setIsApplyingScratchpad] = useState(false);
@@ -617,7 +608,7 @@ ${notes}` : notes;
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   className="pl-9"
-                  placeholder={canSeeNames ? "Search by name or type bib #..." : "Type bib # to find player..."}
+                  placeholder="Search by name or type bib #..."
                   value={bibInput}
                   onChange={e => setBibInput(e.target.value)}
                   onKeyDown={e => {
@@ -645,8 +636,6 @@ ${notes}` : notes;
                       if (!bibInput) return true;
                       const asNum = parseInt(bibInput);
                       if (!isNaN(asNum)) return p.bibNumber === asNum;
-                      // Selectors are bib-blind — name search disabled
-                      if (!canSeeNames) return false;
                       return p.playerName.toLowerCase().includes(bibInput.toLowerCase());
                     })
                     .sort((a, b) => a.bibNumber - b.bibNumber)
@@ -684,9 +673,9 @@ ${notes}` : notes;
                           {/* Bib number */}
                           <span className="text-lg font-bold text-primary w-10 shrink-0">#{p.bibNumber}</span>
 
-                          {/* Player info — skill only for selectors, name shown for admins */}
+                          {/* Player info — skill only, no name in assessment mode */}
                           <div className="flex-1 min-w-0">
-                            {canSeeNames && <p className="text-sm font-medium truncate">{p.playerName}</p>}
+                            <p className="text-sm font-medium truncate">{p.playerName}</p>
                             <p className="text-xs text-muted-foreground">{p.playerPrimarySkill}
                               {p.playerBowlingStyle ? ` · ${p.playerBowlingStyle}` : ''}
                               {p.playerBattingOrder ? ` · ${p.playerBattingOrder}` : ''}
