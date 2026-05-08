@@ -786,3 +786,66 @@ export interface CampPlayerResult {
   // Resolved coach suggested skill (majority vote or latest)
   resolvedSkill: string;
 }
+// ─── Payment / Registration Types ─────────────────────────────────────────────
+// Append these to src/types/index.ts
+
+export interface PendingRegistration {
+  id?: string;                        // Firestore doc ID = stripeSessionId
+  stripeSessionId: string;
+  orgId: string;
+  seriesId: string;
+  playerData: {
+    firstName: string;
+    lastName: string;
+    dateOfBirth: string;              // ISO yyyy-MM-dd
+    gender: string;
+    cricClubsId: string;
+    email: string;
+    primaryTeamId?: string;
+    clubName?: string;
+    primarySkill?: string;
+  };
+  fee: number;                        // cents, after promo
+  originalFee: number;                // cents, before promo
+  promoCodeId?: string;
+  expiresAt: string;                  // ISO — 24 hrs from creation
+  createdAt: string;
+}
+
+export interface PlayerPayment {
+  id?: string;
+  playerId: string;
+  userId: string;
+  seriesId: string;
+  organizationId: string;
+  stripeSessionId: string;
+  stripePaymentIntentId?: string;
+  amount: number;                     // cents paid (0 if waived)
+  originalAmount: number;             // cents before promo
+  promoCodeId?: string;
+  status: 'pending' | 'succeeded' | 'failed' | 'waived';
+  waivedBy?: string;                  // uid of system admin
+  receiptUrl?: string;
+  paidAt?: string;                    // ISO
+  createdAt: string;                  // ISO
+}
+
+export interface PromoCode {
+  id?: string;
+  code: string;
+  seriesId?: string;                  // null = global
+  organizationId?: string;            // null = cross-org
+  discountType: 'percent' | 'fixed';
+  discountValue: number;              // percent: 0-100, fixed: cents
+  maxUses: number;                    // 0 = unlimited
+  usedCount: number;
+  expiresAt?: string;                 // ISO or null
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface RegistrationFeeConfig {
+  defaultFee: number;                 // cents, e.g. 399
+  currency: string;                   // 'usd'
+  isActive: boolean;
+}

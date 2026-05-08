@@ -1,8 +1,14 @@
-
 'use client';
 
+/**
+ * FILE: src/app/register-player/[orgId]/page.tsx
+ *
+ * Reads optional ?seriesId= URL param and passes it to the registration form.
+ * All other logic unchanged from original.
+ */
+
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -18,7 +24,8 @@ import { Button } from '@/components/ui/button';
 export default function PlayerRegistrationPage() {
   const params = useParams<{ orgId: string }>();
   const orgId = params.orgId;
-  const router = useRouter();
+  const searchParams = useSearchParams();
+  const defaultSeriesId = searchParams.get('seriesId') ?? undefined;
 
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -27,7 +34,7 @@ export default function PlayerRegistrationPage() {
 
   useEffect(() => {
     if (!orgId) {
-      setError("No organization ID provided in the URL.");
+      setError('No organization ID provided in the URL.');
       setIsLoading(false);
       return;
     }
@@ -38,15 +45,14 @@ export default function PlayerRegistrationPage() {
       try {
         const orgData = await getPublicOrganizationDetails(orgId);
         if (!orgData || orgData.status !== 'active') {
-          throw new Error("This organization is not active or does not exist.");
+          throw new Error('This organization is not active or does not exist.');
         }
         setOrganization(orgData as Organization);
 
         const orgTeams = await getPublicOrgTeams(orgId);
         setTeams(orgTeams as Team[]);
-
       } catch (err: any) {
-        setError(err.message || "Could not load organization details.");
+        setError(err.message || 'Could not load organization details.');
         setOrganization(null);
         setTeams([]);
       } finally {
@@ -75,18 +81,15 @@ export default function PlayerRegistrationPage() {
           <AlertDescription>
             {error}
             <Button asChild variant="outline" className="mt-4">
-                <Link href="/">Return to Homepage</Link>
+              <Link href="/">Return to Homepage</Link>
             </Button>
           </AlertDescription>
         </Alert>
       </div>
     );
   }
-  
-  if (!organization) {
-    return null; // Should be covered by error state
-  }
 
+  if (!organization) return null;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -94,23 +97,29 @@ export default function PlayerRegistrationPage() {
         <CardHeader className="text-center">
           <div className="flex justify-center items-center gap-3 mb-2">
             {organization.branding?.logoUrl ? (
-                <Image
-                    src={organization.branding.logoUrl}
-                    alt={`${organization.name} Logo`}
-                    width={48}
-                    height={48}
-                    className="h-12 w-12 object-contain rounded-md"
-                    data-ai-hint="organization logo medium"
-                />
+              <Image
+                src={organization.branding.logoUrl}
+                alt={`${organization.name} Logo`}
+                width={48}
+                height={48}
+                className="h-12 w-12 object-contain rounded-md"
+                data-ai-hint="organization logo medium"
+              />
             ) : (
-                <Building className="h-10 w-10 text-muted-foreground" />
+              <Building className="h-10 w-10 text-muted-foreground" />
             )}
-           </div>
+          </div>
           <CardTitle className="text-2xl font-headline text-primary">Player Registration</CardTitle>
-          <CardDescription>Register as a player for <strong className="text-accent">{organization.name}</strong>.</CardDescription>
+          <CardDescription>
+            Register as a player for <strong className="text-accent">{organization.name}</strong>.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <PlayerRegistrationForm organization={organization} teams={teams} />
+          <PlayerRegistrationForm
+            organization={organization}
+            teams={teams}
+            defaultSeriesId={defaultSeriesId}
+          />
         </CardContent>
       </Card>
     </div>

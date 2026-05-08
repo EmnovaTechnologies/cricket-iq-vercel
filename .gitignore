@@ -66,3 +66,4 @@ pnpm-debug.log*
 scorecard.html
 scorecard-rendered.html
 scrape-scorecard.mjs
+.env.local
