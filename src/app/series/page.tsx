@@ -10,7 +10,6 @@ import type { Series } from '@/types';
 import { PlusCircle, Layers, Filter, Upload, AlertTriangle, Info, Loader2, LayoutGrid, List, Lock, CreditCard } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { archiveSeriesAction, unarchiveSeriesAction } from '@/lib/actions/series-actions';
 import { checkSeriesBulkDeletableAction } from '@/lib/actions/series-admin-actions';
