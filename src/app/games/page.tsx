@@ -503,22 +503,22 @@ function GamesPageInner() {
                           </div>
                         )}
                       </div>
-                      {/* Lock overlay — My Stats card style */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-start pt-6 px-4 gap-4 bg-background/95 rounded-lg">
-                        <div className="h-14 w-14 rounded-full bg-card border flex items-center justify-center">
+                      {/* Lock overlay — solid background for prominence */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-start pt-6 px-4 gap-4 rounded-lg" style={{ background: 'hsl(var(--background) / 0.97)', backdropFilter: 'none' }}>
+                        <div className="h-14 w-14 rounded-full bg-muted border border-border flex items-center justify-center">
                           <Lock className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <div className="text-center">
-                          <p className="font-medium text-base text-foreground mb-1">
+                          <p className="font-semibold text-base text-foreground mb-1">
                             {lockedGames.length} {lockedGames.length === 1 ? 'game' : 'games'} locked
                           </p>
                           <p className="text-sm text-muted-foreground max-w-[240px] leading-relaxed">
                             Register for a series to unlock full game access.
                           </p>
                         </div>
-                        <div className="w-full max-w-sm bg-card border rounded-lg p-4">
+                        <div className="w-full max-w-sm border-2 border-border rounded-lg p-4 bg-card shadow-sm">
                           <div className="flex items-start gap-3">
-                            <CreditCard className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                            <CreditCard className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                             <div>
                               <p className="text-sm font-medium text-foreground mb-0.5">Complete registration</p>
                               <p className="text-xs text-muted-foreground leading-relaxed">Register for a series to unlock all games.</p>
@@ -526,7 +526,7 @@ function GamesPageInner() {
                           </div>
                           <Link
                             href={`/register-player/${activeOrganizationId}`}
-                            className="mt-3 flex items-center justify-center w-full px-4 py-2 rounded-md border bg-card text-sm font-medium hover:bg-muted transition-colors"
+                            className="mt-3 flex items-center justify-center w-full px-4 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
                           >
                             Register now
                           </Link>
