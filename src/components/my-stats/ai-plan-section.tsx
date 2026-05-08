@@ -6,6 +6,7 @@ import {
   generatePlayerAIPlanAction,
   loadImprovementPlanAction,
 } from '@/lib/actions/player-ai-plan-action';
+import { getPeerComparisonAction } from '@/lib/actions/player-stats-action';
 import type { AIPlanSuggestion } from '@/lib/actions/player-ai-plan-action';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ interface Props {
   stats: PlayerStatsResult;
   playerId: string;
   seriesId: string;
+  organizationId: string;
 }
 
 const impactColors: Record<string, string> = {
@@ -24,7 +26,7 @@ const impactColors: Record<string, string> = {
   low:    'bg-muted text-muted-foreground',
 };
 
-export function AiPlanSection({ stats, playerId, seriesId }: Props) {
+export function AiPlanSection({ stats, playerId, seriesId, organizationId }: Props) {
   const [suggestions, setSuggestions] = useState<AIPlanSuggestion[] | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,7 +52,10 @@ export function AiPlanSection({ stats, playerId, seriesId }: Props) {
     setIsGenerating(true);
     setError(null);
     try {
-      const result = await generatePlayerAIPlanAction(stats, playerId, seriesId);
+      // Fetch peer data to enrich the plan
+      const peerRes = await getPeerComparisonAction(playerId, seriesId, organizationId);
+      const peerData = peerRes.success && peerRes.peers.length >= 2 ? peerRes : undefined;
+      const result = await generatePlayerAIPlanAction(stats, playerId, seriesId, peerData);
       if (result.success && result.suggestions) {
         setSuggestions(result.suggestions);
         setGeneratedAt(result.generatedAt || new Date().toISOString());

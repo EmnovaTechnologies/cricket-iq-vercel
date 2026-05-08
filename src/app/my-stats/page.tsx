@@ -170,7 +170,7 @@ export default function MyStatsPage() {
           />
           <FeedbackSection feedback={stats.feedback} />
           <CampSection campPerformance={stats.campPerformance} />
-          <AiPlanSection stats={stats} playerId={playerId || ''} seriesId={selectedSeriesId} />
+          <AiPlanSection stats={stats} playerId={playerId || ''} seriesId={selectedSeriesId} organizationId={activeOrganizationId || ''} />
         </>
       )}
 

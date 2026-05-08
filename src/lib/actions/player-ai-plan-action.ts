@@ -79,7 +79,8 @@ export interface AIPlanResult {
 export async function generatePlayerAIPlanAction(
   stats: PlayerStatsResult,
   playerId: string,
-  seriesId: string
+  seriesId: string,
+  peerData?: { primarySkill: string; peers: any[]; currentPlayerRank: number }
 ): Promise<AIPlanResult> {
   try {
     if (!stats.aggregated) {
@@ -89,7 +90,7 @@ export async function generatePlayerAIPlanAction(
     const client = new Anthropic();
 
     const agg = stats.aggregated;
-    const camp = stats.campPerformance[0]; // most recent camp if any
+    const camp = stats.campPerformance[0];
 
     // Build benchmark summary
     const benchmarkSummary = stats.benchmarks.map(b => {
@@ -97,7 +98,7 @@ export async function generatePlayerAIPlanAction(
       return `- ${b.label}: player value ${b.playerValue} (${tier} of series, series median ${b.seriesMedian})`;
     }).join('\n');
 
-    // Build feedback summary (dimension + reason only, no names)
+    // Build feedback summary
     const feedbackSummary = stats.feedback.length === 0
       ? 'No selector feedback available.'
       : stats.feedback.map(f => `- ${f.dimension} (${f.delta > 0 ? '+' : ''}${f.delta}): ${f.reason}`).join('\n');
@@ -106,6 +107,26 @@ export async function generatePlayerAIPlanAction(
     const campSummary = !camp
       ? 'No camp data available.'
       : `Batting: ${camp.avgBatting}/5, Bowling: ${camp.avgBowling}/5, Fielding: ${camp.avgFielding}/5, Fitness: ${camp.avgFitness}/5, Attitude: ${camp.avgAttitude}/5, Overall: ${camp.avgOverall}/5. Fitness test: ${camp.fitnessPassed === true ? 'Passed' : camp.fitnessPassed === false ? 'Failed' : 'No data'}.`;
+
+    // Build peer comparison summary
+    let peerSummary = 'No peer comparison data available.';
+    if (peerData && peerData.peers.length >= 2) {
+      const me = peerData.peers.find(p => p.isCurrentPlayer);
+      const others = peerData.peers.filter(p => !p.isCurrentPlayer);
+      if (me) {
+        const peerMedian = (arr: number[]) => {
+          const sorted = [...arr].sort((a, b) => a - b);
+          return sorted[Math.floor(sorted.length / 2)] || 0;
+        };
+        const lines = [
+          `Peer group: top ${peerData.peers.length} ${peerData.primarySkill} players in series (ranked #${peerData.currentPlayerRank})`,
+          `Bowling — Wickets: ${me.wickets} (peer median: ${peerMedian(others.map((p: any) => p.wickets))}), Economy: ${me.economy} (peer median: ${peerMedian(others.map((p: any) => p.economy))}), Bowling SR: ${me.bowlingSR} (peer median: ${peerMedian(others.map((p: any) => p.bowlingSR))})`,
+          `Batting — Runs: ${me.runs} (peer median: ${peerMedian(others.map((p: any) => p.runs))}), SR: ${me.strikeRate} (peer median: ${peerMedian(others.map((p: any) => p.strikeRate))})`,
+          `Fielding — Catches: ${me.catches} (peer median: ${peerMedian(others.map((p: any) => p.catches))}), Dismissals: ${me.totalDismissals} (peer median: ${peerMedian(others.map((p: any) => p.totalDismissals))})`,
+        ];
+        peerSummary = lines.join('\n');
+      }
+    }
 
     const prompt = `You are an expert cricket coach providing a personalised improvement plan for a player. Your goal is to give specific, actionable advice based on their actual performance data.
 
@@ -119,10 +140,13 @@ AGGREGATED STATS (${agg.gamesPlayed} games):
 - Batting: ${agg.totalRuns} runs, SR ${agg.avgStrikeRate}, ${agg.totalFours} fours, ${agg.totalSixes} sixes
 - Bowling: ${agg.totalWickets} wickets, ${agg.totalOvers} overs, economy ${agg.avgEconomy}
 - Fielding: ${agg.totalCatches} catches, ${agg.totalRunOuts} run outs, ${agg.totalStumpings} stumpings
-- XI Selector score: ${agg.avgScorePerGame} avg per game
+- CIQ score: ${agg.avgScorePerGame} avg per game
 
 ANONYMOUS SERIES BENCHMARKS (no player names):
 ${benchmarkSummary || 'No benchmark data.'}
+
+PEER COMPARISON (anonymous — same primary skill group, no names):
+${peerSummary}
 
 SELECTOR FEEDBACK (distilled from match observations, no selector names):
 ${feedbackSummary}
@@ -131,10 +155,10 @@ CAMP COACH RATINGS (averaged across all coaches):
 ${campSummary}
 
 INSTRUCTIONS:
-1. Analyse all data sources together
+1. Analyse all data sources together — prioritise peer comparison gaps as they are most actionable
 2. Identify the 3 most impactful areas for improvement
 3. For each: write ONE specific, actionable suggestion (2-3 sentences)
-4. Reference actual numbers from the data (e.g. "your economy of 6.8...")
+4. Reference actual numbers (e.g. "your economy of 7.2 vs peer median of 6.4...")
 5. Tone: encouraging, direct, coach-like — not generic
 6. Do NOT mention other player names or ranks
 7. Do NOT say "based on your data" or "according to the stats" — just give the advice
@@ -143,7 +167,7 @@ Respond ONLY with a JSON array. No markdown, no preamble. Format:
 [
   {
     "rank": 1,
-    "dimension": "Fielding",
+    "dimension": "Bowling",
     "suggestion": "...",
     "impact": "high"
   },
