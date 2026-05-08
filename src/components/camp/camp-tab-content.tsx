@@ -105,6 +105,7 @@ export function CampTabContent({
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [editingBibId, setEditingBibId] = useState<string | null>(null);
   const [editBibValue, setEditBibValue] = useState('');
+  const [comboOpen, setComboOpen] = useState(false);
 
   // ── Assessment state ───────────────────────────────────────────────────────
   const [assessments, setAssessments] = useState<CampAssessment[]>(initialAssessments);
@@ -233,7 +234,7 @@ export function CampTabContent({
     if (res.success) {
       const refreshed = await getCampPlayersAction(camp.id);
       if (refreshed.success) setCampPlayers(refreshed.players || []);
-      setSelectedPlayerId(''); setBibInput(''); setPlayerSearch('');
+      setSelectedPlayerId(''); setBibInput(''); setPlayerSearch(''); setComboOpen(false);
       toast({ title: `${player.name} invited as Bib #${bib}` });
     } else {
       toast({ title: 'Error', description: res.error, variant: 'destructive' });
@@ -357,33 +358,93 @@ export function CampTabContent({
         {canManage && (
         <Card>
           <CardContent className="pt-4 space-y-3">
+            {/* Combobox: search + select in one */}
             <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Search players..."
-                value={playerSearch} onChange={e => setPlayerSearch(e.target.value)} />
-            </div>
-            <div className="flex gap-2">
-              <Select value={selectedPlayerId} onValueChange={setSelectedPlayerId}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder={!isSeriesScopingLoaded ? 'Loading...' : availablePlayers.length === 0 ? 'No eligible players' : 'Select player...'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {availablePlayers.slice(0, 50).map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.name} — {p.primarySkill}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex items-center gap-1 w-28">
-                <Hash className="h-4 w-4 text-muted-foreground shrink-0" />
-                <Input type="number" placeholder={nextBib.toString()} value={bibInput}
-                  onChange={e => setBibInput(e.target.value)} min={1} />
+              <div
+                className="flex items-center border rounded-md px-3 py-2 gap-2 bg-background cursor-text"
+                onClick={() => setComboOpen(true)}
+              >
+                <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                <input
+                  className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+                  placeholder={
+                    selectedPlayerId
+                      ? (orgPlayers.find(p => p.id === selectedPlayerId)?.name || 'Selected')
+                      : (!isSeriesScopingLoaded ? 'Loading players...' : 'Search and select player...')
+                  }
+                  value={playerSearch}
+                  onChange={e => { setPlayerSearch(e.target.value); setComboOpen(true); }}
+                  onFocus={() => setComboOpen(true)}
+                />
+                {selectedPlayerId && (
+                  <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); setSelectedPlayerId(''); setBibInput(''); setPlayerSearch(''); }}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
-              <Button onClick={handleInvite} disabled={isInviting || !selectedPlayerId || !bibInput}>
-                {isInviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+              {/* Dropdown */}
+              {comboOpen && (
+                <div className="absolute z-50 w-full mt-1 border rounded-md bg-popover shadow-md max-h-56 overflow-auto">
+                  {availablePlayers.length === 0 ? (
+                    <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                      {!isSeriesScopingLoaded ? 'Loading...' : 'No eligible players found'}
+                    </div>
+                  ) : (
+                    availablePlayers.slice(0, 50).map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center justify-between gap-2"
+                        onMouseDown={e => {
+                          e.preventDefault();
+                          setSelectedPlayerId(p.id);
+                          setPlayerSearch('');
+                          setComboOpen(false);
+                          // Auto-fill next available bib
+                          setBibInput(nextBib.toString());
+                        }}
+                      >
+                        <span className="font-medium">{p.name}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">{p.primarySkill}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+              {/* Click outside to close */}
+              {comboOpen && (
+                <div className="fixed inset-0 z-40" onClick={() => setComboOpen(false)} />
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <div className="flex items-center gap-1 w-32">
+                <Hash className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Input
+                  type="number"
+                  placeholder={nextBib.toString()}
+                  value={bibInput}
+                  onChange={e => setBibInput(e.target.value)}
+                  min={1}
+                />
+              </div>
+              <Button
+                onClick={handleInvite}
+                disabled={isInviting || !selectedPlayerId || !bibInput}
+                className="flex-1"
+              >
+                {isInviting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
+                {selectedPlayerId
+                  ? `Add ${orgPlayers.find(p => p.id === selectedPlayerId)?.name?.split(' ')[0] || 'Player'}`
+                  : 'Add Player'}
               </Button>
             </div>
             {bibInput && usedBibs.has(parseInt(bibInput)) && (
-              <p className="text-xs text-destructive">Bib #{bibInput} already assigned</p>
+              <p className="text-xs text-destructive">Bib #{bibInput} already assigned — please choose another</p>
             )}
           </CardContent>
         </Card>
