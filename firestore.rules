@@ -166,53 +166,39 @@ service cloud.firestore {
       allow read: if isSuperAdmin();
     }
 
-    // Default deny all access to other paths.
-    match /{document=**} {
-      allow read, write: if false;
-
-
-    }
-    // ─── ADD TO firestore.rules ───────────────────────────────────────────────────
-    // Paste these rule blocks inside the existing `match /databases/{database}/documents` block.
-
-    // ── pendingRegistrations — server-only via Admin SDK ──────────────────────────
-    // No client reads or writes. The Admin SDK bypasses all rules.
-    // We deny all client access for safety.
+    // ── pendingRegistrations — server-only via Admin SDK ─────────────────────────
     match /pendingRegistrations/{docId} {
       allow read, write: if false;
     }
 
-    // ── playerPayments — player can read own; admins can read all; no client writes ──
+    // ── playerPayments — player reads own; admins read all; no client writes ──────
     match /playerPayments/{paymentId} {
-      allow read: if request.auth != null && (
-        // Player reads their own payment
+      allow read: if isSignedIn() && (
         resource.data.userId == request.auth.uid
-        // System admin reads all
-        || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin'])
-        // Org admin reads payments within their org
+        || isSuperAdmin()
         || (
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['org_admin'])
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['Organization Admin'])
           && resource.data.organizationId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedOrganizationIds
         )
       );
-      // All writes go through Admin SDK (webhook + waive action)
       allow write: if false;
     }
 
-    // ── promoCodes — admins can CRUD; no public access ────────────────────────────
+    // ── promoCodes — admins can CRUD; no public access ───────────────────────────
     match /promoCodes/{codeId} {
-      allow read: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin', 'org_admin']);
-      allow write: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+      allow read: if isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin', 'Organization Admin']);
+      allow write: if isSuperAdmin();
     }
 
-    // ── systemSettings/registration — admin only ──────────────────────────────────
-    match /systemSettings/registration {
-      allow read: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
-      allow write: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+    // ── systemSettings — admin only ──────────────────────────────────────────────
+    match /systemSettings/{docId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // Default deny all access to other paths.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

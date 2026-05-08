@@ -9,13 +9,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Phone, User, Mail, ShieldCheck, CheckCircle, Info, Pencil } from 'lucide-react';
+import { Loader2, Phone, User, Mail, ShieldCheck, CheckCircle, Info, Pencil, CreditCard, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { doc, updateDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { ConfirmationResult } from 'firebase/auth';
+import { getPlayerPaymentStatusAction } from '@/lib/actions/registration-payment-action';
+import type { PlayerPayment } from '@/types';
 
 export default function ProfilePage() {
   const { currentUser, userProfile, isAuthLoading, signInWithPhoneNumberFlow, confirmPhoneNumberCode } = useAuth();
@@ -54,6 +56,8 @@ export default function ProfilePage() {
   const [showPhoneSection, setShowPhoneSection] = useState(false);
 
   const isPlayer = userProfile?.roles?.includes('player');
+  const [payments, setPayments] = useState<any[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
 
   useEffect(() => {
     if (!isAuthLoading && !currentUser) {
@@ -62,6 +66,21 @@ export default function ProfilePage() {
     if (userProfile) {
       setDisplayName(userProfile.displayName || '');
       setPhoneNumber(userProfile.phoneNumber || currentUser?.phoneNumber || '');
+    }
+    // Load payments for players
+    if (userProfile?.playerId && userProfile.roles?.includes('player')) {
+      setPaymentsLoading(true);
+      import('@/lib/firebase').then(({ auth }) => {
+        auth.currentUser?.getIdToken().then(token => {
+          fetch(`/api/player-payments?playerId=${userProfile.playerId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+            .then(r => r.json())
+            .then(data => setPayments(data.payments || []))
+            .catch(() => setPayments([]))
+            .finally(() => setPaymentsLoading(false));
+        });
+      });
     }
   }, [userProfile, currentUser, isAuthLoading, router]);
 
@@ -400,6 +419,61 @@ export default function ProfilePage() {
           )}
         </CardContent>
       </Card>
+
+      {/* My Payments — players only */}
+      {isPlayer && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-primary" /> My Payments
+            </CardTitle>
+            <CardDescription>Your registration payment history</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {paymentsLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground py-4">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading payments…
+              </div>
+            ) : payments.length === 0 ? (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>No payments yet</AlertTitle>
+                <AlertDescription>Your registration payments will appear here once processed.</AlertDescription>
+              </Alert>
+            ) : (
+              <div className="divide-y">
+                {payments.map((p: any) => (
+                  <div key={p.id} className="py-3 flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{p.seriesName || 'Series Registration'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.paidAt ? new Date(p.paidAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-sm font-medium">
+                        {p.amount === 0 ? 'Free' : `$${(p.amount / 100).toFixed(2)}`}
+                      </span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border
+                        ${p.status === 'succeeded' ? 'bg-green-100 text-green-800 border-green-200'
+                          : p.status === 'waived' ? 'bg-blue-100 text-blue-800 border-blue-200'
+                          : 'bg-yellow-100 text-yellow-800 border-yellow-200'}`}>
+                        {p.status === 'waived' ? 'Waived' : p.status === 'succeeded' ? 'Paid' : p.status}
+                      </span>
+                      {p.receiptUrl && (
+                        <a href={p.receiptUrl} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                          Receipt <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
     </div>
   );

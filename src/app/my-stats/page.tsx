@@ -5,15 +5,19 @@ import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { getPlayerStatsAction } from '@/lib/actions/player-stats-action';
 import type { PlayerStatsResult } from '@/lib/actions/player-stats-action';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, Lock, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
 import { StatsSection } from '@/components/my-stats/stats-section';
 import { BenchmarkSection } from '@/components/my-stats/benchmark-section';
 import { PeerComparisonSection } from '@/components/my-stats/peer-comparison-section';
 import { FeedbackSection } from '@/components/my-stats/feedback-section';
 import { CampSection } from '@/components/my-stats/camp-section';
 import { AiPlanSection } from '@/components/my-stats/ai-plan-section';
+import { getPlayerPaymentStatusAction } from '@/lib/actions/registration-payment-action';
+import Link from 'next/link';
 
 export default function MyStatsPage() {
   const { userProfile, isAuthLoading, activeOrganizationId } = useAuth();
@@ -23,6 +27,7 @@ export default function MyStatsPage() {
   const [selectedSeriesId, setSelectedSeriesId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPaid, setIsPaid] = useState<boolean | null>(null); // null = checking
 
   const isPlayer = userProfile?.roles?.includes('player');
   const playerId = userProfile?.playerId;
@@ -33,6 +38,14 @@ export default function MyStatsPage() {
       router.push('/');
     }
   }, [isAuthLoading, isPlayer, playerId, router]);
+
+  // Check payment status
+  useEffect(() => {
+    if (!playerId) return;
+    getPlayerPaymentStatusAction(playerId).then(status => {
+      setIsPaid(status.isPaid || status.isWaived);
+    }).catch(() => setIsPaid(true)); // fail open
+  }, [playerId]);
 
   // Load stats when series changes
   const loadStats = useCallback(async (seriesId: string) => {
@@ -79,6 +92,51 @@ export default function MyStatsPage() {
   }
 
   if (!isPlayer || !playerId) return null;
+
+  // Payment gate
+  if (isPaid === null) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isPaid) {
+    return (
+      <div className="max-w-lg mx-auto py-16 text-center space-y-6">
+        <div className="flex justify-center">
+          <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center">
+            <Lock className="h-10 w-10 text-muted-foreground" />
+          </div>
+        </div>
+        <div>
+          <h1 className="text-2xl font-headline font-bold text-primary">Registration Required</h1>
+          <p className="text-muted-foreground mt-2">
+            Complete your series registration to unlock your stats dashboard.
+          </p>
+        </div>
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex items-start gap-3 text-left">
+              <CreditCard className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium text-sm">Complete Registration</p>
+                <p className="text-xs text-muted-foreground">
+                  Register for a series to access batting, bowling, fielding stats and your AI improvement plan.
+                </p>
+              </div>
+            </div>
+            <Button asChild className="w-full">
+              <Link href={`/register-player/${activeOrganizationId}`}>
+                Register Now
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const availableSeries = stats?.availableSeries || [];
 
