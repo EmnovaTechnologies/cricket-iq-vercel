@@ -358,71 +358,70 @@ export function CampTabContent({
         {canManage && (
         <Card>
           <CardContent className="pt-4 space-y-3">
-            {/* Combobox: search + select in one */}
-            <div className="relative">
-              <div
-                className="flex items-center border rounded-md px-3 py-2 gap-2 bg-background cursor-text"
-                onClick={() => setComboOpen(true)}
-              >
-                <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-                <input
-                  className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
-                  placeholder={
-                    selectedPlayerId
-                      ? (orgPlayers.find(p => p.id === selectedPlayerId)?.name || 'Selected')
-                      : (!isSeriesScopingLoaded ? 'Loading players...' : 'Search and select player...')
-                  }
-                  value={playerSearch}
-                  onChange={e => { setPlayerSearch(e.target.value); setComboOpen(true); }}
-                  onFocus={() => setComboOpen(true)}
-                />
-                {selectedPlayerId && (
-                  <button
-                    type="button"
-                    onClick={e => { e.stopPropagation(); setSelectedPlayerId(''); setBibInput(''); setPlayerSearch(''); }}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-              {/* Dropdown */}
-              {comboOpen && (
-                <div className="absolute z-50 w-full mt-1 border rounded-md bg-popover shadow-md max-h-56 overflow-auto">
-                  {availablePlayers.length === 0 ? (
-                    <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                      {!isSeriesScopingLoaded ? 'Loading...' : 'No eligible players found'}
-                    </div>
-                  ) : (
-                    availablePlayers.slice(0, 50).map(p => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center justify-between gap-2"
-                        onMouseDown={e => {
-                          e.preventDefault();
-                          setSelectedPlayerId(p.id);
-                          setPlayerSearch('');
-                          setComboOpen(false);
-                          // Auto-fill next available bib
-                          setBibInput(nextBib.toString());
-                        }}
-                      >
-                        <span className="font-medium">{p.name}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">{p.primarySkill}</span>
-                      </button>
-                    ))
+            <div className="flex gap-2 items-start">
+              {/* Combobox: search + select in one */}
+              <div className="relative flex-1">
+                <div
+                  className="flex items-center border rounded-md px-3 py-2 gap-2 bg-background cursor-text h-10"
+                  onClick={() => setComboOpen(true)}
+                >
+                  <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <input
+                    className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+                    placeholder={
+                      selectedPlayerId
+                        ? (orgPlayers.find(p => p.id === selectedPlayerId)?.name || 'Selected')
+                        : (!isSeriesScopingLoaded ? 'Loading players...' : 'Search and select player...')
+                    }
+                    value={playerSearch}
+                    onChange={e => { setPlayerSearch(e.target.value); setComboOpen(true); }}
+                    onFocus={() => setComboOpen(true)}
+                  />
+                  {selectedPlayerId && (
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); setSelectedPlayerId(''); setBibInput(''); setPlayerSearch(''); }}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   )}
                 </div>
-              )}
-              {/* Click outside to close */}
-              {comboOpen && (
-                <div className="fixed inset-0 z-40" onClick={() => setComboOpen(false)} />
-              )}
-            </div>
+                {/* Dropdown */}
+                {comboOpen && (
+                  <div className="absolute z-50 w-full mt-1 border rounded-md bg-popover shadow-md max-h-56 overflow-auto">
+                    {availablePlayers.length === 0 ? (
+                      <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                        {!isSeriesScopingLoaded ? 'Loading...' : 'No eligible players found'}
+                      </div>
+                    ) : (
+                      availablePlayers.slice(0, 50).map(p => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center justify-between gap-2"
+                          onMouseDown={e => {
+                            e.preventDefault();
+                            setSelectedPlayerId(p.id);
+                            setPlayerSearch('');
+                            setComboOpen(false);
+                            setBibInput(nextBib.toString());
+                          }}
+                        >
+                          <span className="font-medium">{p.name}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">{p.primarySkill}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+                {comboOpen && (
+                  <div className="fixed inset-0 z-40" onClick={() => setComboOpen(false)} />
+                )}
+              </div>
 
-            <div className="flex gap-2">
-              <div className="flex items-center gap-1 w-32">
+              {/* Bib # */}
+              <div className="flex items-center gap-1 w-28">
                 <Hash className="h-4 w-4 text-muted-foreground shrink-0" />
                 <Input
                   type="number"
@@ -432,15 +431,10 @@ export function CampTabContent({
                   min={1}
                 />
               </div>
-              <Button
-                onClick={handleInvite}
-                disabled={isInviting || !selectedPlayerId || !bibInput}
-                className="flex-1"
-              >
-                {isInviting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
-                {selectedPlayerId
-                  ? `Add ${orgPlayers.find(p => p.id === selectedPlayerId)?.name?.split(' ')[0] || 'Player'}`
-                  : 'Add Player'}
+
+              {/* Add button */}
+              <Button onClick={handleInvite} disabled={isInviting || !selectedPlayerId || !bibInput}>
+                {isInviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
               </Button>
             </div>
             {bibInput && usedBibs.has(parseInt(bibInput)) && (
