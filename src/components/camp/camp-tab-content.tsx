@@ -27,6 +27,7 @@ import {
 } from '@/lib/actions/camp-actions';
 import { runCampAISelectionAction } from '@/lib/actions/camp-ai-action';
 import { getPlayersWithDetailsFromDB, getTeamByIdFromDB, getSeriesByIdFromDB } from '@/lib/db';
+import { getSeriesPlayerIdsFromGamesAction } from '@/lib/actions/game-actions';
 import type {
   SelectionCamp, CampPlayer, CampAssessment, CampFitnessResult,
   CampPlayerResult, CampSelectionStatus, PlayerWithRatings
@@ -145,17 +146,16 @@ export function CampTabContent({
   useEffect(() => {
     if (!activeOrganizationId) return;
     getPlayersWithDetailsFromDB(activeOrganizationId).then(setOrgPlayers);
-    getSeriesByIdFromDB(seriesId).then(async seriesDoc => {
-      if (seriesDoc?.participatingTeams?.length) {
-        const teams = await Promise.all(
-          seriesDoc.participatingTeams.map((tid: string) => getTeamByIdFromDB(tid))
-        );
-        const ids = new Set<string>();
-        teams.forEach(t => (t?.playerIds || []).forEach((pid: string) => ids.add(pid)));
-        setSeriesPlayerIds(ids);
-      }
+
+    // Scope to players who appeared in ANY game in this series
+    // This covers players who played for a different team than their primaryTeamId
+    getSeriesPlayerIdsFromGamesAction(seriesId).then(ids => {
+      setSeriesPlayerIds(ids);
       setIsSeriesScopingLoaded(true);
-    }).catch(() => setIsSeriesScopingLoaded(true));
+    }).catch(() => {
+      // Fail open — show all org players if scoping fails
+      setIsSeriesScopingLoaded(true);
+    });
   }, [activeOrganizationId, seriesId]);
 
   // ── Derived data ───────────────────────────────────────────────────────────

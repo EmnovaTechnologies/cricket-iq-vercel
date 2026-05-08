@@ -449,3 +449,72 @@ export async function getGamesForUserViewAction(userProfile: UserProfile | null,
 
   return [];
 }
+
+/**
+ * getSeriesPlayerIdsFromGamesAction
+ *
+ * Returns a Set of all player IDs who appeared in a series from TWO sources:
+ * 1. game.team1Players + game.team2Players (game rosters)
+ * 2. scorecardPlayers.linkedPlayerId for scorecards linked to this series
+ *
+ * This ensures players who appear only in scorecards (e.g. imported from CricClubs,
+ * or who played for a different team than their primaryTeamId) still show in camp lists.
+ */
+export async function getSeriesPlayerIdsFromGamesAction(seriesId: string): Promise<Set<string>> {
+  try {
+    const { collection, query, where, getDocs } = await import('firebase/firestore');
+    const { db } = await import('@/lib/firebase');
+
+    const ids = new Set<string>();
+
+    // Source 1: game rosters (client Firestore)
+    const gamesSnap = await getDocs(
+      query(collection(db, 'games'), where('seriesId', '==', seriesId))
+    );
+    gamesSnap.docs.forEach(doc => {
+      const data = doc.data();
+      (data.team1Players || []).forEach((id: string) => ids.add(id));
+      (data.team2Players || []).forEach((id: string) => ids.add(id));
+    });
+
+    // Source 2: scorecardPlayers linked to scorecards in this series
+    // Step A — get scorecard IDs for this series
+    const scorecardsSnap = await getDocs(
+      query(collection(db, 'matchScorecards'), where('seriesId', '==', seriesId))
+    );
+    const scorecardIds = scorecardsSnap.docs.map(d => d.id);
+
+    // Step B — get linked player IDs from those scorecards' innings
+    scorecardsSnap.docs.forEach(doc => {
+      const data = doc.data();
+      const innings = data.innings || [];
+      innings.forEach((inn: any) => {
+        (inn.batting || []).forEach((b: any) => {
+          if (b.linkedPlayerId) ids.add(b.linkedPlayerId);
+        });
+        (inn.bowling || []).forEach((b: any) => {
+          if (b.linkedPlayerId) ids.add(b.linkedPlayerId);
+        });
+      });
+    });
+
+    // Step C — also check scorecardPlayers collection for linked players
+    if (scorecardIds.length > 0) {
+      const scorecardPlayersSnap = await getDocs(
+        query(
+          collection(db, 'scorecardPlayers'),
+          where('scorecardId', 'in', scorecardIds.slice(0, 10)) // Firestore 'in' limit = 10
+        )
+      );
+      scorecardPlayersSnap.docs.forEach(doc => {
+        const linkedPlayerId = doc.data().linkedPlayerId;
+        if (linkedPlayerId) ids.add(linkedPlayerId);
+      });
+    }
+
+    return ids;
+  } catch (e: any) {
+    console.error('[getSeriesPlayerIdsFromGamesAction]', e);
+    return new Set<string>();
+  }
+}
