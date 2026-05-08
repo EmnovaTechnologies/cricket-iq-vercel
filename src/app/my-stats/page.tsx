@@ -10,6 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatsSection } from '@/components/my-stats/stats-section';
 import { BenchmarkSection } from '@/components/my-stats/benchmark-section';
+import { PeerComparisonSection } from '@/components/my-stats/peer-comparison-section';
 import { FeedbackSection } from '@/components/my-stats/feedback-section';
 import { CampSection } from '@/components/my-stats/camp-section';
 import { AiPlanSection } from '@/components/my-stats/ai-plan-section';
@@ -162,6 +163,11 @@ export default function MyStatsPage() {
         <>
           <StatsSection stats={stats} />
           <BenchmarkSection benchmarks={stats.benchmarks} />
+          <PeerComparisonSection
+            playerId={playerId || ''}
+            seriesId={selectedSeriesId}
+            organizationId={activeOrganizationId || ''}
+          />
           <FeedbackSection feedback={stats.feedback} />
           <CampSection campPerformance={stats.campPerformance} />
           <AiPlanSection stats={stats} playerId={playerId || ''} seriesId={selectedSeriesId} />

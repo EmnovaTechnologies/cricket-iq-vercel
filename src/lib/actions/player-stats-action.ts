@@ -188,44 +188,16 @@ export async function getPlayerStatsAction(
           }
         }
         // Fielding — parse dismissal text
-        // Format: "c FIELDER b BOWLER" or "st KEEPER b BOWLER" or "run out (FIELDER)"
-        // CRITICAL: only check the FIELDER portion, not the bowler portion
-        // to avoid crediting the bowler as a fielder
         for (const b of (inn.batting || [])) {
           const d = (b.dismissal || '').toLowerCase();
-
-          // Extract fielder portion only (before " b ")
-          const bIdx = d.indexOf(' b ');
-          const fielderPortion = bIdx !== -1 ? d.slice(0, bIdx) : d;
-
-          // For run outs: format is "run out (FIELDER)" or "run out (FIELDER/FIELDER2)"
-          const runOutMatch = d.match(/run out\s*[\(\[]?([^)\]]+)[\)\]]?/);
-          const runOutFielder = runOutMatch ? runOutMatch[1].trim() : '';
-
           for (const name of linkedNames) {
-            const parts = name.toLowerCase().trim().split(/\s+/);
-            const firstName = parts[0] || '';
-            const lastName = parts[parts.length - 1] || '';
-            const firstInitial = firstName[0] || '';
-            const lastInitial = lastName[0] || '';
-
-            const candidates = [
-              name.toLowerCase(),                                          // "atharv pilkhane"
-              firstName && lastInitial ? `${firstName} ${lastInitial}` : '', // "atharv p"
-              firstInitial && lastName ? `${firstInitial} ${lastName}` : '', // "a pilkhane"
-              lastName.length > 2 ? lastName : '',                          // "pilkhane"
-              firstName.length > 2 ? firstName : '',                        // "atharv"
-            ].filter(Boolean);
-
-            const fielderMatch = candidates.some(c => fielderPortion.includes(c));
-            const runOutFielderMatch = runOutFielder && candidates.some(c => runOutFielder.includes(c));
-
-            // Catch: "c FIELDER b BOWLER" — check fielder portion only
-            if (fielderPortion.startsWith('c ') && fielderMatch) catches++;
-            // Run out: check run out fielder name
-            if (d.includes('run out') && runOutFielderMatch) runOuts++;
-            // Stumping: "st KEEPER b BOWLER" — check fielder portion only
-            if (fielderPortion.startsWith('st ') && fielderMatch) stumpings++;
+            const nl = name.toLowerCase();
+            // Catch: "c Name b Bowler" or "c †Name b Bowler"
+            if (d.startsWith('c ') && d.includes(nl) && d.includes(' b ')) catches++;
+            // Run out
+            if (d.includes('run out') && d.includes(nl)) runOuts++;
+            // Stumping
+            if (d.startsWith('st ') && d.includes(nl)) stumpings++;
           }
         }
         // Did not bat — still appeared
@@ -590,4 +562,216 @@ export async function getAvailableSeriesForPlayer(
     }))
     .sort((a, b) => b.createdAt - a.createdAt)
     .map(({ id, name }) => ({ id, name }));
+}
+
+// ─── Peer comparison data ─────────────────────────────────────────────────────
+
+export interface PeerPlayerStats {
+  rank: number; // anonymous rank within peer group
+  isCurrentPlayer: boolean;
+  // Bowling
+  wickets: number; overs: number; economy: number; bowlingSR: number;
+  // Batting
+  runs: number; balls: number; strikeRate: number; boundaries: number; avgRunsPerGame: number;
+  // Fielding
+  catches: number; runOuts: number; totalDismissals: number;
+  // Overall
+  ciqScore: number;
+}
+
+export interface PeerComparisonResult {
+  success: boolean;
+  error?: string;
+  primarySkill: string;
+  peers: PeerPlayerStats[];
+  currentPlayerRank: number;
+}
+
+export async function getPeerComparisonAction(
+  playerId: string,
+  seriesId: string,
+  organizationId: string
+): Promise<PeerComparisonResult> {
+  try {
+    // Step 1: Get current player's primarySkill from players collection
+    const playerDoc = await adminDb.collection('players').doc(playerId).get();
+    if (!playerDoc.exists) return { success: false, error: 'Player not found', primarySkill: '', peers: [], currentPlayerRank: 0 };
+    const primarySkill = (playerDoc.data()?.primarySkill || 'Batting') as string;
+
+    // Step 2: Find all scorecardPlayers in this series that are linked + same primarySkill
+    // Get all matchScorecards for this series
+    const scSnap = await adminDb.collection('matchScorecards')
+      .where('organizationId', '==', organizationId)
+      .where('seriesId', '==', seriesId)
+      .get();
+
+    if (scSnap.empty) return { success: true, primarySkill, peers: [], currentPlayerRank: 0 };
+
+    const scorecardIds = scSnap.docs.map(d => d.id);
+
+    // Step 3: Get scorecardPlayers that are linked + in this series
+    const allSPDocs: any[] = [];
+    const chunks: string[][] = [];
+    for (let i = 0; i < scorecardIds.length; i += 30) chunks.push(scorecardIds.slice(i, i + 30));
+
+    for (const chunk of chunks) {
+      const spSnap = await adminDb.collection('scorecardPlayers')
+        .where('organizationId', '==', organizationId)
+        .get();
+      // Filter to linked players in this series' scorecards
+      spSnap.docs
+        .filter(d => d.data().linkedPlayerId && chunk.includes(d.data().scorecardId))
+        .forEach(d => allSPDocs.push(d.data()));
+    }
+
+    // Get all linked playerIds in this series
+    const linkedPlayerIds = [...new Set(allSPDocs.map(d => d.linkedPlayerId).filter(Boolean))];
+
+    // Step 4: Get each player's primarySkill from players collection
+    const playerSkills = new Map<string, string>();
+    const playerChunks: string[][] = [];
+    for (let i = 0; i < linkedPlayerIds.length; i += 30) playerChunks.push(linkedPlayerIds.slice(i, i + 30));
+    for (const chunk of playerChunks) {
+      const pSnap = await adminDb.collection('players').where('__name__', 'in', chunk).get();
+      pSnap.docs.forEach(d => playerSkills.set(d.id, d.data().primarySkill || 'Batting'));
+    }
+
+    // Step 5: Filter to same primarySkill group
+    const peerPlayerIds = linkedPlayerIds.filter(pid =>
+      playerSkills.get(pid) === primarySkill
+    );
+
+    if (peerPlayerIds.length === 0) return { success: true, primarySkill, peers: [], currentPlayerRank: 0 };
+
+    // Step 6: Aggregate stats for each peer player using same logic as getPlayerStatsAction
+    const peerStats: Array<{ playerId: string; stats: PeerPlayerStats }> = [];
+
+    for (const pid of peerPlayerIds) {
+      // Get this player's linked names in scorecardPlayers
+      const pidSPSnap = await adminDb.collection('scorecardPlayers')
+        .where('organizationId', '==', organizationId)
+        .where('linkedPlayerId', '==', pid)
+        .get();
+      if (pidSPSnap.empty) continue;
+
+      const linkedNames = pidSPSnap.docs.map(d => d.data().name as string);
+      let runs = 0, balls = 0, fours = 0, sixes = 0;
+      let wickets = 0, oversBowled = 0, runsConceded = 0;
+      let catches = 0, runOuts = 0;
+      const gamesSet = new Set<string>();
+
+      for (const scDoc of scSnap.docs) {
+        const data = scDoc.data();
+        const innings = data.innings || [];
+        let playerInThisGame = false;
+
+        for (const inn of innings) {
+          // Batting
+          for (const b of (inn.batting || [])) {
+            const n = (b.name || '').toLowerCase();
+            if (linkedNames.some(ln => namesMatch(ln, n))) {
+              runs += b.runs || 0;
+              balls += b.balls || 0;
+              fours += b.fours || 0;
+              sixes += b.sixes || 0;
+              playerInThisGame = true;
+            }
+          }
+          // Bowling
+          for (const bw of (inn.bowling || [])) {
+            const n = (bw.name || '').toLowerCase();
+            if (linkedNames.some(ln => namesMatch(ln, n))) {
+              wickets += bw.wickets || 0;
+              const ov = parseFloat(bw.overs || '0');
+              oversBowled += ov;
+              runsConceded += bw.runs || 0;
+              playerInThisGame = true;
+            }
+          }
+          // Fielding
+          for (const b of (inn.batting || [])) {
+            const d = (b.dismissal || '').toLowerCase();
+            const bIdx = d.indexOf(' b ');
+            const fielderPortion = bIdx !== -1 ? d.slice(0, bIdx) : d;
+            const runOutMatch = d.match(/run out\s*[\(\[]?([^)\]]+)[\)\]]?/);
+            const runOutFielder = runOutMatch ? runOutMatch[1].trim() : '';
+            for (const name of linkedNames) {
+              const candidates = buildCandidates(name);
+              const fielderMatch = candidates.some(c => fielderPortion.includes(c));
+              const runOutFielderMatch = runOutFielder && candidates.some(c => runOutFielder.includes(c));
+              if (fielderPortion.startsWith('c ') && fielderMatch) catches++;
+              if (d.includes('run out') && runOutFielderMatch) runOuts++;
+            }
+          }
+        }
+        if (playerInThisGame) gamesSet.add(scDoc.id);
+      }
+
+      const gamesPlayed = gamesSet.size || 1;
+      const economy = oversBowled > 0 ? Math.round((runsConceded / oversBowled) * 10) / 10 : 0;
+      const bowlingSR = wickets > 0 ? Math.round((oversBowled * 6 / wickets) * 10) / 10 : 0;
+      const strikeRate = balls > 0 ? Math.round((runs / balls) * 100 * 10) / 10 : 0;
+
+      // Simple CIQ score
+      const battingScore = runs * 1.5 + (strikeRate > 150 ? 10 : strikeRate > 100 ? 5 : 0);
+      const bowlingScore = wickets * 20 + (economy > 0 && economy < 5 ? 15 : economy < 7 ? 8 : 0);
+      const fieldingScore = (catches + runOuts) * 10;
+      const ciqScore = Math.round(battingScore + bowlingScore + fieldingScore);
+
+      peerStats.push({
+        playerId: pid,
+        stats: {
+          rank: 0, isCurrentPlayer: pid === playerId,
+          wickets, overs: Math.round(oversBowled * 10) / 10, economy, bowlingSR,
+          runs, balls, strikeRate, boundaries: fours + sixes,
+          avgRunsPerGame: Math.round((runs / gamesPlayed) * 10) / 10,
+          catches, runOuts, totalDismissals: catches + runOuts,
+          ciqScore,
+        },
+      });
+    }
+
+    // Step 7: Rank by primarySkill metric
+    const rankMetric = primarySkill.toLowerCase().includes('bowl') ? 'wickets'
+      : primarySkill.toLowerCase().includes('bat') ? 'runs'
+      : 'ciqScore';
+
+    peerStats.sort((a, b) => b.stats[rankMetric as keyof PeerPlayerStats] as number - (a.stats[rankMetric as keyof PeerPlayerStats] as number));
+
+    // Assign ranks + take top 6 (top 5 + current player if outside top 5)
+    peerStats.forEach((p, i) => { p.stats.rank = i + 1; });
+
+    const top5 = peerStats.slice(0, 5);
+    const currentInTop5 = top5.some(p => p.isCurrentPlayer);
+    const currentEntry = peerStats.find(p => p.stats.isCurrentPlayer);
+
+    const finalPeers = currentInTop5 || !currentEntry
+      ? top5.map(p => p.stats)
+      : [...top5.map(p => p.stats), currentEntry.stats];
+
+    const currentPlayerRank = currentEntry?.stats.rank || 0;
+
+    return { success: true, primarySkill, peers: finalPeers, currentPlayerRank };
+  } catch (e: any) {
+    console.error('[getPeerComparisonAction]', e);
+    return { success: false, error: e.message, primarySkill: '', peers: [], currentPlayerRank: 0 };
+  }
+}
+
+// ─── Name matching helpers ────────────────────────────────────────────────────
+
+function buildCandidates(name: string): string[] {
+  const parts = name.toLowerCase().trim().split(/\s+/);
+  const firstName = parts[0] || '';
+  const lastName = parts[parts.length - 1] || '';
+  const lastInitial = lastName[0] || '';
+  return [
+    name.toLowerCase(),
+    firstName && lastInitial ? `${firstName} ${lastInitial}` : '',
+    lastName.length > 2 ? lastName : '',
+  ].filter(Boolean);
+}
+
+function namesMatch(linkedName: string, scorecardName: string): boolean {
+  return buildCandidates(linkedName).some(c => scorecardName.includes(c));
 }
