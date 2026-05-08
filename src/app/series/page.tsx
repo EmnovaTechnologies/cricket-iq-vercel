@@ -7,16 +7,19 @@ import SeriesCard from '@/components/series-card';
 import SeriesListRow from '@/components/series-list-row';
 import { getAllSeriesFromDB, getGamesByIdsFromDB, getTeamByIdFromDB } from '@/lib/db';
 import type { Series } from '@/types';
-import { PlusCircle, Layers, Filter, Upload, AlertTriangle, Info, Loader2, LayoutGrid, List } from 'lucide-react';
+import { PlusCircle, Layers, Filter, Upload, AlertTriangle, Info, Loader2, LayoutGrid, List, Lock, CreditCard } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { archiveSeriesAction, unarchiveSeriesAction } from '@/lib/actions/series-actions';
 import { checkSeriesBulkDeletableAction } from '@/lib/actions/series-admin-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent } from '@/components/ui/card';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
+import { getPlayerPaymentStatusAction } from '@/lib/actions/registration-payment-action';
 
 function SeriesPageInner() {
   const { userProfile, activeOrganizationId, activeOrganizationDetails, loading: authLoading, isOrgLoading, effectivePermissions, isPermissionsLoading } = useAuth();
@@ -24,6 +27,17 @@ function SeriesPageInner() {
   const [seriesDeletable, setSeriesDeletable] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+
+  const isPlayer = userProfile?.roles?.includes('player');
+
+  // Payment gate — only for players
+  const [isPaid, setIsPaid] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!isPlayer || !userProfile?.playerId) { setIsPaid(true); return; }
+    getPlayerPaymentStatusAction(userProfile.playerId)
+      .then(s => setIsPaid(s.isPaid || s.isWaived))
+      .catch(() => setIsPaid(true));
+  }, [isPlayer, userProfile?.playerId]);
 
   const searchParams = useSearchParams();
   const currentYearString = useMemo(() => new Date().getFullYear().toString(), []);
@@ -52,6 +66,12 @@ function SeriesPageInner() {
 
       if(userProfile.roles.includes('admin') || userProfile.roles.includes('Organization Admin')) {
         orgSeries.forEach(s => visibleSeriesIds.add(s.id));
+      } else if (userProfile.roles.includes('player')) {
+        // Players only see series they are registered for (assignedSeriesIds)
+        const assignedSeriesIds = userProfile.assignedSeriesIds || [];
+        orgSeries
+          .filter(s => assignedSeriesIds.includes(s.id))
+          .forEach(s => visibleSeriesIds.add(s.id));
       } else {
         if (userProfile.roles.includes('Series Admin')) {
           // Use seriesAdminUids on the series doc as source of truth (matches dashboard count)
@@ -148,7 +168,7 @@ function SeriesPageInner() {
   const canArchiveAnySeries = effectivePermissions[PERMISSIONS.SERIES_ARCHIVE_ANY];
   const canUnarchiveAnySeries = effectivePermissions[PERMISSIONS.SERIES_UNARCHIVE_ANY];
 
-  const isPageLoading = authLoading || isPermissionsLoading || (isLoading && !!activeOrganizationId);
+  const isPageLoading = authLoading || isPermissionsLoading || (isLoading && !!activeOrganizationId) || (isPlayer && isPaid === null);
 
   if (isPageLoading) {
     return (
@@ -156,6 +176,43 @@ function SeriesPageInner() {
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
             <p className="ml-4 text-lg text-muted-foreground">Loading series...</p>
         </div>
+    );
+  }
+
+  // Paywall for unpaid players
+  if (isPlayer && isPaid === false) {
+    return (
+      <div className="max-w-lg mx-auto py-16 text-center space-y-6">
+        <div className="flex justify-center">
+          <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center">
+            <Lock className="h-10 w-10 text-muted-foreground" />
+          </div>
+        </div>
+        <div>
+          <h1 className="text-2xl font-headline font-bold text-primary">Registration Required</h1>
+          <p className="text-muted-foreground mt-2">
+            Complete your series registration to view your series.
+          </p>
+        </div>
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex items-start gap-3 text-left">
+              <CreditCard className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium text-sm">Complete Registration</p>
+                <p className="text-xs text-muted-foreground">
+                  Register for a series to access your series list, games, and stats.
+                </p>
+              </div>
+            </div>
+            <Button asChild className="w-full">
+              <Link href={`/register-player/${activeOrganizationId}`}>
+                Register Now
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
