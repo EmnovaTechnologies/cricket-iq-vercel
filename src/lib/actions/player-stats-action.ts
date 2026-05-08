@@ -188,48 +188,44 @@ export async function getPlayerStatsAction(
           }
         }
         // Fielding — parse dismissal text
-        // Dismissal formats seen: "c Aarav A b Bowler", "c Pilkhane b Bowler",
-        // "c Aarav Arora b Bowler", "c A Arora b Bowler", "run out (Pilkhane)"
+        // Format: "c FIELDER b BOWLER" or "st KEEPER b BOWLER" or "run out (FIELDER)"
+        // CRITICAL: only check the FIELDER portion, not the bowler portion
+        // to avoid crediting the bowler as a fielder
         for (const b of (inn.batting || [])) {
           const d = (b.dismissal || '').toLowerCase();
+
+          // Extract fielder portion only (before " b ")
+          const bIdx = d.indexOf(' b ');
+          const fielderPortion = bIdx !== -1 ? d.slice(0, bIdx) : d;
+
+          // For run outs: format is "run out (FIELDER)" or "run out (FIELDER/FIELDER2)"
+          const runOutMatch = d.match(/run out\s*[\(\[]?([^)\]]+)[\)\]]?/);
+          const runOutFielder = runOutMatch ? runOutMatch[1].trim() : '';
+
           for (const name of linkedNames) {
             const parts = name.toLowerCase().trim().split(/\s+/);
             const firstName = parts[0] || '';
             const lastName = parts[parts.length - 1] || '';
             const firstInitial = firstName[0] || '';
             const lastInitial = lastName[0] || '';
-            const fullName = name.toLowerCase();
 
-            // Build all candidate match strings
-            const candidates = new Set<string>([
-              fullName,                                        // "aarav arora"
-              firstName && lastName ? `${firstName} ${lastName}` : '', // same as full for 2-part names
-              firstName && lastInitial ? `${firstName} ${lastInitial}` : '', // "aarav a"
-              firstInitial && lastName ? `${firstInitial} ${lastName}` : '', // "a arora"
-              firstInitial && lastInitial ? `${firstInitial} ${lastInitial}` : '', // "a a" — too ambiguous, skip
-              lastName,                                        // "arora" — surname only
-              firstName,                                       // "aarav" — first name only
-            ]);
-            // Remove empty strings and overly short/ambiguous ones (single char)
-            const validCandidates = [...candidates].filter(c => c && c.length > 1);
+            const candidates = [
+              name.toLowerCase(),                                          // "atharv pilkhane"
+              firstName && lastInitial ? `${firstName} ${lastInitial}` : '', // "atharv p"
+              firstInitial && lastName ? `${firstInitial} ${lastName}` : '', // "a pilkhane"
+              lastName.length > 2 ? lastName : '',                          // "pilkhane"
+              firstName.length > 2 ? firstName : '',                        // "atharv"
+            ].filter(Boolean);
 
-            // For surname/firstname-only matches, require word boundary to avoid false partials
-            // e.g. "arora" should not match "arorasmith"
-            const matches = validCandidates.some(candidate => {
-              // For longer candidates (3+ chars) a simple includes is fine
-              // For short candidates, wrap with word-boundary-like check
-              if (candidate.length >= 4) return d.includes(candidate);
-              // Short candidates: check surrounded by space/start/end/punctuation
-              const re = new RegExp(`(?:^|\\s|†)${candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$|\\b)`);
-              return re.test(d);
-            });
+            const fielderMatch = candidates.some(c => fielderPortion.includes(c));
+            const runOutFielderMatch = runOutFielder && candidates.some(c => runOutFielder.includes(c));
 
-            // Catch: "c Name b Bowler"
-            if (d.startsWith('c ') && matches && d.includes(' b ')) catches++;
-            // Run out: "run out (Name)" or "run out Name"
-            if (d.includes('run out') && matches) runOuts++;
-            // Stumping: "st Name b Bowler"
-            if (d.startsWith('st ') && matches) stumpings++;
+            // Catch: "c FIELDER b BOWLER" — check fielder portion only
+            if (fielderPortion.startsWith('c ') && fielderMatch) catches++;
+            // Run out: check run out fielder name
+            if (d.includes('run out') && runOutFielderMatch) runOuts++;
+            // Stumping: "st KEEPER b BOWLER" — check fielder portion only
+            if (fielderPortion.startsWith('st ') && fielderMatch) stumpings++;
           }
         }
         // Did not bat — still appeared
