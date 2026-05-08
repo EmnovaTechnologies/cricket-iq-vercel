@@ -8,7 +8,7 @@ import GameListRow from '@/components/game-list-row';
 import { getAllSeriesFromDB, getAllTeamsFromDB } from '@/lib/db';
 import { getGamesForUserViewAction } from '@/lib/actions/game-actions';
 import type { Game, Series, Team } from '@/types';
-import { PlusCircle, Filter, Upload, Info, Loader2, Gamepad2, CheckSquare, Square, UserCheck , LayoutGrid, List } from 'lucide-react'; // Added UserCheck
+import { PlusCircle, Filter, Upload, Info, Loader2, Gamepad2, CheckSquare, Square, UserCheck , LayoutGrid, List, Lock, CreditCard } from 'lucide-react';
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,7 +17,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { PERMISSIONS } from '@/lib/permissions-master-list';
-import { parseISO, startOfDay, isValid } from 'date-fns'; // Added date-fns imports
+import { parseISO, startOfDay, isValid } from 'date-fns';
+import { getPlayerPaymentStatusAction } from '@/lib/actions/registration-payment-action';
 
 interface SeriesFilterItem {
   id: string;
@@ -253,6 +254,18 @@ function GamesPageInner() {
   const canImportGames = effectivePermissions[PERMISSIONS.PAGE_VIEW_GAME_IMPORT];
   const canAddGames = effectivePermissions[PERMISSIONS.PAGE_VIEW_GAME_ADD];
   const isSelector = userProfile?.roles?.includes('selector');
+  const isPlayer = userProfile?.roles?.includes('player');
+
+  // Payment gate — only for players
+  const [isPaid, setIsPaid] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!isPlayer || !userProfile?.playerId) { setIsPaid(true); return; }
+    getPlayerPaymentStatusAction(userProfile.playerId)
+      .then(s => setIsPaid(s.isPaid || s.isWaived))
+      .catch(() => setIsPaid(true)); // fail open
+  }, [isPlayer, userProfile?.playerId]);
+
+  const showPaywall = isPlayer && isPaid === false;
 
   if (!mounted) {
     return (
@@ -452,6 +465,67 @@ function GamesPageInner() {
             <p className="text-muted-foreground text-center py-6">
               No games found matching your criteria for this organization. Try adjusting the filters or add some games.
             </p>
+          ) : showPaywall ? (
+            // ── Payment gate — show most recent game, blur the rest ──
+            (() => {
+              const sortedGames = [...filteredGames].sort((a, b) =>
+                new Date(b.date).getTime() - new Date(a.date).getTime()
+              );
+              const [firstGame, ...lockedGames] = sortedGames;
+              return (
+                <div className="space-y-4">
+                  {/* First game — fully visible */}
+                  {viewMode === 'cards' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <GameCard key={firstGame.id} game={firstGame} />
+                    </div>
+                  ) : (
+                    <div className="border rounded-lg overflow-hidden bg-card">
+                      <GameListRow game={firstGame} isLast={lockedGames.length === 0} />
+                    </div>
+                  )}
+
+                  {/* Remaining games — blurred with lock overlay */}
+                  {lockedGames.length > 0 && (
+                    <div className="relative rounded-lg overflow-hidden">
+                      <div style={{ filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
+                        {viewMode === 'cards' ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {lockedGames.map(game => (
+                              <GameCard key={game.id} game={game} />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="border rounded-lg overflow-hidden bg-card">
+                            {lockedGames.map((game, idx) => (
+                              <GameListRow key={game.id} game={game} isLast={idx === lockedGames.length - 1} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {/* Lock overlay */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/30 rounded-lg">
+                        <div className="h-12 w-12 rounded-full bg-card border flex items-center justify-center">
+                          <Lock className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <p className="font-medium text-sm text-foreground">
+                          {lockedGames.length} {lockedGames.length === 1 ? 'game' : 'games'} locked
+                        </p>
+                        <p className="text-xs text-muted-foreground text-center max-w-[220px]">
+                          Register for a series to unlock full game access
+                        </p>
+                        <Link
+                          href={`/register-player/${activeOrganizationId}`}
+                          className="mt-1 inline-flex items-center gap-2 px-4 py-2 rounded-md border bg-card text-sm font-medium hover:bg-muted transition-colors"
+                        >
+                          <CreditCard className="h-4 w-4" /> Register now
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()
           ) : viewMode === 'cards' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredGames.map((game) => (
