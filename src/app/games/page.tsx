@@ -503,8 +503,8 @@ function GamesPageInner() {
                           </div>
                         )}
                       </div>
-                      {/* Lock overlay */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/30 rounded-lg">
+                      {/* Lock overlay — pinned to top so it's always visible */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-start pt-8 gap-3 bg-background/30 rounded-lg">
                         <div className="h-12 w-12 rounded-full bg-card border flex items-center justify-center">
                           <Lock className="h-6 w-6 text-muted-foreground" />
                         </div>
