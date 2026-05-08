@@ -15,6 +15,7 @@ export interface PaymentRow {
   seriesId: string;
   seriesName: string;
   organizationId: string;
+  organizationName: string;
   amount: number;
   originalAmount: number;
   status: 'succeeded' | 'failed' | 'waived' | 'pending';
@@ -45,16 +46,20 @@ export async function getPaymentsAction(orgId?: string): Promise<PaymentRow[]> {
     // Enrich with player names and series names in parallel
     const rows = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 
-    // Batch fetch player names
+    // Batch fetch player names, series names, and org names
     const playerIds = [...new Set(rows.map((r: any) => r.playerId).filter(Boolean))];
     const seriesIds = [...new Set(rows.map((r: any) => r.seriesId).filter(Boolean))];
+    const orgIds = [...new Set(rows.map((r: any) => r.organizationId).filter(Boolean))];
 
-    const [playerSnaps, seriesSnaps] = await Promise.all([
+    const [playerSnaps, seriesSnaps, orgSnaps] = await Promise.all([
       playerIds.length > 0
         ? Promise.all(playerIds.map(id => adminDb.doc(`players/${id}`).get()))
         : Promise.resolve([]),
       seriesIds.length > 0
         ? Promise.all(seriesIds.map(id => adminDb.doc(`series/${id}`).get()))
+        : Promise.resolve([]),
+      orgIds.length > 0
+        ? Promise.all(orgIds.map(id => adminDb.doc(`organizations/${id}`).get()))
         : Promise.resolve([]),
     ]);
 
@@ -68,6 +73,11 @@ export async function getPaymentsAction(orgId?: string): Promise<PaymentRow[]> {
       if (s.exists) seriesMap[s.id] = s.data().name;
     });
 
+    const orgMap: Record<string, string> = {};
+    orgSnaps.forEach((s: any) => {
+      if (s.exists) orgMap[s.id] = s.data().name;
+    });
+
     return rows.map((r: any) => ({
       id: r.id,
       playerId: r.playerId,
@@ -76,6 +86,7 @@ export async function getPaymentsAction(orgId?: string): Promise<PaymentRow[]> {
       seriesId: r.seriesId,
       seriesName: seriesMap[r.seriesId] || 'Unknown Series',
       organizationId: r.organizationId,
+      organizationName: orgMap[r.organizationId] || 'Unknown Org',
       amount: r.amount,
       originalAmount: r.originalAmount,
       status: r.status,

@@ -94,6 +94,7 @@ export default function AdminPaymentsPage() {
       result = result.filter(p =>
         p.playerName.toLowerCase().includes(q) ||
         p.seriesName.toLowerCase().includes(q) ||
+        p.organizationName.toLowerCase().includes(q) ||
         p.stripeSessionId.toLowerCase().includes(q)
       );
     }
@@ -235,6 +236,7 @@ export default function AdminPaymentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Player</TableHead>
+                  <TableHead>Organization</TableHead>
                   <TableHead>Series</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
@@ -247,6 +249,7 @@ export default function AdminPaymentsPage() {
                 {filtered.map(p => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.playerName}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{p.organizationName}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{p.seriesName}</TableCell>
                     <TableCell>
                       {p.amount === 0
