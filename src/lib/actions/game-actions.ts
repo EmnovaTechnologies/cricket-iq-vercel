@@ -413,8 +413,8 @@ export async function getGamesForUserViewAction(userProfile: UserProfile | null,
 
   let gamesToDisplaySet = new Set<string>();
 
-  if (userProfile.roles.includes('Organization Admin')) {
-    // Organization Admin sees all active games for their active organization.
+  if (userProfile.roles.includes('Organization Admin') || userProfile.roles.includes('player')) {
+    // Organization Admin and players see all active games for their active organization.
     orgGames.forEach(game => gamesToDisplaySet.add(game.id));
   } else {
     // For Series Admin, Team Manager, and Selector, filter based on their assignments within orgGames.

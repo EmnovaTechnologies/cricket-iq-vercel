@@ -477,11 +477,11 @@ function GamesPageInner() {
                   {/* First game — fully visible */}
                   {viewMode === 'cards' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      <GameCard key={firstGame.id} game={firstGame} />
+                      <GameCard key={firstGame.id} game={firstGame} isPlayerView={true} />
                     </div>
                   ) : (
                     <div className="border rounded-lg overflow-hidden bg-card">
-                      <GameListRow game={firstGame} isLast={lockedGames.length === 0} />
+                      <GameListRow game={firstGame} isLast={lockedGames.length === 0} isPlayerView={true} />
                     </div>
                   )}
 
@@ -529,7 +529,7 @@ function GamesPageInner() {
           ) : viewMode === 'cards' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredGames.map((game) => (
-                <GameCard key={game.id} game={game} />
+                <GameCard key={game.id} game={game} isPlayerView={isPlayer} />
               ))}
             </div>
           ) : (
@@ -539,6 +539,7 @@ function GamesPageInner() {
                   key={game.id}
                   game={game}
                   isLast={idx === filteredGames.length - 1}
+                  isPlayerView={isPlayer}
                 />
               ))}
             </div>

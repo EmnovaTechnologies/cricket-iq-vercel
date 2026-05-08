@@ -23,6 +23,7 @@ import { PERMISSIONS } from '@/lib/permissions-master-list';
 interface GameListRowProps {
   game: Game;
   isLast?: boolean;
+  isPlayerView?: boolean;
 }
 
 function getGameDisplayStatus(game: Game, currentUserId?: string): { text: string; variant: BadgeProps['variant']; icon?: JSX.Element; className?: string } {
@@ -59,19 +60,23 @@ function getGameDisplayStatus(game: Game, currentUserId?: string): { text: strin
   return { text: 'Ratings Open', variant: 'secondary', icon: <Edit3 className="h-3 w-3" /> };
 }
 
-const GameListRow: React.FC<GameListRowProps> = ({ game, isLast }) => {
+const GameListRow: React.FC<GameListRowProps> = ({ game, isLast, isPlayerView = false }) => {
   const { userProfile: currentUserProfile, effectivePermissions, activeOrganizationDetails } = useAuth();
   const gameDate = game.date ? parseISO(game.date) : null;
   const isFutureGame = gameDate ? startOfDay(gameDate) > startOfDay(new Date()) : false;
-  const displayStatus = getGameDisplayStatus(game, currentUserProfile?.uid);
-  const showRatePlayers = activeOrganizationDetails?.selectionModel !== 'performance';
 
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    setIsMobile(window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
-  }, []);
+  // Players only see Finalized or Upcoming — no selector workflow info
+  const displayStatus = isPlayerView
+    ? (isFutureGame
+        ? { text: 'Upcoming', variant: 'outline' as const, icon: <CalendarClock className="h-3 w-3" />, className: 'text-muted-foreground border-muted-foreground/30' }
+        : game.ratingsFinalized
+          ? { text: 'Finalized', variant: 'default' as const, icon: <CheckCircle className="h-3 w-3" />, className: 'bg-green-600 hover:bg-green-600 text-white' }
+          : { text: 'Played', variant: 'secondary' as const, icon: undefined, className: undefined })
+    : getGameDisplayStatus(game, currentUserProfile?.uid);
 
-  const canRatePlayers = !isFutureGame && (
+  const showRatePlayers = !isPlayerView && activeOrganizationDetails?.selectionModel !== 'performance';
+
+  const canRatePlayers = !isPlayerView && !isFutureGame && (
     !!effectivePermissions[PERMISSIONS.GAMES_RATE_ANY] ||
     (!!effectivePermissions[PERMISSIONS.GAMES_RATE_ASSIGNED] && !!game.selectorUserIds?.includes(currentUserProfile?.uid || ''))
   );

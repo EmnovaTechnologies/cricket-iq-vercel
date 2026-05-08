@@ -17,6 +17,7 @@ import { PERMISSIONS } from '@/lib/permissions-master-list';
 
 interface GameCardProps {
   game: Game;
+  isPlayerView?: boolean;
 }
 
 function getGameDisplayStatus(game: Game, currentUserId?: string): { text: string; variant: BadgeProps['variant']; icon?: JSX.Element; className?: string } {
@@ -61,15 +62,21 @@ function getGameDisplayStatus(game: Game, currentUserId?: string): { text: strin
 }
 
 
-const GameCard: React.FC<GameCardProps> = ({ game }) => {
+const GameCard: React.FC<GameCardProps> = ({ game, isPlayerView = false }) => {
   const { userProfile: currentUserProfile, effectivePermissions, activeOrganizationDetails } = useAuth();
   const gameDate = game.date ? parseISO(game.date) : null;
   const isFutureGame = gameDate ? startOfDay(gameDate) > startOfDay(new Date()) : false;
 
-  const displayStatus = getGameDisplayStatus(game, currentUserProfile?.uid);
+  // Players only see Finalized or Future Game status — no selector workflow info
+  const displayStatus = isPlayerView
+    ? (isFutureGame
+        ? { text: 'Upcoming', variant: 'outline' as const, icon: <CalendarClock className="h-3 w-3" />, className: 'text-muted-foreground border-muted-foreground/30' }
+        : game.ratingsFinalized
+          ? { text: 'Finalized', variant: 'default' as const, icon: <CheckCircle className="h-3 w-3" />, className: 'bg-green-600 hover:bg-green-600 text-white' }
+          : { text: 'Played', variant: 'secondary' as const, icon: undefined, className: undefined })
+    : getGameDisplayStatus(game, currentUserProfile?.uid);
 
-  // Hide Rate Players entirely for performance-model orgs; show for rating, hybrid, or unset (safe default)
-  const showRatePlayers = activeOrganizationDetails?.selectionModel !== 'performance';
+  const showRatePlayers = !isPlayerView && activeOrganizationDetails?.selectionModel !== 'performance';
 
   // Detect mobile for Step 2: redirect selector Rate button to mobile-optimized page
   const [isMobile, setIsMobile] = useState(false);
@@ -77,7 +84,7 @@ const GameCard: React.FC<GameCardProps> = ({ game }) => {
     setIsMobile(window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
   }, []);
 
-  const canRatePlayers = !isFutureGame && (
+  const canRatePlayers = !isPlayerView && !isFutureGame && (
     !!effectivePermissions[PERMISSIONS.GAMES_RATE_ANY] ||
     (!!effectivePermissions[PERMISSIONS.GAMES_RATE_ASSIGNED] && !!game.selectorUserIds?.includes(currentUserProfile?.uid || ''))
   );
