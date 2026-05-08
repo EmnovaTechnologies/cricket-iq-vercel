@@ -503,8 +503,8 @@ function GamesPageInner() {
                           </div>
                         )}
                       </div>
-                      {/* Lock overlay — solid background for prominence */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-start pt-6 px-4 gap-4 rounded-lg" style={{ background: 'hsl(var(--background) / 0.97)', backdropFilter: 'none' }}>
+                      {/* Lock overlay — transparent so blur shows through, card is solid */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-start pt-6 px-4 gap-4 rounded-lg" style={{ background: 'transparent' }}>
                         <div className="h-14 w-14 rounded-full bg-muted border border-border flex items-center justify-center">
                           <Lock className="h-6 w-6 text-muted-foreground" />
                         </div>
