@@ -4,7 +4,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Leaf, Users, UserSquare2, Gamepad2, Target, Menu, Layers, MapPinned, LogIn, LogOut, UserPlus, UserCog, ShieldCheck, Building, ChevronsUpDown, Check, Hourglass, ListFilter, ImageIcon, User, Download, ChevronRight, BarChart3, Table, ClipboardCheck, Trophy, CheckCircle } from 'lucide-react';
+import { Leaf, Users, UserSquare2, Gamepad2, Target, Menu, Layers, MapPinned, LogIn, LogOut, UserPlus, UserCog, ShieldCheck, Building, ChevronsUpDown, Check, Hourglass, ListFilter, ImageIcon, User, Download, ChevronRight, BarChart3, Table, ClipboardCheck, Trophy, CheckCircle, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useState, useEffect } from 'react';
@@ -125,6 +125,8 @@ const Navbar = () => {
   const superAdminLinks = [
       { href: '/admin/organizations', label: 'Organizations', icon: <Building className="h-5 w-5" />, roles: ['admin'] },
       { href: '/admin/role-management', label: 'Role Permissions', icon: <ListFilter className="h-5 w-5" />, roles: ['admin'] },
+      { href: '/admin/payments', label: 'Payment Ledger', icon: <CreditCard className="h-5 w-5" />, roles: ['admin'] },
+      { href: '/admin/settings/registration', label: 'Registration Settings', icon: <UserCog className="h-5 w-5" />, roles: ['admin'] },
       { href: '/admin/icon-library', label: 'Icon Library', icon: <ImageIcon className="h-5 w-5" />, roles: ['admin'] },
   ];
 
